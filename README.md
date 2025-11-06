@@ -1,4 +1,4 @@
-# Sphere Project - PostgreSQL Edition
+# NeoSec Project - PostgreSQL Edition
 
 A full-stack authentication application with React frontend and Express backend, using PostgreSQL database with Sequelize ORM.
 
@@ -50,10 +50,10 @@ A full-stack authentication application with React frontend and Express backend,
    ```bash
    git clone <repository-url>
    ```
-   Example: `git clone https://github.com/yourusername/sphere.git`
+   Example: `git clone https://github.com/yourusername/neosec.git`
 4. Navigate into the project directory:
    ```bash
-   cd sphere
+   cd neosec
    ```
 
 ---
@@ -96,8 +96,8 @@ A full-stack authentication application with React frontend and Express backend,
    - Start the PostgreSQL service.
    - Open pgAdmin.
    - Create a new login/user (or use the default postgres user).
-   - Create a new database (e.g., sphere).
-   - Connection string: `postgres://your_username:your_password@localhost:5432/sphere`
+   - Create a new database (e.g., neosec).
+   - Connection string: `postgres://your_username:your_password@localhost:5432/neosec`
 
 4. Create environment file:
 
@@ -121,7 +121,7 @@ A full-stack authentication application with React frontend and Express backend,
    NODE_ENV=development
    DATABASE_URL=your_postgresql_connection_string_here
    ALLOWED_ORIGINS=http://localhost:3000
-   JWT_SECRET=sphere_is_round_but_please_change_this_to_a_strong_secret
+   JWT_SECRET=neosec_is_secure_but_please_change_this_to_a_strong_secret
    JWT_EXPIRE=7d
    ```
 
@@ -186,7 +186,7 @@ A full-stack authentication application with React frontend and Express backend,
 
 - **Frontend should be running:**
   - Browser should open automatically
-  - You should see the Sphere homepage with Login/Register forms
+  - You should see the NeoSec homepage with Login/Register forms
 
 - **Test Registration:**
   - Click "Register" tab
@@ -239,7 +239,7 @@ A full-stack authentication application with React frontend and Express backend,
 ## Project Structure
 
 ```
-sphere/
+neosec/
 ├── client/                    # React frontend
 │   ├── src/
 │   │   ├── components/
@@ -324,9 +324,9 @@ Navigate to: http://localhost:3000
 ```env
 PORT=5000
 NODE_ENV=development
-DATABASE_URL=postgres://your_user:your_password@localhost:5432/sphere
+DATABASE_URL=postgres://your_user:your_password@localhost:5432/neosec
 ALLOWED_ORIGINS=http://localhost:3000
-JWT_SECRET=sphere_is_round
+JWT_SECRET=neosec_is_secure
 JWT_EXPIRE=7d
 ```
 
