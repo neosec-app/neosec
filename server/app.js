@@ -1,9 +1,20 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
+
+// IMPORTANT: Load models BEFORE connecting to database
+const User = require('./models/User');
+const VpnConfig = require('./models/VpnConfig');
+const Notification = require('./models/Notification');
+
+// Now connect to database (this will sync the models)
 const { connectDB } = require('./config/db');
+
 const authRoutes = require('./routes/authRoutes');
 require("./scheduler");
+
+const VpnRoutes = require('./routes/VpnRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 
 // Initialize Express app
@@ -14,12 +25,12 @@ connectDB();
 
 // CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:3000'];
+    ? process.env.ALLOWED_ORIGINS.split(',')
+    : ['http://localhost:3000'];
 
 app.use(cors({
-  origin: allowedOrigins,
-  credentials: true
+    origin: allowedOrigins,
+    credentials: true
 }));
 
 // Body parser middleware
@@ -31,50 +42,52 @@ app.use('/api/auth', authRoutes);
 const profileRoutes = require('./routes/profileRoutes');
 app.use('/api/profiles', profileRoutes);
 
+app.use('/api/vpn', VpnRoutes);
+app.use('/api/notifications', notificationRoutes);
+
 
 // Health check route
 app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Server is running',
-    timestamp: new Date().toISOString()
-  });
+    res.status(200).json({
+        success: true,
+        message: 'Server is running',
+        timestamp: new Date().toISOString()
+    });
 });
 
 // Root route
 app.get('/', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Welcome to NeoSec API',
-    version: '1.0.0'
-  });
+    res.status(200).json({
+        success: true,
+        message: 'Welcome to NeoSec API',
+        version: '1.0.0'
+    });
 });
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found'
-  });
+    res.status(404).json({
+        success: false,
+        message: 'Route not found'
+    });
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  res.status(err.status || 500).json({
-    success: false,
-    message: err.message || 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? err.stack : undefined
-  });
+    console.error('Error:', err);
+    res.status(err.status || 500).json({
+        success: false,
+        message: err.message || 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
 });
 
 // Start server
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`Server started on port ${PORT}`);
+    console.log(`Server started on port ${PORT}`);
 });
-
 
 module.exports = app;
 

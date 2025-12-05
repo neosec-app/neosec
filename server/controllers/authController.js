@@ -23,7 +23,7 @@ const register = async (req, res) => {
     const user = await User.create({
       email,
       password,
-      isApproved: false,
+      isApproved: true,
       role: 'user'
     });
 
