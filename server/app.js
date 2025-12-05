@@ -6,6 +6,7 @@ require('dotenv').config();
 const User = require('./models/User');
 const VpnConfig = require('./models/VpnConfig');
 const Notification = require('./models/Notification');
+const Threat = require('./models/Threat');
 
 // Now connect to database (this will sync the models)
 const { connectDB } = require('./config/db');
@@ -13,6 +14,8 @@ const { connectDB } = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const VpnRoutes = require('./routes/VpnRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 // Initialize Express app
 const app = express();
@@ -38,6 +41,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/vpn', VpnRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

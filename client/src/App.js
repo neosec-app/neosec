@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
-import { authAPI } from './services/api';
+import { authAPI, dashboardAPI, adminAPI } from './services/api';
 import './index.css';
 
 function App() {
@@ -9,6 +9,13 @@ function App() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [currentView, setCurrentView] = useState('dashboard'); // dashboard, vpn, firewall, profiles
+    const [dashboardData, setDashboardData] = useState(null);
+    const [dashboardLoading, setDashboardLoading] = useState(true);
+    const [users, setUsers] = useState([]);
+    const [adminStats, setAdminStats] = useState(null);
+    const [usersLoading, setUsersLoading] = useState(false);
+    const [editingUser, setEditingUser] = useState(null);
+    const [showEditModal, setShowEditModal] = useState(false);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -28,6 +35,92 @@ function App() {
 
         checkAuth();
     }, []);
+
+    // Fetch dashboard data when user is logged in
+    useEffect(() => {
+        const fetchDashboardData = async () => {
+            if (user && currentView === 'dashboard') {
+                try {
+                    setDashboardLoading(true);
+                    const response = await dashboardAPI.getDashboard();
+                    if (response.success) {
+                        setDashboardData(response.data);
+                    }
+                } catch (error) {
+                    console.error('Dashboard fetch error:', error);
+                } finally {
+                    setDashboardLoading(false);
+                }
+            }
+        };
+
+        fetchDashboardData();
+    }, [user, currentView]);
+
+    // Fetch users and stats when admin views user management
+    useEffect(() => {
+        const fetchAdminData = async () => {
+            if (user && user.role === 'admin' && currentView === 'users') {
+                try {
+                    setUsersLoading(true);
+                    const [usersResponse, statsResponse] = await Promise.all([
+                        adminAPI.getAllUsers(),
+                        adminAPI.getStatistics()
+                    ]);
+                    if (usersResponse.success) {
+                        setUsers(usersResponse.data || []);
+                    }
+                    if (statsResponse.success) {
+                        setAdminStats(statsResponse.data);
+                    }
+                } catch (error) {
+                    console.error('Admin data fetch error:', error);
+                } finally {
+                    setUsersLoading(false);
+                }
+            }
+        };
+
+        fetchAdminData();
+    }, [user, currentView]);
+
+    const handleEditUser = (userToEdit) => {
+        setEditingUser({ ...userToEdit });
+        setShowEditModal(true);
+    };
+
+    const handleSaveUser = async () => {
+        try {
+            const response = await adminAPI.updateUser(editingUser.id, {
+                email: editingUser.email,
+                role: editingUser.role,
+                isApproved: editingUser.isApproved
+            });
+            if (response.success) {
+                setUsers(users.map(u => u.id === editingUser.id ? response.data : u));
+                setShowEditModal(false);
+                setEditingUser(null);
+            }
+        } catch (error) {
+            console.error('Update user error:', error);
+            alert('Failed to update user: ' + (error.response?.data?.message || error.message));
+        }
+    };
+
+    const handleDeleteUser = async (userId) => {
+        if (!window.confirm('Are you sure you want to delete this user?')) {
+            return;
+        }
+        try {
+            const response = await adminAPI.deleteUser(userId);
+            if (response.success) {
+                setUsers(users.filter(u => u.id !== userId));
+            }
+        } catch (error) {
+            console.error('Delete user error:', error);
+            alert('Failed to delete user: ' + (error.response?.data?.message || error.message));
+        }
+    };
 
     const handleLoginSuccess = (userData) => {
         setUser(userData);
@@ -268,12 +361,24 @@ function App() {
                                     <div style={{ fontSize: '14px', color: '#888', marginBottom: '10px' }}>
                                         VPN Status
                                     </div>
-                                    <div style={{ fontSize: '24px', color: '#36E27B', fontWeight: 'bold' }}>
-                                        Connected
-                                    </div>
-                                    <div style={{ fontSize: '12px', color: '#888', marginTop: '10px' }}>
-                                        Server: Singapore
-                                    </div>
+                                    {dashboardLoading ? (
+                                        <div style={{ fontSize: '14px', color: '#888' }}>Loading...</div>
+                                    ) : (
+                                        <>
+                                            <div style={{ 
+                                                fontSize: '24px', 
+                                                color: dashboardData?.vpnStatus?.connected ? '#36E27B' : '#FF9800', 
+                                                fontWeight: 'bold' 
+                                            }}>
+                                                {dashboardData?.vpnStatus?.connected ? 'Connected' : 'Disconnected'}
+                                            </div>
+                                            <div style={{ fontSize: '12px', color: '#888', marginTop: '10px' }}>
+                                                {dashboardData?.vpnStatus?.server 
+                                                    ? `Server: ${dashboardData.vpnStatus.server}` 
+                                                    : 'No active connection'}
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
 
                                 <div style={{
@@ -285,12 +390,18 @@ function App() {
                                     <div style={{ fontSize: '14px', color: '#888', marginBottom: '10px' }}>
                                         Threats Blocked
                                     </div>
-                                    <div style={{ fontSize: '24px', color: '#36E27B', fontWeight: 'bold' }}>
-                                        247
-                                    </div>
-                                    <div style={{ fontSize: '12px', color: '#888', marginTop: '10px' }}>
-                                        Last 24 hours
-                                    </div>
+                                    {dashboardLoading ? (
+                                        <div style={{ fontSize: '14px', color: '#888' }}>Loading...</div>
+                                    ) : (
+                                        <>
+                                            <div style={{ fontSize: '24px', color: '#36E27B', fontWeight: 'bold' }}>
+                                                {dashboardData?.threatsBlocked?.last24Hours || 0}
+                                            </div>
+                                            <div style={{ fontSize: '12px', color: '#888', marginTop: '10px' }}>
+                                                Last 24 hours (Total: {dashboardData?.threatsBlocked?.total || 0})
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
 
                                 <div style={{
@@ -469,24 +580,265 @@ function App() {
                                 <h1 style={{ fontSize: '32px', margin: 0 }}>User Management</h1>
                             </div>
 
+                            {/* Admin Statistics */}
+                            {adminStats && (
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                                    gap: '20px',
+                                    marginBottom: '30px'
+                                }}>
+                                    <div style={{
+                                        padding: '20px',
+                                        backgroundColor: '#181818',
+                                        border: '1px solid #282828',
+                                        borderRadius: '10px'
+                                    }}>
+                                        <div style={{ fontSize: '14px', color: '#888', marginBottom: '10px' }}>Total Users</div>
+                                        <div style={{ fontSize: '24px', color: '#36E27B', fontWeight: 'bold' }}>
+                                            {adminStats.users?.total || 0}
+                                        </div>
+                                    </div>
+                                    <div style={{
+                                        padding: '20px',
+                                        backgroundColor: '#181818',
+                                        border: '1px solid #282828',
+                                        borderRadius: '10px'
+                                    }}>
+                                        <div style={{ fontSize: '14px', color: '#888', marginBottom: '10px' }}>Pending Approvals</div>
+                                        <div style={{ fontSize: '24px', color: '#FF9800', fontWeight: 'bold' }}>
+                                            {adminStats.users?.pendingApprovals || 0}
+                                        </div>
+                                    </div>
+                                    <div style={{
+                                        padding: '20px',
+                                        backgroundColor: '#181818',
+                                        border: '1px solid #282828',
+                                        borderRadius: '10px'
+                                    }}>
+                                        <div style={{ fontSize: '14px', color: '#888', marginBottom: '10px' }}>Total Threats Blocked</div>
+                                        <div style={{ fontSize: '24px', color: '#36E27B', fontWeight: 'bold' }}>
+                                            {adminStats.threats?.totalBlocked || 0}
+                                        </div>
+                                    </div>
+                                    <div style={{
+                                        padding: '20px',
+                                        backgroundColor: '#181818',
+                                        border: '1px solid #282828',
+                                        borderRadius: '10px'
+                                    }}>
+                                        <div style={{ fontSize: '14px', color: '#888', marginBottom: '10px' }}>Application Health</div>
+                                        <div style={{ fontSize: '24px', color: '#36E27B', fontWeight: 'bold' }}>
+                                            {adminStats.applicationHealth?.status || 'Unknown'}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Users Table */}
                             <div style={{
                                 padding: '25px',
                                 backgroundColor: '#181818',
-                                border: '1px solid #36E27B',
+                                border: '1px solid #282828',
                                 borderRadius: '10px'
                             }}>
-                                <h3 style={{ color: '#36E27B', marginTop: 0 }}>👑 Admin Panel</h3>
-                                <p style={{ color: '#ccc' }}>
-                                    As an admin, you can manage all users, approve registrations, and configure system-wide settings.
-                                </p>
-                                <ul style={{ color: '#888', lineHeight: '1.8' }}>
-                                    <li>View and edit all user accounts</li>
-                                    <li>Approve or reject pending registrations</li>
-                                    <li>Assign roles and permissions</li>
-                                    <li>Monitor system activity and logs</li>
-                                    <li>Configure global security policies</li>
-                                </ul>
+                                <h2 style={{ color: '#fff', marginTop: 0, marginBottom: '20px' }}>All Users</h2>
+                                {usersLoading ? (
+                                    <div style={{ color: '#888', textAlign: 'center', padding: '40px' }}>Loading users...</div>
+                                ) : users.length === 0 ? (
+                                    <div style={{ color: '#888', textAlign: 'center', padding: '40px' }}>No users found</div>
+                                ) : (
+                                    <div style={{ overflowX: 'auto' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                            <thead>
+                                                <tr style={{ borderBottom: '1px solid #282828' }}>
+                                                    <th style={{ padding: '12px', textAlign: 'left', color: '#888', fontWeight: '600' }}>Email</th>
+                                                    <th style={{ padding: '12px', textAlign: 'left', color: '#888', fontWeight: '600' }}>Role</th>
+                                                    <th style={{ padding: '12px', textAlign: 'left', color: '#888', fontWeight: '600' }}>Status</th>
+                                                    <th style={{ padding: '12px', textAlign: 'left', color: '#888', fontWeight: '600' }}>Created</th>
+                                                    <th style={{ padding: '12px', textAlign: 'left', color: '#888', fontWeight: '600' }}>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {users.map((u) => (
+                                                    <tr key={u.id} style={{ borderBottom: '1px solid #282828' }}>
+                                                        <td style={{ padding: '12px', color: '#fff' }}>{u.email}</td>
+                                                        <td style={{ padding: '12px' }}>
+                                                            <span style={{
+                                                                padding: '4px 12px',
+                                                                borderRadius: '12px',
+                                                                fontSize: '12px',
+                                                                backgroundColor: u.role === 'admin' ? '#1E402C' : '#282828',
+                                                                color: u.role === 'admin' ? '#36E27B' : '#fff',
+                                                                border: u.role === 'admin' ? '1px solid #36E27B' : '1px solid #444'
+                                                            }}>
+                                                                {u.role}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ padding: '12px' }}>
+                                                            <span style={{
+                                                                color: u.isApproved ? '#36E27B' : '#FF9800'
+                                                            }}>
+                                                                {u.isApproved ? '✅ Approved' : '⏳ Pending'}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ padding: '12px', color: '#888', fontSize: '14px' }}>
+                                                            {new Date(u.createdAt).toLocaleDateString()}
+                                                        </td>
+                                                        <td style={{ padding: '12px' }}>
+                                                            <button
+                                                                onClick={() => handleEditUser(u)}
+                                                                style={{
+                                                                    padding: '6px 12px',
+                                                                    marginRight: '8px',
+                                                                    backgroundColor: '#36E27B',
+                                                                    color: '#121212',
+                                                                    border: 'none',
+                                                                    borderRadius: '6px',
+                                                                    cursor: 'pointer',
+                                                                    fontSize: '12px',
+                                                                    fontWeight: '600'
+                                                                }}
+                                                            >
+                                                                Edit
+                                                            </button>
+                                                            {u.id !== user.id && (
+                                                                <button
+                                                                    onClick={() => handleDeleteUser(u.id)}
+                                                                    style={{
+                                                                        padding: '6px 12px',
+                                                                        backgroundColor: '#FF4444',
+                                                                        color: '#fff',
+                                                                        border: 'none',
+                                                                        borderRadius: '6px',
+                                                                        cursor: 'pointer',
+                                                                        fontSize: '12px',
+                                                                        fontWeight: '600'
+                                                                    }}
+                                                                >
+                                                                    Delete
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </div>
+
+                            {/* Edit User Modal */}
+                            {showEditModal && editingUser && (
+                                <div style={{
+                                    position: 'fixed',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    zIndex: 1000
+                                }}>
+                                    <div style={{
+                                        backgroundColor: '#181818',
+                                        padding: '30px',
+                                        borderRadius: '10px',
+                                        border: '1px solid #282828',
+                                        width: '90%',
+                                        maxWidth: '500px'
+                                    }}>
+                                        <h2 style={{ color: '#fff', marginTop: 0 }}>Edit User</h2>
+                                        <div style={{ marginBottom: '15px' }}>
+                                            <label style={{ display: 'block', color: '#888', marginBottom: '5px', fontSize: '14px' }}>Email</label>
+                                            <input
+                                                type="email"
+                                                value={editingUser.email}
+                                                onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '10px',
+                                                    backgroundColor: '#121212',
+                                                    border: '1px solid #282828',
+                                                    borderRadius: '6px',
+                                                    color: '#fff',
+                                                    fontSize: '14px'
+                                                }}
+                                            />
+                                        </div>
+                                        <div style={{ marginBottom: '15px' }}>
+                                            <label style={{ display: 'block', color: '#888', marginBottom: '5px', fontSize: '14px' }}>Role</label>
+                                            <select
+                                                value={editingUser.role}
+                                                onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
+                                                disabled={editingUser.id === user.id}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '10px',
+                                                    backgroundColor: '#121212',
+                                                    border: '1px solid #282828',
+                                                    borderRadius: '6px',
+                                                    color: '#fff',
+                                                    fontSize: '14px'
+                                                }}
+                                            >
+                                                <option value="user">User</option>
+                                                <option value="admin">Admin</option>
+                                            </select>
+                                        </div>
+                                        <div style={{ marginBottom: '20px' }}>
+                                            <label style={{ display: 'flex', alignItems: 'center', color: '#888', fontSize: '14px', cursor: 'pointer' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={editingUser.isApproved}
+                                                    onChange={(e) => setEditingUser({ ...editingUser, isApproved: e.target.checked })}
+                                                    style={{
+                                                        marginRight: '8px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                />
+                                                Approved
+                                            </label>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                            <button
+                                                onClick={() => {
+                                                    setShowEditModal(false);
+                                                    setEditingUser(null);
+                                                }}
+                                                style={{
+                                                    padding: '10px 20px',
+                                                    backgroundColor: '#282828',
+                                                    color: '#fff',
+                                                    border: '1px solid #444',
+                                                    borderRadius: '6px',
+                                                    cursor: 'pointer',
+                                                    fontSize: '14px'
+                                                }}
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={handleSaveUser}
+                                                style={{
+                                                    padding: '10px 20px',
+                                                    backgroundColor: '#36E27B',
+                                                    color: '#121212',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    cursor: 'pointer',
+                                                    fontSize: '14px',
+                                                    fontWeight: '600'
+                                                }}
+                                            >
+                                                Save
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

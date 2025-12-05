@@ -81,5 +81,47 @@ export const authAPI = {
   }
 };
 
+// Dashboard API functions
+export const dashboardAPI = {
+  // Get dashboard data (VPN status and threats blocked)
+  getDashboard: async () => {
+    const response = await api.get('/dashboard');
+    return response.data;
+  }
+};
+
+// Admin API functions
+export const adminAPI = {
+  // Get all users
+  getAllUsers: async () => {
+    const response = await api.get('/admin/users');
+    return response.data;
+  },
+
+  // Get user by ID
+  getUserById: async (userId) => {
+    const response = await api.get(`/admin/users/${userId}`);
+    return response.data;
+  },
+
+  // Update user
+  updateUser: async (userId, userData) => {
+    const response = await api.put(`/admin/users/${userId}`, userData);
+    return response.data;
+  },
+
+  // Delete user
+  deleteUser: async (userId) => {
+    const response = await api.delete(`/admin/users/${userId}`);
+    return response.data;
+  },
+
+  // Get admin statistics
+  getStatistics: async () => {
+    const response = await api.get('/admin/statistics');
+    return response.data;
+  }
+};
+
 export default api;
 

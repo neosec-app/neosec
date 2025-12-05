@@ -39,3 +39,6 @@ logs/
 *.tmp
 *.temp
 
+# Custom folders
+ig/
+
