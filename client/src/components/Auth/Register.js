@@ -40,6 +40,20 @@ const Register = ({ onSwitchToLogin }) => {
             return;
         }
 
+        // Check for at least one letter
+        if (!/[A-Za-z]/.test(formData.password)) {
+            setError('Password must contain at least one letter');
+            setLoading(false);
+            return;
+        }
+
+        // Check for at least one number
+        if (!/[0-9]/.test(formData.password)) {
+            setError('Password must contain at least one number');
+            setLoading(false);
+            return;
+        }
+
         try {
             const response = await authAPI.register(formData.email, formData.password);
 
@@ -54,9 +68,20 @@ const Register = ({ onSwitchToLogin }) => {
                 setError(response.message || 'Registration failed. Please try again.');
             }
         } catch (err) {
-            const errorMessage = err.response?.data?.message ||
-                err.response?.data?.errors?.map(e => e.msg).join(', ') ||
-                'Registration failed. Please try again.';
+            // Extract error message from backend validation
+            let errorMessage = 'Registration failed. Please try again.';
+            
+            if (err.response?.data) {
+                // Check for validation errors array
+                if (err.response.data.errors && Array.isArray(err.response.data.errors)) {
+                    errorMessage = err.response.data.errors.map(e => e.msg || e.message).join(', ');
+                } 
+                // Check for single error message
+                else if (err.response.data.message) {
+                    errorMessage = err.response.data.message;
+                }
+            }
+            
             setError(errorMessage);
         } finally {
             setLoading(false);
@@ -201,7 +226,7 @@ const Register = ({ onSwitchToLogin }) => {
                             value={formData.password}
                             onChange={handleChange}
                             required
-                            placeholder="Enter your password (min 6 characters)"
+                            placeholder="Enter your password (min 6 chars, letter + number)"
                             minLength={6}
                             style={{
                                 width: '100%',
