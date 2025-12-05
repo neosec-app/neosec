@@ -1,6 +1,7 @@
 const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
+
 // Create Sequelize instance
 const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: 'postgres',
@@ -20,6 +21,7 @@ const connectDB = async () => {
   try {
     await sequelize.authenticate();
     console.log('Database connected successfully...');
+    require('../models');
     
     // Sync models with database (creates tables if they don't exist)
     // In production, you should use migrations instead
@@ -32,6 +34,7 @@ const connectDB = async () => {
     process.exit(1);
   }
 };
+
 
 module.exports = { sequelize, connectDB };
 

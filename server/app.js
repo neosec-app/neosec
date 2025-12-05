@@ -3,6 +3,8 @@ const cors = require('cors');
 require('dotenv').config();
 const { connectDB } = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
+require("./scheduler");
+
 
 // Initialize Express app
 const app = express();
@@ -26,6 +28,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', authRoutes);
+const profileRoutes = require('./routes/profileRoutes');
+app.use('/api/profiles', profileRoutes);
+
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -69,6 +74,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
+
 
 module.exports = app;
 

@@ -24,9 +24,15 @@ const protect = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       
       // Get user from token
-      req.user = {
-        userId: decoded.userId
-      };
+      // req.user = {
+      //   userId: decoded.userId
+      // };
+
+    req.user = {
+      userId: decoded.userId,
+      role: decoded.role
+    };
+
 
       next();
     } catch (error) {

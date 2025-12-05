@@ -1,4 +1,4 @@
-const User = require('../models/User');
+const { User } = require('../models');
 const jwt = require('jsonwebtoken');
 
 // Generate JWT Token
@@ -8,14 +8,9 @@ const generateToken = (userId) => {
   });
 };
 
-// @desc    Register a new user
-// @route   POST /api/auth/register
-// @access  Public
 const register = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    // Check if user already exists
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
       return res.status(400).json({
@@ -81,7 +76,13 @@ const login = async (req, res) => {
     }
 
     // Generate token
-    const token = generateToken(user.id);
+    // const token = generateToken(user.id);
+    const token = jwt.sign(
+      { userId: user.id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
 
     // Return user data and token
     res.status(200).json({
