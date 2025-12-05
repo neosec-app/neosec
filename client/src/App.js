@@ -3,8 +3,6 @@ import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import { authAPI } from './services/api';
 import './index.css';
-import ProfileManager from "./components/ProfileManager";
-
 
 function App() {
   const [activeTab, setActiveTab] = useState('login'); // 'login' or 'register'
@@ -50,41 +48,33 @@ function App() {
   }
 
   // If user is logged in, show dashboard
- if (user) {
-  return (
-    <div className="app-container">
-      <div className="dashboard">
-        <header className="dashboard-header">
-          <h1>Welcome to NeoSec</h1>
-          <button onClick={handleLogout} className="btn btn-secondary">
-            Logout
-          </button>
-        </header>
-
-        <div className="dashboard-content">
-          <div className="user-info">
-            <h2>User Information</h2>
-            <p><strong>Email:</strong> {user.email}</p>
-            <p><strong>Role:</strong> {user.role}</p>
-            <p><strong>Status:</strong> {user.isApproved ? 'Approved' : 'Pending Approval'}</p>
+  if (user) {
+    return (
+      <div className="app-container">
+        <div className="dashboard">
+          <header className="dashboard-header">
+            <h1>Welcome to NeoSec</h1>
+            <button onClick={handleLogout} className="btn btn-secondary">
+              Logout
+            </button>
+          </header>
+          <div className="dashboard-content">
+            <div className="user-info">
+              <h2>User Information</h2>
+              <p><strong>Email:</strong> {user.email}</p>
+              <p><strong>Role:</strong> {user.role}</p>
+              <p><strong>Status:</strong> {user.isApproved ? 'Approved' : 'Pending Approval'}</p>
+            </div>
+            {!user.isApproved && (
+              <div className="info-message">
+                Your account is pending approval. Please wait for admin approval to access all features.
+              </div>
+            )}
           </div>
-
-          {!user.isApproved && (
-            <div className="info-message">
-              Your account is pending approval. Please wait for admin approval to access all features.
-            </div>
-          )}
-          {user.isApproved && (
-            <div className="profile-manager-section">
-              <ProfileManager />
-            </div>
-          )}
         </div>
       </div>
-    </div>
-  );
-}
-
+    );
+  }
 
   // Show login/register forms
   return (
