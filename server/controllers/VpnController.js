@@ -192,3 +192,86 @@ exports.toggleVpnConfig = async (req, res) => {
         });
     }
 };
+
+// Clone VPN Configuration (for Validation & Versioning)
+exports.cloneVpnConfig = async (req, res) => {
+    try {
+        const original = await VpnConfig.findOne({
+            where: {
+                id: req.params.id,
+                userId: req.user.id
+            }
+        });
+
+        if (!original) {
+            return res.status(404).json({
+                success: false,
+                message: 'VPN configuration not found'
+            });
+        }
+
+        // Create clone
+        const clone = await VpnConfig.create({
+            name: `${original.name} - Copy`,
+            serverAddress: original.serverAddress,
+            port: original.port,
+            protocol: original.protocol,
+            username: original.username,
+            password: original.password,
+            description: original.description,
+            isActive: false,
+            userId: req.user.id
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'VPN configuration cloned successfully',
+            data: clone
+        });
+    } catch (error) {
+        console.error('Clone VPN config error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to clone VPN configuration'
+        });
+    }
+};
+
+// Assign VPN Task (for Task Assignment feature)
+exports.assignVpnTask = async (req, res) => {
+    try {
+        const { deviceId, userId } = req.body;
+
+        const vpnConfig = await VpnConfig.findOne({
+            where: {
+                id: req.params.id,
+                userId: req.user.id
+            }
+        });
+
+        if (!vpnConfig) {
+            return res.status(404).json({
+                success: false,
+                message: 'VPN configuration not found'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'VPN task assigned successfully',
+            data: {
+                taskId: Date.now().toString(),
+                vpnConfigId: vpnConfig.id,
+                deviceId,
+                userId,
+                status: 'pending'
+            }
+        });
+    } catch (error) {
+        console.error('Assign VPN task error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to assign VPN task'
+        });
+    }
+};

@@ -25,7 +25,7 @@ const protect = async (req, res, next) => {
       
       // Get user from token
       req.user = {
-        userId: decoded.userId
+        id: decoded.userId
       };
 
       next();
