@@ -192,6 +192,7 @@ const Register = ({ onSwitchToLogin }) => {
                             onChange={handleChange}
                             required
                             placeholder="Enter your email"
+                            autoComplete="email"
                             style={{
                                 width: '100%',
                                 padding: '12px 14px',
