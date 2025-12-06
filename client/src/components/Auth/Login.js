@@ -132,6 +132,7 @@ const Login = ({ onSwitchToRegister, onLoginSuccess }) => {
                             onChange={handleChange}
                             required
                             placeholder="Enter your username"
+                            autoComplete="email"
                             style={{
                                 width: '100%',
                                 padding: '12px 14px',
@@ -167,6 +168,7 @@ const Login = ({ onSwitchToRegister, onLoginSuccess }) => {
                             onChange={handleChange}
                             required
                             placeholder="Enter your password"
+                            autoComplete="current-password"
                             style={{
                                 width: '100%',
                                 padding: '12px 14px',

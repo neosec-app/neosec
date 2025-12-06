@@ -228,6 +228,7 @@ const Register = ({ onSwitchToLogin }) => {
                             required
                             placeholder="Enter your password (min 6 chars, letter + number)"
                             minLength={6}
+                            autoComplete="new-password"
                             style={{
                                 width: '100%',
                                 padding: '12px 14px',
@@ -264,6 +265,7 @@ const Register = ({ onSwitchToLogin }) => {
                             required
                             placeholder="Confirm your password"
                             minLength={6}
+                            autoComplete="new-password"
                             style={{
                                 width: '100%',
                                 padding: '12px 14px',

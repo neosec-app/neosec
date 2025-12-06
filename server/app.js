@@ -25,12 +25,33 @@ connectDB();
 
 // CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(',')
+    ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
     : ['http://localhost:3000'];
 
 app.use(cors({
-    origin: allowedOrigins,
-    credentials: true
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        // Check if origin is in allowed list
+        if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } 
+        // Also allow any Vercel preview URL in production
+        else if (process.env.NODE_ENV === 'production' && origin.includes('.vercel.app')) {
+            callback(null, true);
+        } 
+        else {
+            console.log('CORS blocked origin:', origin);
+            console.log('Allowed origins:', allowedOrigins);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204
 }));
 
 // Body parser middleware
@@ -80,13 +101,11 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start server (only in development or when not on Vercel)
-// Vercel serverless functions don't need app.listen()
-if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
-    const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => {
-        console.log(`Server started on port ${PORT}`);
-    });
-}
+// Start server
+// Render provides PORT environment variable automatically
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+    console.log(`Server started on port ${PORT}`);
+});
 
 module.exports = app;
