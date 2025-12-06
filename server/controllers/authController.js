@@ -24,18 +24,24 @@ const register = async (req, res) => {
       });
     }
 
+    // Check if this is the first user (make them admin automatically)
+    const userCount = await User.count();
+    const isFirstUser = userCount === 0;
+
     // Create user
     const user = await User.create({
       email,
       password,
       isApproved: true,
-      role: 'user'
+      role: isFirstUser ? 'admin' : 'user'  // First user = admin, others = user
     });
 
-    // Return success message (don't send user data yet since not approved)
+    // Return success message
     res.status(201).json({
       success: true,
-      message: 'Registration successful! Please wait for admin approval.'
+      message: isFirstUser 
+        ? 'Registration successful! You are the first user and have been granted admin privileges.'
+        : 'Registration successful! Please wait for admin approval.'
     });
   } catch (error) {
     console.error('Registration error:', error);
