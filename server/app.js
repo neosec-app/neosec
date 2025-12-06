@@ -80,11 +80,13 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start server
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-    console.log(`Server started on port ${PORT}`);
-});
+// Start server (only in development or when not on Vercel)
+// Vercel serverless functions don't need app.listen()
+if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => {
+        console.log(`Server started on port ${PORT}`);
+    });
+}
 
 module.exports = app;

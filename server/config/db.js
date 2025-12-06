@@ -6,7 +6,11 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: 'postgres',
   logging: process.env.NODE_ENV === 'development' ? console.log : false,
   dialectOptions: {
-    ssl: process.env.DATABASE_URL?.includes('render.com') || process.env.DATABASE_URL?.includes('amazonaws.com')
+    ssl: process.env.DATABASE_URL?.includes('render.com') || 
+         process.env.DATABASE_URL?.includes('amazonaws.com') ||
+         process.env.DATABASE_URL?.includes('supabase.co') ||
+         process.env.DATABASE_URL?.includes('vercel-storage.com') ||
+         process.env.NODE_ENV === 'production'
       ? {
           require: true,
           rejectUnauthorized: false
