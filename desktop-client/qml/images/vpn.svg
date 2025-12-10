@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
+
+<svg
+   width="800px"
+   height="800px"
+   viewBox="0 0 24 24"
+   fill="none"
+   version="1.1"
+   id="svg3"
+   sodipodi:docname="vpn.svg"
+   inkscape:version="1.4.2 (ebf0e940d0, 2025-05-08)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs3" />
+  <sodipodi:namedview
+     id="namedview3"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="0.64"
+     inkscape:cx="498.4375"
+     inkscape:cy="476.5625"
+     inkscape:window-width="1920"
+     inkscape:window-height="1011"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg3" />
+  <path
+     opacity="0.5"
+     d="m 18.9771,14.7904 c 2.6972,-2.6972 2.6972,-7.07027 0,-9.76749 -2.6972,-2.69721 -7.0703,-2.69721 -9.76749,0 C 7.41866,6.81385 6.8169,9.34366 7.40432,11.6311 7.49906,12 7.41492,12.399 7.14558,12.6684 l -3.71209,3.712 c -0.31791,0.318 -0.47408,0.7631 -0.42443,1.21 l 0.23207,2.0886 c 0.02474,0.2227 0.12453,0.4303 0.28295,0.5887 l 0.20821,0.2082 c 0.15843,0.1584 0.36605,0.2582 0.58872,0.283 l 2.08859,0.232 c 0.44685,0.0497 0.89204,-0.1065 1.20996,-0.4244 l 0.71002,-0.71 1.06068,-1.0607 1.94164,-1.9417 c 0.2694,-0.2693 0.6681,-0.3532 1.037,-0.2584 2.2874,0.5874 4.8172,-0.0144 6.6082,-1.8053 z"
+     fill="#1c274c"
+     id="path1"
+     sodipodi:nodetypes="cccccccccccccccccc"
+     style="fill:#1db954;fill-opacity:1" />
+  <path
+     d="M15.4142 8.58579C14.6332 7.80474 13.3668 7.80474 12.5858 8.58579C11.8047 9.36683 11.8047 10.6332 12.5858 11.4142C13.3668 12.1953 14.6332 12.1953 15.4142 11.4142C16.1953 10.6332 16.1953 9.36683 15.4142 8.58579Z"
+     fill="#1C274C"
+     id="path2"
+     style="fill:#1db954;fill-opacity:1" />
+  <path
+     d="M6.58295 18.1294L8.3291 19.8565L9.38977 18.7958L7.63776 17.063C7.34326 16.7717 6.86839 16.7743 6.57711 17.0688C6.28584 17.3633 6.28845 17.8382 6.58295 18.1294Z"
+     fill="#1C274C"
+     id="path3"
+     style="fill:#1db954;fill-opacity:1" />
+</svg>
