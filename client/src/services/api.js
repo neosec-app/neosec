@@ -1,7 +1,27 @@
 import axios from 'axios';
 
 // Get API URL from environment variable or use default
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// For production, use Render backend URL
+// For development, use localhost
+const getApiUrl = () => {
+  if (process.env.REACT_APP_API_URL) {
+    // Ensure it ends with /api
+    let url = process.env.REACT_APP_API_URL.trim();
+    if (!url.endsWith('/api')) {
+      url = url.endsWith('/') ? url + 'api' : url + '/api';
+    }
+    return url;
+  }
+  
+  if (process.env.NODE_ENV === 'production') {
+    // Default production URL - update this with your actual Render backend URL
+    return 'https://neosec.onrender.com/api';
+  }
+  
+  return 'http://localhost:5000/api';
+};
+
+const API_URL = getApiUrl();
 
 // Create axios instance with default config
 const api = axios.create({
@@ -81,5 +101,46 @@ export const authAPI = {
   }
 };
 
-export default api;
+// Dashboard API functions
+export const dashboardAPI = {
+  // Get dashboard data (VPN status and threats blocked)
+  getDashboard: async () => {
+    const response = await api.get('/dashboard');
+    return response.data;
+  }
+};
 
+// Admin API functions
+export const adminAPI = {
+  // Get all users
+  getAllUsers: async () => {
+    const response = await api.get('/admin/users');
+    return response.data;
+  },
+
+  // Get user by ID
+  getUserById: async (userId) => {
+    const response = await api.get(`/admin/users/${userId}`);
+    return response.data;
+  },
+
+  // Update user
+  updateUser: async (userId, userData) => {
+    const response = await api.put(`/admin/users/${userId}`, userData);
+    return response.data;
+  },
+
+  // Delete user
+  deleteUser: async (userId) => {
+    const response = await api.delete(`/admin/users/${userId}`);
+    return response.data;
+  },
+
+  // Get admin statistics
+  getStatistics: async () => {
+    const response = await api.get('/admin/statistics');
+    return response.data;
+  }
+};
+
+export default api;

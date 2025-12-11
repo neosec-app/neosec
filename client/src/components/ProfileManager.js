@@ -345,33 +345,34 @@ const handleDeactivate = async (id) => {
           {logs.length === 0 ? (
             <p className="no-logs">No activity logs yet.</p>
           ) : (
-            <div className="logs-table-container">
-              <table className="logs-table">
-                <thead>
-                  <tr>
-                    <th>Date & Time</th>
-                    <th>Profile</th>
-                    <th>Action</th>
-                    <th>User</th>
-                    <th>Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs.map((log) => (
-                    <tr key={log.id}>
-                      <td className="log-date">{formatDate(log.createdAt)}</td>
-                      <td>{log.profile?.name || 'N/A'}</td>
-                      <td>
-                        <span className={`action-badge ${getActionBadgeClass(log.action)}`}>
-                          {log.action}
-                        </span>
-                      </td>
-                      <td className="log-email">{log.userEmail}</td>
-                      <td className="log-description">{log.description}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="logs-container">
+              {logs.map((log) => (
+                <div key={log.id} className="log-card">
+                  <div className="log-card-header">
+                    <span className="log-date">{formatDate(log.createdAt)}</span>
+                    <span className={`action-badge ${getActionBadgeClass(log.action)}`}>
+                      {log.action}
+                    </span>
+                  </div>
+                  <div className="log-card-body">
+                    <p>
+                      <span className="log-label">Profile:</span>{' '}
+                      <span className={`log-profile ${!log.profile?.name ? 'deleted' : ''}`}>
+                        {log.profile?.name || (
+                          log.description?.match(/"([^"]+)"/)?.[1] || "Deleted"
+                        )}
+                      </span>
+                    </p>
+                    <p>
+                      <span className="log-label">User:</span>{' '}
+                      <span className="log-email">{log.userEmail}</span>
+                    </p>
+                    {log.description && (
+                      <p className="log-description">{log.description}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -408,21 +409,6 @@ const handleDeactivate = async (id) => {
                   rows="3"
                   className="form-textarea"
                 />
-              </div>
-
-              <div className="form-group">
-                <label>Profile Type</label>
-                <select
-                  name="profileType"
-                  value={formData.profileType}
-                  onChange={handleInputChange}
-                  className="form-select"
-                >
-                  <option value="Custom">Custom</option>
-                  <option value="Work Mode">Work Mode</option>
-                  <option value="Public WiFi Mode">Public WiFi Mode</option>
-                  <option value="Home Mode">Home Mode</option>
-                </select>
               </div>
             </div>
 
