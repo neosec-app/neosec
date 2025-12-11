@@ -3,6 +3,7 @@ import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import { authAPI, dashboardAPI, adminAPI } from './services/api';
 import './index.css';
+import ProfileManager from './components/ProfileManager';
 
 function App() {
     const [activeTab, setActiveTab] = useState('login');
@@ -533,39 +534,7 @@ function App() {
 
                     {/* Profiles View */}
                     {currentView === 'profiles' && (
-                        <div>
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: '30px'
-                            }}>
-                                <h1 style={{ fontSize: '32px', margin: 0 }}>Security Profiles</h1>
-                                <button style={{
-                                    padding: '12px 24px',
-                                    backgroundColor: '#36E27B',
-                                    color: '#121212',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    fontWeight: 'bold',
-                                    cursor: 'pointer',
-                                    fontSize: '14px'
-                                }}>
-                                    + Create Profile
-                                </button>
-                            </div>
-
-                            <div style={{
-                                padding: '25px',
-                                backgroundColor: '#181818',
-                                border: '1px solid #282828',
-                                borderRadius: '10px',
-                                textAlign: 'center',
-                                color: '#888'
-                            }}>
-                                <p>No security profiles yet. Click "Create Profile" to set up your first profile.</p>
-                            </div>
-                        </div>
+                        <ProfileManager />
                     )}
 
                     {/* User Management View (Admin Only) */}

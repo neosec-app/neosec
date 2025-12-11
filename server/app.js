@@ -12,10 +12,13 @@ const Threat = require('./models/Threat');
 const { connectDB } = require('./config/db');
 
 const authRoutes = require('./routes/authRoutes');
+require("./scheduler");
+
 const VpnRoutes = require('./routes/VpnRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+
 
 // Initialize Express app
 const app = express();
@@ -60,10 +63,14 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', authRoutes);
+const profileRoutes = require('./routes/profileRoutes');
+app.use('/api/profiles', profileRoutes);
+
 app.use('/api/vpn', VpnRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
+
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -109,3 +116,4 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
+

@@ -144,4 +144,3 @@ export const adminAPI = {
 };
 
 export default api;
-
