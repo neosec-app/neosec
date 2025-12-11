@@ -83,7 +83,7 @@ User.hasMany(VpnConfig, {
 });
 VpnConfig.belongsTo(User, {
     foreignKey: 'userId',
-    as: 'user'
+    as: 'vpnOwner'
 });
 
 module.exports = {
