@@ -30,7 +30,7 @@ const connectDB = async () => {
     // Sync models with database (creates tables if they don't exist)
     // In production, sync only if required tables are missing
     try {
-      const tablesToCheck = ['users', 'vpn_configs', 'notifications', 'threats', 'firewall_rules'];
+      const tablesToCheck = ['users', 'vpn_configs', 'notifications', 'threats', 'firewall_rules', 'data_transfers'];
       const missingTables = [];
 
       for (const table of tablesToCheck) {

@@ -1,10 +1,12 @@
 const VpnConfig = require('../models/VpnConfig');
+const DataTransfer = require('../models/DataTransfer');
+const { Op } = require('sequelize');
 
 // Get all VPN configs for current user
 exports.getVpnConfigs = async (req, res) => {
     try {
         const vpnConfigs = await VpnConfig.findAll({
-            where: { userId: req.user.id },
+            where: { userId: req.user.userId },
             order: [['createdAt', 'DESC']]
         });
 
@@ -28,7 +30,7 @@ exports.getVpnConfig = async (req, res) => {
         const vpnConfig = await VpnConfig.findOne({
             where: {
                 id: req.params.id,
-                userId: req.user.id
+                userId: req.user.userId
             }
         });
 
@@ -65,7 +67,7 @@ exports.createVpnConfig = async (req, res) => {
             username,
             password,
             description,
-            userId: req.user.id
+            userId: req.user.userId
         });
 
         res.status(201).json({
@@ -88,7 +90,7 @@ exports.updateVpnConfig = async (req, res) => {
         const vpnConfig = await VpnConfig.findOne({
             where: {
                 id: req.params.id,
-                userId: req.user.id
+                userId: req.user.userId
             }
         });
 
@@ -132,7 +134,7 @@ exports.deleteVpnConfig = async (req, res) => {
         const vpnConfig = await VpnConfig.findOne({
             where: {
                 id: req.params.id,
-                userId: req.user.id
+                userId: req.user.userId
             }
         });
 
@@ -164,7 +166,7 @@ exports.toggleVpnConfig = async (req, res) => {
         const vpnConfig = await VpnConfig.findOne({
             where: {
                 id: req.params.id,
-                userId: req.user.id
+                userId: req.user.userId
             }
         });
 
@@ -175,13 +177,62 @@ exports.toggleVpnConfig = async (req, res) => {
             });
         }
 
+        const wasActive = vpnConfig.isActive;
+        const willBeActive = !wasActive;
+
+        // If activating, deactivate all other VPN configs for this user
+        if (willBeActive) {
+            await VpnConfig.update(
+                { isActive: false },
+                {
+                    where: {
+                        userId: req.user.userId,
+                        id: { [Op.ne]: vpnConfig.id }
+                    }
+                }
+            );
+            
+            // End any active data transfer sessions
+            await DataTransfer.update(
+                { isActive: false, sessionEnd: new Date() },
+                {
+                    where: {
+                        userId: req.user.userId,
+                        isActive: true
+                    }
+                }
+            );
+            
+            // Create new data transfer session
+            await DataTransfer.create({
+                userId: req.user.userId,
+                vpnConfigId: vpnConfig.id,
+                bytesSent: 0,
+                bytesReceived: 0,
+                sessionStart: new Date(),
+                isActive: true
+            });
+        } else {
+            // If deactivating, end the current data transfer session
+            await DataTransfer.update(
+                { isActive: false, sessionEnd: new Date() },
+                {
+                    where: {
+                        userId: req.user.userId,
+                        vpnConfigId: vpnConfig.id,
+                        isActive: true
+                    }
+                }
+            );
+        }
+
         await vpnConfig.update({
-            isActive: !vpnConfig.isActive
+            isActive: willBeActive
         });
 
         res.status(200).json({
             success: true,
-            message: `VPN configuration ${vpnConfig.isActive ? 'activated' : 'deactivated'} successfully`,
+            message: `VPN configuration ${willBeActive ? 'activated' : 'deactivated'} successfully`,
             data: vpnConfig
         });
     } catch (error) {
@@ -199,7 +250,7 @@ exports.cloneVpnConfig = async (req, res) => {
         const original = await VpnConfig.findOne({
             where: {
                 id: req.params.id,
-                userId: req.user.id
+                userId: req.user.userId
             }
         });
 
@@ -220,7 +271,7 @@ exports.cloneVpnConfig = async (req, res) => {
             password: original.password,
             description: original.description,
             isActive: false,
-            userId: req.user.id
+            userId: req.user.userId
         });
 
         res.status(201).json({
@@ -245,7 +296,7 @@ exports.assignVpnTask = async (req, res) => {
         const vpnConfig = await VpnConfig.findOne({
             where: {
                 id: req.params.id,
-                userId: req.user.id
+                userId: req.user.userId
             }
         });
 

@@ -8,6 +8,7 @@ const VpnConfig = require('./models/VpnConfig');
 const Notification = require('./models/Notification');
 const Threat = require('./models/Threat');
 const FirewallRule = require('./models/FirewallRule');
+const DataTransfer = require('./models/DataTransfer');
 
 // Now connect to database (this will sync the models)
 const { connectDB } = require('./config/db');
@@ -73,6 +74,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/firewall', firewallRoutes);
+const dataTransferRoutes = require('./routes/dataTransferRoutes');
+app.use('/api/data-transfer', dataTransferRoutes);
 
 
 // Health check route
