@@ -143,6 +143,28 @@ export const adminAPI = {
   }
 };
 
+
+// Scan API (VirusTotal)
+
+export const scanAPI = {
+  // Submit a URL for scanning
+  scanUrl: async (url) => {
+    const response = await api.post('/scan/url', { url });
+    return response.data; 
+  },
+
+  // Get scan status
+  getStatus: async (scanId) => {
+    const response = await api.get(`/scan/status/${scanId}`);
+    return response.data; 
+  },
+
+  getHistory: async () => {
+    const response = await api.get('/scan/history');
+    return response.data;
+  }
+};
+
 // Firewall API functions
 export const firewallAPI = {
   // Get all firewall rules for the current user

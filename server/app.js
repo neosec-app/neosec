@@ -20,6 +20,7 @@ const VpnRoutes = require('./routes/VpnRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const scanRoutes = require('./routes/scanRoutes');
 const firewallRoutes = require('./routes/firewallRoutes');
 
 
@@ -73,6 +74,7 @@ app.use('/api/vpn', VpnRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/scan', scanRoutes);
 app.use('/api/firewall', firewallRoutes);
 const dataTransferRoutes = require('./routes/dataTransferRoutes');
 app.use('/api/data-transfer', dataTransferRoutes);
@@ -120,6 +122,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`Server started on port ${PORT}`);
 });
+
 
 module.exports = app;
 

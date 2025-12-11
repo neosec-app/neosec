@@ -4,6 +4,7 @@ import Register from './components/Auth/Register';
 import { authAPI, dashboardAPI, adminAPI, firewallAPI, vpnAPI } from './services/api';
 import './index.css';
 import ProfileManager from './components/ProfileManager';
+import ScanDashboard from './components/ScanDashboard';
 import { SiAlwaysdata } from 'react-icons/si';
 import { GoAlertFill } from 'react-icons/go';
 import { MdModeEdit } from 'react-icons/md';
@@ -1611,6 +1612,18 @@ function App() {
                                     )}
                                 </div>
 
+                    {/* Profiles View */}
+                    {currentView === 'profiles' && (
+                        <ProfileManager />
+                    )}
+
+                    {/* Scanner */}
+                    {currentView === 'scan' && <ScanDashboard />}
+
+
+                    {/* User Management View (Admin Only) */}
+                    {currentView === 'users' && user.role === 'admin' && (
+                        <div>
                                 {/* Delete Confirmation Modal */}
                                 {confirmDeleteRuleId && (
                                     <div style={{
