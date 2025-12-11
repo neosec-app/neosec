@@ -170,4 +170,13 @@ export const firewallAPI = {
   }
 };
 
+// VPN API functions
+export const vpnAPI = {
+  // Toggle VPN configuration (connect/disconnect)
+  toggleVpnConfig: async (configId) => {
+    const response = await api.post(`/vpn/${configId}/toggle`);
+    return response.data;
+  }
+};
+
 export default api;
