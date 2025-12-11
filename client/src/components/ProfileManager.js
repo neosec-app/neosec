@@ -14,25 +14,25 @@ const ProfileManager = () => {
     name: '',
     description: '',
     profileType: 'Custom',
-    
+
     // VPN
     vpnEnabled: false,
     vpnServer: '',
     vpnProtocol: 'OpenVPN',
     vpnPort: '',
     vpnUsername: '',
-    
+
     // Firewall
     firewallEnabled: true,
     defaultFirewallAction: 'DENY',
     firewallRules: '',
-    
+
     // Access Control
     allowedIps: '',
     blockedIps: '',
     allowedPorts: '',
     blockedPorts: '',
-    
+
     // Scheduling
     isScheduled: false,
     scheduleType: 'NONE',
@@ -95,54 +95,54 @@ const ProfileManager = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      
-    const submitData = {
-      ...formData,
 
-      vpnPort:
-        formData.vpnPort && !isNaN(formData.vpnPort)
-          ? parseInt(formData.vpnPort)
-          : null,
+      const submitData = {
+        ...formData,
 
-      firewallRules: formData.firewallRules
-        ? formData.firewallRules
+        vpnPort:
+          formData.vpnPort && !isNaN(formData.vpnPort)
+            ? parseInt(formData.vpnPort)
+            : null,
+
+        firewallRules: formData.firewallRules
+          ? formData.firewallRules
             .split(',')
             .map(r => r.trim())
             .filter(r => r !== '')
-        : [],
+          : [],
 
-      allowedIps: formData.allowedIps
-        ? formData.allowedIps
+        allowedIps: formData.allowedIps
+          ? formData.allowedIps
             .split(',')
             .map(ip => ip.trim())
             .filter(ip => ip !== '')
-        : [],
+          : [],
 
-      blockedIps: formData.blockedIps
-        ? formData.blockedIps
+        blockedIps: formData.blockedIps
+          ? formData.blockedIps
             .split(',')
             .map(ip => ip.trim())
             .filter(ip => ip !== '')
-        : [],
+          : [],
 
-      allowedPorts: formData.allowedPorts
-        ? formData.allowedPorts
+        allowedPorts: formData.allowedPorts
+          ? formData.allowedPorts
             .split(',')
             .map(p => p.trim())
             .filter(p => p !== '' && !isNaN(p))
             .map(Number)
-        : [],
+          : [],
 
-      blockedPorts: formData.blockedPorts
-        ? formData.blockedPorts
+        blockedPorts: formData.blockedPorts
+          ? formData.blockedPorts
             .split(',')
             .map(p => p.trim())
             .filter(p => p !== '' && !isNaN(p))
             .map(Number)
-        : []
-    };
+          : []
+      };
 
-      
+
       if (editingProfile) {
         await api.put(`/profiles/${editingProfile.id}`, submitData);
         alert('Profile updated successfully!');
@@ -150,7 +150,7 @@ const ProfileManager = () => {
         await api.post(`/profiles`, submitData);
         alert('Profile created successfully!');
       }
-      
+
       setShowForm(false);
       setEditingProfile(null);
       resetForm();
@@ -168,27 +168,27 @@ const ProfileManager = () => {
       name: profile.name,
       description: profile.description || '',
       profileType: profile.profileType,
-      
+
       vpnEnabled: profile.vpnEnabled,
       vpnServer: profile.vpnServer || '',
       vpnProtocol: profile.vpnProtocol || 'OpenVPN',
       vpnPort: profile.vpnPort || '',
       vpnUsername: profile.vpnUsername || '',
-      
+
       firewallEnabled: profile.firewallEnabled,
       defaultFirewallAction: profile.defaultFirewallAction || 'DENY',
       firewallRules: Array.isArray(profile.firewallRules) ? profile.firewallRules.join(', ') : '',
-      
+
       dnsEnabled: profile.dnsEnabled,
       primaryDns: profile.primaryDns || '',
       secondaryDns: profile.secondaryDns || '',
       dnsSecurity: profile.dnsSecurity,
-      
+
       allowedIps: Array.isArray(profile.allowedIps) ? profile.allowedIps.join(', ') : '',
       blockedIps: Array.isArray(profile.blockedIps) ? profile.blockedIps.join(', ') : '',
       allowedPorts: Array.isArray(profile.allowedPorts) ? profile.allowedPorts.join(', ') : '',
       blockedPorts: Array.isArray(profile.blockedPorts) ? profile.blockedPorts.join(', ') : '',
-      
+
       isScheduled: profile.isScheduled,
       scheduleType: profile.scheduleType || 'NONE',
       scheduleStartTime: profile.scheduleStartTime || '',
@@ -199,21 +199,21 @@ const ProfileManager = () => {
     });
     setShowForm(true);
   };
-  
-const handleDeactivate = async (id) => {
-  if (window.confirm('Are you sure you want to deactivate this profile?')) {
-    try {
-      await api.put(`/profiles/${id}/deactivate`, {});
-      alert('Profile deactivated successfully!');
-      fetchProfiles();
-      fetchLogs();
-    } catch (error) {
-      console.error('Error deactivating profile:', error);
-      alert('Error deactivating profile');
+
+  const handleDeactivate = async (id) => {
+    if (window.confirm('Are you sure you want to deactivate this profile?')) {
+      try {
+        await api.put(`/profiles/${id}/deactivate`, {});
+        alert('Profile deactivated successfully!');
+        fetchProfiles();
+        fetchLogs();
+      } catch (error) {
+        console.error('Error deactivating profile:', error);
+        alert('Error deactivating profile');
+      }
     }
-  }
-};
-  
+  };
+
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this profile?')) {
@@ -240,7 +240,7 @@ const handleDeactivate = async (id) => {
       alert('Error activating profile');
     }
   };
-  
+
 
   const resetForm = () => {
     setFormData({
@@ -283,7 +283,7 @@ const handleDeactivate = async (id) => {
   };
 
   const getActionBadgeClass = (action) => {
-    switch(action) {
+    switch (action) {
       case 'CREATED': return 'badge-created';
       case 'UPDATED': return 'badge-updated';
       case 'DELETED': return 'badge-deleted';
@@ -303,13 +303,13 @@ const handleDeactivate = async (id) => {
       <div className="pm-header">
         <h2>Security Profile Management</h2>
         <div className="header-actions">
-          <button 
+          <button
             onClick={() => setShowLogs(!showLogs)}
             className="btn btn-logs"
           >
             {showLogs ? 'Hide Logs' : 'View Activity Logs'}
           </button>
-          <button 
+          <button
             onClick={() => setShowForm(true)}
             className="btn btn-create"
           >
@@ -363,11 +363,11 @@ const handleDeactivate = async (id) => {
         <div className="profile-form-container">
           <h3>{editingProfile ? 'Edit Profile' : 'Create New Profile'}</h3>
           <form onSubmit={handleSubmit} className="profile-form">
-            
+
             {/* Basic Information */}
             <div className="form-section">
               <h4>Basic Information</h4>
-              
+
               <div className="form-group">
                 <label>Profile Name *</label>
                 <input
@@ -395,7 +395,7 @@ const handleDeactivate = async (id) => {
             {/* VPN Settings */}
             <div className="form-section">
               <h4>VPN Settings</h4>
-              
+
               <label className="checkbox-label">
                 <input
                   type="checkbox"
@@ -405,7 +405,7 @@ const handleDeactivate = async (id) => {
                 />
                 <span>Enable VPN</span>
               </label>
-              
+
               {formData.vpnEnabled && (
                 <div className="nested-fields">
                   <div className="form-group">
@@ -419,7 +419,7 @@ const handleDeactivate = async (id) => {
                       className="form-input"
                     />
                   </div>
-                  
+
                   <div className="form-group">
                     <label>Protocol</label>
                     <select
@@ -433,7 +433,7 @@ const handleDeactivate = async (id) => {
                       <option value="IKEv2">IKEv2</option>
                     </select>
                   </div>
-                  
+
                   <div className="form-group">
                     <label>Port</label>
                     <input
@@ -445,7 +445,7 @@ const handleDeactivate = async (id) => {
                       className="form-input"
                     />
                   </div>
-                  
+
                   <div className="form-group">
                     <label>Username</label>
                     <input
@@ -464,7 +464,7 @@ const handleDeactivate = async (id) => {
             {/* Firewall Settings */}
             <div className="form-section">
               <h4>Firewall Settings</h4>
-              
+
               <label className="checkbox-label">
                 <input
                   type="checkbox"
@@ -474,7 +474,7 @@ const handleDeactivate = async (id) => {
                 />
                 <span>Enable Firewall</span>
               </label>
-              
+
               {formData.firewallEnabled && (
                 <div className="nested-fields">
                   <div className="form-group">
@@ -489,7 +489,7 @@ const handleDeactivate = async (id) => {
                       <option value="DENY">Deny All (Whitelist Mode)</option>
                     </select>
                   </div>
-                  
+
                   <div className="form-group">
                     <label>Custom Rules (comma-separated)</label>
                     <input
@@ -508,7 +508,7 @@ const handleDeactivate = async (id) => {
             {/* Access Control */}
             <div className="form-section">
               <h4>Access Control</h4>
-              
+
               <div className="form-group">
                 <label>Allowed IPs (comma-separated)</label>
                 <input
@@ -520,7 +520,7 @@ const handleDeactivate = async (id) => {
                   className="form-input"
                 />
               </div>
-              
+
               <div className="form-group">
                 <label>Blocked IPs (comma-separated)</label>
                 <input
@@ -532,7 +532,7 @@ const handleDeactivate = async (id) => {
                   className="form-input"
                 />
               </div>
-              
+
               <div className="form-group">
                 <label>Allowed Ports (comma-separated)</label>
                 <input
@@ -544,7 +544,7 @@ const handleDeactivate = async (id) => {
                   className="form-input"
                 />
               </div>
-              
+
               <div className="form-group">
                 <label>Blocked Ports (comma-separated)</label>
                 <input
@@ -561,7 +561,7 @@ const handleDeactivate = async (id) => {
             {/* Scheduling */}
             <div className="form-section">
               <h4>Scheduling</h4>
-              
+
               <label className="checkbox-label">
                 <input
                   type="checkbox"
@@ -571,7 +571,7 @@ const handleDeactivate = async (id) => {
                 />
                 <span>Enable Scheduling</span>
               </label>
-              
+
               {formData.isScheduled && (
                 <div className="nested-fields">
                   <div className="form-group">
@@ -588,7 +588,7 @@ const handleDeactivate = async (id) => {
                       <option value="BOTH">Both</option>
                     </select>
                   </div>
-                  
+
                   {(formData.scheduleType === 'TIME' || formData.scheduleType === 'BOTH') && (
                     <>
                       <div className="form-group">
@@ -601,7 +601,7 @@ const handleDeactivate = async (id) => {
                           className="form-input"
                         />
                       </div>
-                      
+
                       <div className="form-group">
                         <label>End Time</label>
                         <input
@@ -612,7 +612,7 @@ const handleDeactivate = async (id) => {
                           className="form-input"
                         />
                       </div>
-                      
+
                       <div className="form-group">
                         <label>Active Days</label>
                         <div className="days-selector">
@@ -630,7 +630,7 @@ const handleDeactivate = async (id) => {
                       </div>
                     </>
                   )}
-                  
+
                   {(formData.scheduleType === 'CONDITION' || formData.scheduleType === 'BOTH') && (
                     <div className="form-group">
                       <label>Activation Condition</label>
@@ -647,7 +647,7 @@ const handleDeactivate = async (id) => {
                       </small>
                     </div>
                   )}
-                  
+
                   <label className="checkbox-label">
                     <input
                       type="checkbox"
@@ -699,11 +699,11 @@ const handleDeactivate = async (id) => {
                         <span className="badge badge-type">{profile.profileType}</span>
                       </div>
                     </div>
-                    
+
                     {profile.description && (
                       <p className="profile-description">{profile.description}</p>
                     )}
-                    
+
                     {/* Settings Summary */}
                     <div className="settings-summary">
                       <div className="setting-item">
@@ -716,7 +716,7 @@ const handleDeactivate = async (id) => {
                           <span className="status-disabled">✗ Disabled</span>
                         )}
                       </div>
-                      
+
                       <div className="setting-item">
                         <strong>Firewall:</strong>
                         {profile.firewallEnabled ? (
@@ -726,8 +726,8 @@ const handleDeactivate = async (id) => {
                         ) : (
                           <span className="status-disabled">✗ Disabled</span>
                         )}
-                      </div>                     
-                      
+                      </div>
+
                       <div className="setting-item">
                         <strong>Scheduling:</strong>
                         {profile.isScheduled ? (
@@ -737,19 +737,19 @@ const handleDeactivate = async (id) => {
                         )}
                       </div>
                     </div>
-                    
+
                     {/* Additional Info */}
                     <div className="profile-meta">
                       <p>Created: {formatDate(profile.createdAt)}</p>
                       {profile.lastActivatedAt && (
                         <p>
-                          Last Activated: {formatDate(profile.lastActivatedAt)} 
+                          Last Activated: {formatDate(profile.lastActivatedAt)}
                           ({profile.activationCount} times)
                         </p>
                       )}
                     </div>
                   </div>
-                  
+
                   {/* Action Buttons */}
                   <div className="profile-actions">
                     {!profile.isActive ? (
