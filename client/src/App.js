@@ -4,6 +4,7 @@ import Register from './components/Auth/Register';
 import { authAPI, dashboardAPI, adminAPI, firewallAPI } from './services/api';
 import './index.css';
 import ProfileManager from './components/ProfileManager';
+import ScanDashboard from './components/ScanDashboard';
 import { SiAlwaysdata } from 'react-icons/si';
 import { GoAlertFill } from 'react-icons/go';
 import { MdModeEdit } from 'react-icons/md';
@@ -786,6 +787,25 @@ function App() {
                             </button>
                         )}
                     </nav>
+                    <button
+                        onClick={() => setCurrentView('scan')}
+                        style={{
+                            width: '100%',
+                            padding: '12px 15px',
+                            marginBottom: '10px',
+                            backgroundColor: currentView === 'scan' ? '#1E402C' : 'transparent',
+                            color: currentView === 'scan' ? '#36E27B' : '#fff',
+                            border: currentView === 'scan' ? '1px solid #36E27B' : '1px solid transparent',
+                            borderRadius: '8px',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        URL Scanner
+                    </button>
+
 
                     <button
                         onClick={handleLogout}
@@ -1429,6 +1449,18 @@ function App() {
                     )}
                                 </div>
 
+                    {/* Profiles View */}
+                    {currentView === 'profiles' && (
+                        <ProfileManager />
+                    )}
+
+                    {/* Scanner */}
+                    {currentView === 'scan' && <ScanDashboard />}
+
+
+                    {/* User Management View (Admin Only) */}
+                    {currentView === 'users' && user.role === 'admin' && (
+                        <div>
                                 {/* Delete Confirmation Modal */}
                                 {confirmDeleteRuleId && (
                             <div style={{

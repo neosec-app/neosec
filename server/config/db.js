@@ -30,6 +30,28 @@ const connectDB = async () => {
     // Sync models with database (creates tables if they don't exist)
     // In production, sync only if required tables are missing
     try {
+      // Check if users table exists
+      const [results] = await sequelize.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'users'
+        );
+      `);
+      
+      const tableExists = results[0].exists;
+      
+      // if (!tableExists) {
+      //   console.log('Tables not found. Creating database tables...');
+      //   await sequelize.sync({ force: false }); // Create tables without dropping
+      //   console.log('Database tables created successfully.');
+      // } else {
+      //   console.log('Database tables already exist.');
+      // }
+      console.log("Synchronizing database tables...");
+      await sequelize.sync({ alter: true });
+      console.log("Database sync complete.");
+
       const tablesToCheck = ['users', 'vpn_configs', 'notifications', 'threats', 'firewall_rules', 'data_transfers'];
       const missingTables = [];
 
