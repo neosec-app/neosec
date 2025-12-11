@@ -7,6 +7,7 @@ const User = require('./models/User');
 const VpnConfig = require('./models/VpnConfig');
 const Notification = require('./models/Notification');
 const Threat = require('./models/Threat');
+const FirewallRule = require('./models/FirewallRule');
 
 // Now connect to database (this will sync the models)
 const { connectDB } = require('./config/db');
@@ -18,6 +19,7 @@ const VpnRoutes = require('./routes/VpnRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const firewallRoutes = require('./routes/firewallRoutes');
 
 
 // Initialize Express app
@@ -70,6 +72,7 @@ app.use('/api/vpn', VpnRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/firewall', firewallRoutes);
 
 
 // Health check route

@@ -143,4 +143,31 @@ export const adminAPI = {
   }
 };
 
+// Firewall API functions
+export const firewallAPI = {
+  // Get all firewall rules for the current user
+  getRules: async () => {
+    const response = await api.get('/firewall');
+    return response.data;
+  },
+
+  // Create a new firewall rule
+  createRule: async (rule) => {
+    const response = await api.post('/firewall', rule);
+    return response.data;
+  },
+
+  // Update an existing firewall rule
+  updateRule: async (id, rule) => {
+    const response = await api.put(`/firewall/${id}`, rule);
+    return response.data;
+  },
+
+  // Delete a firewall rule
+  deleteRule: async (id) => {
+    const response = await api.delete(`/firewall/${id}`);
+    return response.data;
+  }
+};
+
 export default api;

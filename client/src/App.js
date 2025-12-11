@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
-import { authAPI, dashboardAPI, adminAPI } from './services/api';
+import { authAPI, dashboardAPI, adminAPI, firewallAPI } from './services/api';
 import './index.css';
 import ProfileManager from './components/ProfileManager';
 
@@ -17,6 +17,17 @@ function App() {
     const [usersLoading, setUsersLoading] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
+    const [firewallRules, setFirewallRules] = useState([]);
+    const [firewallLoading, setFirewallLoading] = useState(false);
+    const [firewallError, setFirewallError] = useState('');
+    const [editingRuleId, setEditingRuleId] = useState(null);
+    const [firewallForm, setFirewallForm] = useState({
+        action: 'allow',
+        direction: 'inbound',
+        ipAddress: '',
+        port: '',
+        description: ''
+    });
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -85,6 +96,31 @@ function App() {
         fetchAdminData();
     }, [user, currentView]);
 
+    // Fetch firewall rules when viewing firewall
+    useEffect(() => {
+        const fetchFirewallRules = async () => {
+            if (user && currentView === 'firewall') {
+                try {
+                    setFirewallLoading(true);
+                    setFirewallError('');
+                    const response = await firewallAPI.getRules();
+                    if (response.success) {
+                        setFirewallRules(response.data || []);
+                    } else {
+                        setFirewallError(response.message || 'Failed to load firewall rules');
+                    }
+                } catch (error) {
+                    console.error('Firewall fetch error:', error);
+                    setFirewallError(error.response?.data?.message || 'Failed to load firewall rules');
+                } finally {
+                    setFirewallLoading(false);
+                }
+            }
+        };
+
+        fetchFirewallRules();
+    }, [user, currentView]);
+
     const handleEditUser = (userToEdit) => {
         setEditingUser({ ...userToEdit });
         setShowEditModal(true);
@@ -120,6 +156,91 @@ function App() {
         } catch (error) {
             console.error('Delete user error:', error);
             alert('Failed to delete user: ' + (error.response?.data?.message || error.message));
+        }
+    };
+
+    // Firewall handlers
+    const resetFirewallForm = () => {
+        setFirewallForm({
+            action: 'allow',
+            direction: 'inbound',
+            ipAddress: '',
+            port: '',
+            description: ''
+        });
+        setEditingRuleId(null);
+    };
+
+    const handleFirewallChange = (e) => {
+        const { name, value } = e.target;
+        setFirewallForm((prev) => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleSaveRule = async (e) => {
+        e.preventDefault();
+        setFirewallError('');
+        try {
+            const payload = {
+                ...firewallForm,
+                port: firewallForm.port ? Number(firewallForm.port) : null,
+                ipAddress: firewallForm.ipAddress || null,
+                description: firewallForm.description || null
+            };
+
+            let response;
+            if (editingRuleId) {
+                response = await firewallAPI.updateRule(editingRuleId, payload);
+                if (response.success) {
+                    setFirewallRules((prev) =>
+                        prev.map((rule) => (rule.id === editingRuleId ? response.data : rule))
+                    );
+                }
+            } else {
+                response = await firewallAPI.createRule(payload);
+                if (response.success) {
+                    setFirewallRules((prev) => [response.data, ...prev]);
+                }
+            }
+
+            if (!response?.success) {
+                setFirewallError(response?.message || 'Failed to save firewall rule');
+                return;
+            }
+
+            resetFirewallForm();
+        } catch (error) {
+            console.error('Save firewall rule error:', error);
+            setFirewallError(error.response?.data?.message || 'Failed to save firewall rule');
+        }
+    };
+
+    const handleEditRule = (rule) => {
+        setEditingRuleId(rule.id);
+        setFirewallForm({
+            action: rule.action,
+            direction: rule.direction,
+            ipAddress: rule.ipAddress || '',
+            port: rule.port || '',
+            description: rule.description || ''
+        });
+    };
+
+    const handleDeleteRule = async (id) => {
+        if (!window.confirm('Delete this firewall rule?')) return;
+        setFirewallError('');
+        try {
+            const response = await firewallAPI.deleteRule(id);
+            if (response.success) {
+                setFirewallRules((prev) => prev.filter((rule) => rule.id !== id));
+            } else {
+                setFirewallError(response.message || 'Failed to delete firewall rule');
+            }
+        } catch (error) {
+            console.error('Delete firewall rule error:', error);
+            setFirewallError(error.response?.data?.message || 'Failed to delete firewall rule');
         }
     };
 
@@ -505,29 +626,290 @@ function App() {
                                 marginBottom: '30px'
                             }}>
                                 <h1 style={{ fontSize: '32px', margin: 0 }}>Firewall Rules</h1>
-                                <button style={{
-                                    padding: '12px 24px',
-                                    backgroundColor: '#36E27B',
-                                    color: '#121212',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    fontWeight: 'bold',
-                                    cursor: 'pointer',
-                                    fontSize: '14px'
-                                }}>
-                                    + Add Rule
+                                <button
+                                    onClick={resetFirewallForm}
+                                    style={{
+                                        padding: '12px 24px',
+                                        backgroundColor: '#36E27B',
+                                        color: '#121212',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer',
+                                        fontSize: '14px'
+                                    }}>
+                                    {editingRuleId ? 'Cancel Edit' : 'Reset Form'}
                                 </button>
                             </div>
 
                             <div style={{
-                                padding: '25px',
-                                backgroundColor: '#181818',
-                                border: '1px solid #282828',
-                                borderRadius: '10px',
-                                textAlign: 'center',
-                                color: '#888'
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: '20px',
+                                marginBottom: '30px'
                             }}>
-                                <p>No firewall rules configured. Click "Add Rule" to create your first rule.</p>
+                                {/* Add / Edit Rule Form */}
+                                <div style={{
+                                    padding: '25px',
+                                    backgroundColor: '#181818',
+                                    border: '1px solid #282828',
+                                    borderRadius: '10px'
+                                }}>
+                                    <h2 style={{ color: '#fff', marginTop: 0, marginBottom: '16px' }}>
+                                        {editingRuleId ? 'Edit Firewall Rule' : 'Add Firewall Rule'}
+                                    </h2>
+                                    {firewallError && (
+                                        <div style={{
+                                            padding: '12px',
+                                            marginBottom: '12px',
+                                            borderRadius: '6px',
+                                            backgroundColor: '#2a1515',
+                                            border: '1px solid #ff4444',
+                                            color: '#ff6666',
+                                            fontSize: '13px'
+                                        }}>
+                                            {firewallError}
+                                        </div>
+                                    )}
+                                    <form onSubmit={handleSaveRule} style={{ display: 'grid', gap: '14px' }}>
+                                        <div>
+                                            <label style={{ display: 'block', color: '#888', marginBottom: '6px', fontSize: '13px' }}>
+                                                Action
+                                            </label>
+                                            <select
+                                                name="action"
+                                                value={firewallForm.action}
+                                                onChange={handleFirewallChange}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '10px',
+                                                    backgroundColor: '#121212',
+                                                    border: '1px solid #282828',
+                                                    borderRadius: '6px',
+                                                    color: '#fff'
+                                                }}
+                                            >
+                                                <option value="allow">Allow</option>
+                                                <option value="deny">Deny</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label style={{ display: 'block', color: '#888', marginBottom: '6px', fontSize: '13px' }}>
+                                                Direction
+                                            </label>
+                                            <select
+                                                name="direction"
+                                                value={firewallForm.direction}
+                                                onChange={handleFirewallChange}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '10px',
+                                                    backgroundColor: '#121212',
+                                                    border: '1px solid #282828',
+                                                    borderRadius: '6px',
+                                                    color: '#fff'
+                                                }}
+                                            >
+                                                <option value="inbound">Inbound</option>
+                                                <option value="outbound">Outbound</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label style={{ display: 'block', color: '#888', marginBottom: '6px', fontSize: '13px' }}>
+                                                IP Address (optional)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="ipAddress"
+                                                value={firewallForm.ipAddress}
+                                                onChange={handleFirewallChange}
+                                                placeholder="e.g., 192.168.1.10"
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '10px',
+                                                    backgroundColor: '#121212',
+                                                    border: '1px solid #282828',
+                                                    borderRadius: '6px',
+                                                    color: '#fff'
+                                                }}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label style={{ display: 'block', color: '#888', marginBottom: '6px', fontSize: '13px' }}>
+                                                Port (optional)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="65535"
+                                                name="port"
+                                                value={firewallForm.port}
+                                                onChange={handleFirewallChange}
+                                                placeholder="e.g., 443"
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '10px',
+                                                    backgroundColor: '#121212',
+                                                    border: '1px solid #282828',
+                                                    borderRadius: '6px',
+                                                    color: '#fff'
+                                                }}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label style={{ display: 'block', color: '#888', marginBottom: '6px', fontSize: '13px' }}>
+                                                Description (optional)
+                                            </label>
+                                            <textarea
+                                                name="description"
+                                                value={firewallForm.description}
+                                                onChange={handleFirewallChange}
+                                                rows={3}
+                                                placeholder="Describe the rule"
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '10px',
+                                                    backgroundColor: '#121212',
+                                                    border: '1px solid #282828',
+                                                    borderRadius: '6px',
+                                                    color: '#fff',
+                                                    resize: 'vertical'
+                                                }}
+                                            />
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                            <button
+                                                type="button"
+                                                onClick={resetFirewallForm}
+                                                style={{
+                                                    padding: '10px 16px',
+                                                    backgroundColor: '#282828',
+                                                    color: '#fff',
+                                                    border: '1px solid #444',
+                                                    borderRadius: '6px',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                Clear
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                disabled={firewallLoading}
+                                                style={{
+                                                    padding: '10px 16px',
+                                                    backgroundColor: '#36E27B',
+                                                    color: '#121212',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    cursor: 'pointer',
+                                                    fontWeight: '600'
+                                                }}
+                                            >
+                                                {editingRuleId ? 'Update Rule' : 'Add Rule'}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+
+                                {/* Rules List */}
+                                <div style={{
+                                    padding: '25px',
+                                    backgroundColor: '#181818',
+                                    border: '1px solid #282828',
+                                    borderRadius: '10px'
+                                }}>
+                                    <h2 style={{ color: '#fff', marginTop: 0, marginBottom: '16px' }}>Your Rules</h2>
+                                    {firewallLoading ? (
+                                        <div style={{ color: '#888' }}>Loading rules...</div>
+                                    ) : firewallRules.length === 0 ? (
+                                        <div style={{ color: '#888' }}>No firewall rules yet. Add one using the form.</div>
+                                    ) : (
+                                        <div style={{ display: 'grid', gap: '12px' }}>
+                                            {firewallRules.map((rule) => (
+                                                <div key={rule.id} style={{
+                                                    padding: '15px',
+                                                    backgroundColor: '#121212',
+                                                    border: '1px solid #282828',
+                                                    borderRadius: '8px',
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    gap: '12px',
+                                                    alignItems: 'center'
+                                                }}>
+                                                    <div style={{ display: 'grid', gap: '4px' }}>
+                                                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                                            <span style={{
+                                                                padding: '4px 10px',
+                                                                borderRadius: '12px',
+                                                                backgroundColor: rule.action === 'allow' ? '#1E402C' : '#40201E',
+                                                                color: rule.action === 'allow' ? '#36E27B' : '#FF7777',
+                                                                border: rule.action === 'allow' ? '1px solid #36E27B' : '1px solid #FF7777',
+                                                                fontSize: '12px',
+                                                                fontWeight: '600'
+                                                            }}>
+                                                                {rule.action.toUpperCase()}
+                                                            </span>
+                                                            <span style={{
+                                                                padding: '4px 10px',
+                                                                borderRadius: '12px',
+                                                                backgroundColor: '#222',
+                                                                color: '#fff',
+                                                                border: '1px solid #333',
+                                                                fontSize: '12px',
+                                                                fontWeight: '600'
+                                                            }}>
+                                                                {rule.direction.toUpperCase()}
+                                                            </span>
+                                                        </div>
+                                                        <div style={{ color: '#fff', fontSize: '14px' }}>
+                                                            {rule.ipAddress ? `IP: ${rule.ipAddress}` : 'Any IP'} | {rule.port ? `Port: ${rule.port}` : 'Any Port'}
+                                                        </div>
+                                                        <div style={{ color: '#888', fontSize: '12px' }}>
+                                                            {rule.description || 'No description'}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                                        <button
+                                                            onClick={() => handleEditRule(rule)}
+                                                            style={{
+                                                                padding: '8px 12px',
+                                                                backgroundColor: '#36E27B',
+                                                                color: '#121212',
+                                                                border: 'none',
+                                                                borderRadius: '6px',
+                                                                cursor: 'pointer',
+                                                                fontSize: '12px',
+                                                                fontWeight: '600'
+                                                            }}
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteRule(rule.id)}
+                                                            style={{
+                                                                padding: '8px 12px',
+                                                                backgroundColor: '#FF4444',
+                                                                color: '#fff',
+                                                                border: 'none',
+                                                                borderRadius: '6px',
+                                                                cursor: 'pointer',
+                                                                fontSize: '12px',
+                                                                fontWeight: '600'
+                                                            }}
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
