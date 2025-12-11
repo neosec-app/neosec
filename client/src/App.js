@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import { authAPI, dashboardAPI, adminAPI, firewallAPI } from './services/api';
@@ -6,14 +6,82 @@ import './index.css';
 import ProfileManager from './components/ProfileManager';
 
 function App() {
+    // Theme
+    const initialTheme = (typeof window !== 'undefined' && localStorage.getItem('theme')) || 'dark';
+    const [theme, setTheme] = useState(initialTheme); // 'dark' | 'light'
+    const themeVars = {
+        // Keep dark close to original green tone
+        dark: {
+            bgMain: '#121212',
+            bgCard: '#181818',
+            bgPanel: '#0a0a0a',
+            text: '#ffffff',
+            textMuted: '#9aa3b5',
+            border: '#242424',
+            accent: '#36E27B',
+            accentSoft: 'rgba(54,226,123,0.12)',
+            warning: '#f0a500',
+            danger: '#e04848',
+            inputBg: '#1c1c1c',
+            inputBorder: '#2c2c2c'
+        },
+        // Light theme aligned to Figma green style
+        light: {
+            bgMain: '#f6f8fb',          // soft gray-blue background
+            bgCard: '#ffffff',          // white cards
+            bgPanel: '#eef3f8',         // slightly tinted panel
+            text: '#0b172a',            // deep navy text
+            textMuted: '#5b6b7a',       // muted gray-blue
+            border: '#d9e2ec',          // subtle border
+            accent: '#1fa45a',          // green primary
+            accentSoft: '#e6f4ed',      // light green tint
+            warning: '#d97706',
+            danger: '#d4183d',
+            inputBg: '#ffffff',
+            inputBorder: '#d9e2ec'
+        }
+    };
+    const palette = themeVars[theme];
+
+    useEffect(() => {
+        // Smooth theme transition
+        document.documentElement.style.setProperty('color-scheme', theme === 'dark' ? 'dark' : 'light');
+        document.body.style.transition = 'background-color 0.3s ease, color 0.3s ease';
+        document.body.style.backgroundColor = palette.bgMain;
+        document.body.style.color = palette.text;
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('theme', theme);
+        }
+    }, [theme, palette]);
+
+    // Toasts
+    const [toasts, setToasts] = useState([]);
+    const showToast = (message, type = 'info') => {
+        const id = `${Date.now()}-${Math.random()}`;
+        setToasts((prev) => [...prev, { id, message, type }]);
+        setTimeout(() => {
+            setToasts((prev) => prev.filter((t) => t.id !== id));
+        }, 3200);
+    };
+
+    const cardShadow = theme === 'light' ? '0 12px 30px rgba(17, 24, 39, 0.08)' : 'none';
+    const cardBorder = `1px solid ${palette.border}`;
+    const cardBase = {
+        backgroundColor: palette.bgCard,
+        borderRadius: 14,
+        border: cardBorder,
+        boxShadow: cardShadow,
+        transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease'
+    };
+
+    const initialView = (typeof window !== 'undefined' && localStorage.getItem('currentView')) || 'dashboard';
     const [activeTab, setActiveTab] = useState('login');
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [currentView, setCurrentView] = useState('dashboard'); // dashboard, vpn, firewall, profiles
+    const [currentView, setCurrentView] = useState(initialView); // dashboard, vpn, firewall, profiles
     const [dashboardData, setDashboardData] = useState(null);
     const [dashboardLoading, setDashboardLoading] = useState(true);
     const [users, setUsers] = useState([]);
-    const [adminStats, setAdminStats] = useState(null);
     const [usersLoading, setUsersLoading] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -21,13 +89,47 @@ function App() {
     const [firewallLoading, setFirewallLoading] = useState(false);
     const [firewallError, setFirewallError] = useState('');
     const [editingRuleId, setEditingRuleId] = useState(null);
-    const [firewallForm, setFirewallForm] = useState({
+    const [confirmDeleteRuleId, setConfirmDeleteRuleId] = useState(null);
+    const [navHover, setNavHover] = useState(null);
+    const [logoutHover, setLogoutHover] = useState(false);
+    const [actionButtonHover, setActionButtonHover] = useState(null); // Track hovered action button: 'reset-{id}', 'edit-{id}', 'delete-{id}', etc.
+    const [showFirewallModal, setShowFirewallModal] = useState(false);
+    const [firewallModalAnimating, setFirewallModalAnimating] = useState(false);
+    const initialFirewallForm = {
         action: 'allow',
         direction: 'inbound',
-        ipAddress: '',
-        port: '',
-        description: ''
-    });
+        protocol: 'any',
+        sourceIPType: 'any', // 'any', 'specific', 'range'
+        sourceIP: '',
+        destinationIPType: 'any',
+        destinationIP: '',
+        sourcePortType: 'any', // 'any', 'specific', 'range'
+        sourcePort: '',
+        destinationPortType: 'any',
+        destinationPort: '',
+        description: '',
+        enabled: true
+    };
+    const [firewallForm, setFirewallForm] = useState(initialFirewallForm);
+
+    // Helper to fetch admin data (users + stats)
+    const loadAdminData = useCallback(
+        async (withLoading = true) => {
+            if (!(user && user.role === 'admin' && currentView === 'users')) return;
+            try {
+                if (withLoading) setUsersLoading(true);
+                const usersResponse = await adminAPI.getAllUsers();
+                if (usersResponse.success) {
+                    setUsers(usersResponse.data || []);
+                }
+            } catch (error) {
+                console.error('Admin data fetch error:', error);
+            } finally {
+                if (withLoading) setUsersLoading(false);
+            }
+        },
+        [user, currentView]
+    );
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -47,6 +149,17 @@ function App() {
 
         checkAuth();
     }, []);
+
+    // Persist currentView and validate for role
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('currentView', currentView);
+        }
+        // If user is not admin, avoid admin-only views
+        if (user && user.role !== 'admin' && currentView === 'users') {
+            setCurrentView('dashboard');
+        }
+    }, [currentView, user]);
 
     // Fetch dashboard data when user is logged in
     useEffect(() => {
@@ -71,30 +184,8 @@ function App() {
 
     // Fetch users and stats when admin views user management
     useEffect(() => {
-        const fetchAdminData = async () => {
-            if (user && user.role === 'admin' && currentView === 'users') {
-                try {
-                    setUsersLoading(true);
-                    const [usersResponse, statsResponse] = await Promise.all([
-                        adminAPI.getAllUsers(),
-                        adminAPI.getStatistics()
-                    ]);
-                    if (usersResponse.success) {
-                        setUsers(usersResponse.data || []);
-                    }
-                    if (statsResponse.success) {
-                        setAdminStats(statsResponse.data);
-                    }
-                } catch (error) {
-                    console.error('Admin data fetch error:', error);
-                } finally {
-                    setUsersLoading(false);
-                }
-            }
-        };
-
-        fetchAdminData();
-    }, [user, currentView]);
+        loadAdminData();
+    }, [loadAdminData]);
 
     // Fetch firewall rules when viewing firewall
     useEffect(() => {
@@ -137,10 +228,15 @@ function App() {
                 setUsers(users.map(u => u.id === editingUser.id ? response.data : u));
                 setShowEditModal(false);
                 setEditingUser(null);
+                // Refresh stats (e.g., pending approvals) without full page refresh
+                await loadAdminData(false);
+                showToast('User updated', 'success');
             }
         } catch (error) {
             console.error('Update user error:', error);
-            alert('Failed to update user: ' + (error.response?.data?.message || error.message));
+            const msg = error.response?.data?.message || error.message || 'Failed to update user';
+            showToast(msg, 'error');
+            alert(msg);
         }
     };
 
@@ -152,42 +248,99 @@ function App() {
             const response = await adminAPI.deleteUser(userId);
             if (response.success) {
                 setUsers(users.filter(u => u.id !== userId));
+                // Refresh stats after delete
+                await loadAdminData(false);
+                showToast('User deleted', 'success');
             }
         } catch (error) {
             console.error('Delete user error:', error);
-            alert('Failed to delete user: ' + (error.response?.data?.message || error.message));
+            const msg = error.response?.data?.message || error.message || 'Failed to delete user';
+            showToast(msg, 'error');
+            alert(msg);
+        }
+    };
+
+    // Toggle user approval status
+    const handleToggleUserStatus = async (u) => {
+        if (u.id === user.id) {
+            showToast('You cannot change your own status', 'error');
+            return;
+        }
+        try {
+            const response = await adminAPI.updateUser(u.id, {
+                email: u.email,
+                role: u.role,
+                isApproved: !u.isApproved
+            });
+            if (response.success) {
+                setUsers(prev => prev.map(x => x.id === u.id ? response.data : x));
+                await loadAdminData(false);
+                showToast(`User marked ${response.data.isApproved ? 'active' : 'inactive'}`, 'success');
+            } else {
+                showToast(response.message || 'Failed to update status', 'error');
+            }
+        } catch (error) {
+            const msg = error.response?.data?.message || 'Failed to update status';
+            showToast(msg, 'error');
         }
     };
 
     // Firewall handlers
-    const resetFirewallForm = () => {
-        setFirewallForm({
-            action: 'allow',
-            direction: 'inbound',
-            ipAddress: '',
-            port: '',
-            description: ''
-        });
+    const clearFirewallForm = () => {
+        setFirewallForm(initialFirewallForm);
         setEditingRuleId(null);
     };
 
+    const resetFirewallForm = () => {
+        closeFirewallModal();
+    };
+
+    const closeFirewallModal = () => {
+        // Animate out before closing
+        setFirewallModalAnimating(false);
+        setTimeout(() => {
+            clearFirewallForm();
+            setShowFirewallModal(false);
+        }, 200);
+    };
+
+    const openFirewallModal = () => {
+        clearFirewallForm();
+        setShowFirewallModal(true);
+        setFirewallModalAnimating(false);
+        // Trigger animation after mount
+        setTimeout(() => setFirewallModalAnimating(true), 10);
+    };
+
+    const openFirewallModalForEdit = () => {
+        setShowFirewallModal(true);
+        setFirewallModalAnimating(false);
+        setTimeout(() => setFirewallModalAnimating(true), 10);
+    };
+
     const handleFirewallChange = (e) => {
-        const { name, value } = e.target;
+        const { name, value, type, checked } = e.target;
         setFirewallForm((prev) => ({
             ...prev,
-            [name]: value
+            [name]: type === 'checkbox' ? checked : value
         }));
     };
 
     const handleSaveRule = async (e) => {
         e.preventDefault();
         setFirewallError('');
+        setFirewallLoading(true);
         try {
             const payload = {
-                ...firewallForm,
-                port: firewallForm.port ? Number(firewallForm.port) : null,
-                ipAddress: firewallForm.ipAddress || null,
-                description: firewallForm.description || null
+                action: firewallForm.action,
+                direction: firewallForm.direction,
+                protocol: firewallForm.protocol,
+                sourceIP: firewallForm.sourceIPType === 'any' ? null : (firewallForm.sourceIP || null),
+                destinationIP: firewallForm.destinationIPType === 'any' ? null : (firewallForm.destinationIP || null),
+                sourcePort: firewallForm.sourcePortType === 'any' ? null : (firewallForm.sourcePort || null),
+                destinationPort: firewallForm.destinationPortType === 'any' ? null : (firewallForm.destinationPort || null),
+                description: firewallForm.description || null,
+                enabled: firewallForm.enabled
             };
 
             let response;
@@ -197,23 +350,30 @@ function App() {
                     setFirewallRules((prev) =>
                         prev.map((rule) => (rule.id === editingRuleId ? response.data : rule))
                     );
+                    showToast('Firewall rule updated', 'success');
                 }
             } else {
                 response = await firewallAPI.createRule(payload);
                 if (response.success) {
                     setFirewallRules((prev) => [response.data, ...prev]);
+                    showToast('Firewall rule added', 'success');
                 }
             }
 
             if (!response?.success) {
                 setFirewallError(response?.message || 'Failed to save firewall rule');
+                showToast(response?.message || 'Failed to save firewall rule', 'error');
                 return;
             }
 
             resetFirewallForm();
         } catch (error) {
             console.error('Save firewall rule error:', error);
-            setFirewallError(error.response?.data?.message || 'Failed to save firewall rule');
+            const msg = error.response?.data?.message || 'Failed to save firewall rule';
+            setFirewallError(msg);
+            showToast(msg, 'error');
+        } finally {
+            setFirewallLoading(false);
         }
     };
 
@@ -222,36 +382,142 @@ function App() {
         setFirewallForm({
             action: rule.action,
             direction: rule.direction,
-            ipAddress: rule.ipAddress || '',
-            port: rule.port || '',
-            description: rule.description || ''
+            protocol: rule.protocol || 'any',
+            sourceIPType: rule.sourceIP ? (rule.sourceIP.includes('/') ? 'range' : 'specific') : 'any',
+            sourceIP: rule.sourceIP || '',
+            destinationIPType: rule.destinationIP ? (rule.destinationIP.includes('/') ? 'range' : 'specific') : 'any',
+            destinationIP: rule.destinationIP || '',
+            sourcePortType: rule.sourcePort ? (rule.sourcePort.includes('-') ? 'range' : 'specific') : 'any',
+            sourcePort: rule.sourcePort || '',
+            destinationPortType: rule.destinationPort ? (rule.destinationPort.includes('-') ? 'range' : 'specific') : 'any',
+            destinationPort: rule.destinationPort || '',
+            description: rule.description || '',
+            enabled: rule.enabled !== undefined ? rule.enabled : true
         });
+        openFirewallModalForEdit();
     };
 
-    const handleDeleteRule = async (id) => {
-        if (!window.confirm('Delete this firewall rule?')) return;
+    const handleDeleteRule = (id) => {
+        setConfirmDeleteRuleId(id);
+    };
+
+    const confirmDeleteRule = async () => {
+        if (!confirmDeleteRuleId) return;
         setFirewallError('');
         try {
-            const response = await firewallAPI.deleteRule(id);
+            const response = await firewallAPI.deleteRule(confirmDeleteRuleId);
             if (response.success) {
-                setFirewallRules((prev) => prev.filter((rule) => rule.id !== id));
+                setFirewallRules((prev) => prev.filter((rule) => rule.id !== confirmDeleteRuleId));
+                showToast('Firewall rule deleted', 'success');
             } else {
                 setFirewallError(response.message || 'Failed to delete firewall rule');
+                showToast(response.message || 'Failed to delete firewall rule', 'error');
             }
         } catch (error) {
             console.error('Delete firewall rule error:', error);
-            setFirewallError(error.response?.data?.message || 'Failed to delete firewall rule');
+            const msg = error.response?.data?.message || 'Failed to delete firewall rule';
+            setFirewallError(msg);
+            showToast(msg, 'error');
+        } finally {
+            setConfirmDeleteRuleId(null);
+        }
+    };
+
+    // Move rule up (decrease order)
+    const handleMoveRuleUp = async (ruleId, currentIndex) => {
+        if (currentIndex === 0) return;
+        try {
+            setFirewallLoading(true);
+            const currentRule = firewallRules[currentIndex];
+            const previousRule = firewallRules[currentIndex - 1];
+
+            // Get current orders or use index as fallback
+            const currentOrder = currentRule.order !== undefined ? currentRule.order : currentIndex;
+            const previousOrder = previousRule.order !== undefined ? previousRule.order : currentIndex - 1;
+
+            // Swap orders - current rule gets previous order, previous rule gets current order
+            await Promise.all([
+                firewallAPI.updateRule(currentRule.id, { order: previousOrder }),
+                firewallAPI.updateRule(previousRule.id, { order: currentOrder })
+            ]);
+
+            // Refresh rules list
+            const response = await firewallAPI.getRules();
+            if (response.success) {
+                setFirewallRules(response.data || []);
+                showToast('Rule moved up', 'success');
+            }
+        } catch (error) {
+            console.error('Move rule up error:', error);
+            const msg = error.response?.data?.message || 'Failed to move rule';
+            showToast(msg, 'error');
+        } finally {
+            setFirewallLoading(false);
+        }
+    };
+
+    // Move rule down (increase order)
+    const handleMoveRuleDown = async (ruleId, currentIndex) => {
+        if (currentIndex === firewallRules.length - 1) return;
+        try {
+            setFirewallLoading(true);
+            const currentRule = firewallRules[currentIndex];
+            const nextRule = firewallRules[currentIndex + 1];
+
+            // Get current orders or use index as fallback
+            const currentOrder = currentRule.order !== undefined ? currentRule.order : currentIndex;
+            const nextOrder = nextRule.order !== undefined ? nextRule.order : currentIndex + 1;
+
+            // Swap orders - current rule gets next order, next rule gets current order
+            await Promise.all([
+                firewallAPI.updateRule(currentRule.id, { order: nextOrder }),
+                firewallAPI.updateRule(nextRule.id, { order: currentOrder })
+            ]);
+
+            // Refresh rules list
+            const response = await firewallAPI.getRules();
+            if (response.success) {
+                setFirewallRules(response.data || []);
+                showToast('Rule moved down', 'success');
+            }
+        } catch (error) {
+            console.error('Move rule down error:', error);
+            const msg = error.response?.data?.message || 'Failed to move rule';
+            showToast(msg, 'error');
+        } finally {
+            setFirewallLoading(false);
+        }
+    };
+
+    // Reset/Refresh rule (reload from server)
+    const handleResetRule = async (ruleId) => {
+        try {
+            const response = await firewallAPI.getRules();
+            if (response.success) {
+                const updatedRule = response.data.find(r => r.id === ruleId);
+                if (updatedRule) {
+                    setFirewallRules((prev) =>
+                        prev.map((rule) => rule.id === ruleId ? updatedRule : rule)
+                    );
+                    showToast('Rule refreshed', 'success');
+                }
+            }
+        } catch (error) {
+            console.error('Reset rule error:', error);
+            showToast('Failed to refresh rule', 'error');
         }
     };
 
     const handleLoginSuccess = (userData) => {
         setUser(userData);
+        showToast('Login successful', 'success');
     };
 
     const handleLogout = () => {
         authAPI.logout();
         setUser(null);
         setActiveTab('login');
+        showToast('Logged out', 'info');
     };
 
     if (loading) {
@@ -261,8 +527,8 @@ function App() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: '#121212',
-                color: '#36E27B',
+                backgroundColor: palette.bgMain,
+                color: palette.accent,
                 fontSize: '18px'
             }}>
                 Loading...
@@ -273,362 +539,389 @@ function App() {
     // If user is logged in, show dashboard
     if (user) {
         return (
-            <div style={{
-                minHeight: '100vh',
-                backgroundColor: '#121212',
-                color: '#fff',
-                display: 'flex'
-            }}>
-                {/* Sidebar */}
+            <>
                 <div style={{
-                    width: '250px',
-                    backgroundColor: '#181818',
-                    padding: '20px',
-                    borderRight: '1px solid #282828'
+                    minHeight: '100vh',
+                    backgroundColor: palette.bgMain,
+                    color: palette.text,
+                    display: 'flex'
                 }}>
+                    {/* Sidebar */}
                     <div style={{
-                        marginBottom: '40px',
-                        paddingBottom: '20px',
-                        borderBottom: '1px solid #282828'
+                        width: '260px',
+                        backgroundColor: palette.bgPanel,
+                        padding: '20px',
+                        borderRight: `1px solid ${palette.border}`,
+                        transition: 'background-color 0.3s ease, border-color 0.3s ease'
                     }}>
-                        <h2 style={{
-                            color: '#36E27B',
-                            margin: '0 0 10px 0',
-                            fontSize: '24px'
-                        }}>NeoSec</h2>
-                        <p style={{
-                            margin: 0,
-                            fontSize: '12px',
-                            color: '#888'
-                        }}>{user.email}</p>
-                        <span style={{
-                            display: 'inline-block',
-                            marginTop: '10px',
-                            padding: '5px 12px',
-                            borderRadius: '15px',
-                            fontSize: '12px',
-                            backgroundColor: user.role === 'admin' ? '#1E402C' : '#282828',
-                            color: user.role === 'admin' ? '#36E27B' : '#fff',
-                            border: user.role === 'admin' ? '1px solid #36E27B' : '1px solid #444'
+                        <div style={{
+                            marginBottom: '40px',
+                            paddingBottom: '20px',
+                            borderBottom: `1px solid ${palette.border}`,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px'
                         }}>
-              {user.role === 'admin' ? ' Admin' : ' User'}
-            </span>
-                    </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{
+                                    width: '14px',
+                                    height: '14px',
+                                    borderRadius: '4px',
+                                    background: theme === 'dark' ? '#7c8bff' : '#030213'
+                                }} />
+                                <h2 style={{
+                                    color: palette.accent,
+                                    margin: 0,
+                                    fontSize: '20px',
+                                    letterSpacing: '0.2px'
+                                }}>NeoSec</h2>
+                            </div>
+                            <p style={{
+                                margin: 0,
+                                fontSize: '12px',
+                                color: palette.textMuted
+                            }}>{user.email}</p>
+                            <span style={{
+                                display: 'inline-block',
+                                marginTop: '10px',
+                                padding: '5px 12px',
+                                borderRadius: '15px',
+                                fontSize: '12px',
+                                backgroundColor: user.role === 'admin' ? palette.accentSoft : palette.bgPanel,
+                                color: user.role === 'admin' ? palette.accent : palette.text,
+                                border: user.role === 'admin' ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`
+                            }}>
+                                {user.role === 'admin' ? ' Admin' : ' User'}
+                            </span>
+                            <div style={{
+                                marginTop: '4px',
+                                alignSelf: 'flex-start',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                            }}>
+                                <span style={{ fontSize: '12px', color: palette.textMuted }}>Theme</span>
+                                <label style={{
+                                    position: 'relative',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    cursor: 'pointer'
+                                }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={theme === 'dark'}
+                                        onChange={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                                        style={{ display: 'none' }}
+                                    />
+                                    <span style={{
+                                        width: '46px',
+                                        height: '24px',
+                                        backgroundColor: theme === 'dark' ? palette.accent : palette.border,
+                                        borderRadius: '999px',
+                                        position: 'relative',
+                                        transition: 'all 0.2s'
+                                    }}>
+                                        <span style={{
+                                            position: 'absolute',
+                                            top: '3px',
+                                            left: theme === 'dark' ? '24px' : '3px',
+                                            width: '18px',
+                                            height: '18px',
+                                            borderRadius: '50%',
+                                            backgroundColor: theme === 'dark' ? '#fff' : palette.text,
+                                            transition: 'all 0.2s',
+                                            boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
+                                        }} />
+                                    </span>
+                                </label>
+                                <span style={{ fontSize: '12px', color: palette.textMuted }}>
+                                    {theme === 'dark' ? 'Dark' : 'Light'}
+                                </span>
+                            </div>
+                        </div>
 
-                    <nav>
-                        <button
-                            onClick={() => setCurrentView('dashboard')}
-                            style={{
-                                width: '100%',
-                                padding: '12px 15px',
-                                marginBottom: '10px',
-                                backgroundColor: currentView === 'dashboard' ? '#1E402C' : 'transparent',
-                                color: currentView === 'dashboard' ? '#36E27B' : '#fff',
-                                border: currentView === 'dashboard' ? '1px solid #36E27B' : '1px solid transparent',
-                                borderRadius: '8px',
-                                textAlign: 'left',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                             Dashboard
-                        </button>
-
-                        <button
-                            onClick={() => setCurrentView('vpn')}
-                            style={{
-                                width: '100%',
-                                padding: '12px 15px',
-                                marginBottom: '10px',
-                                backgroundColor: currentView === 'vpn' ? '#1E402C' : 'transparent',
-                                color: currentView === 'vpn' ? '#36E27B' : '#fff',
-                                border: currentView === 'vpn' ? '1px solid #36E27B' : '1px solid transparent',
-                                borderRadius: '8px',
-                                textAlign: 'left',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                             VPN Configurations
-                        </button>
-
-                        <button
-                            onClick={() => setCurrentView('firewall')}
-                            style={{
-                                width: '100%',
-                                padding: '12px 15px',
-                                marginBottom: '10px',
-                                backgroundColor: currentView === 'firewall' ? '#1E402C' : 'transparent',
-                                color: currentView === 'firewall' ? '#36E27B' : '#fff',
-                                border: currentView === 'firewall' ? '1px solid #36E27B' : '1px solid transparent',
-                                borderRadius: '8px',
-                                textAlign: 'left',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                             Firewall Rules
-                        </button>
-
-                        <button
-                            onClick={() => setCurrentView('profiles')}
-                            style={{
-                                width: '100%',
-                                padding: '12px 15px',
-                                marginBottom: '10px',
-                                backgroundColor: currentView === 'profiles' ? '#1E402C' : 'transparent',
-                                color: currentView === 'profiles' ? '#36E27B' : '#fff',
-                                border: currentView === 'profiles' ? '1px solid #36E27B' : '1px solid transparent',
-                                borderRadius: '8px',
-                                textAlign: 'left',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                             Security Profiles
-                        </button>
-
-                        {user.role === 'admin' && (
+                        <nav>
                             <button
-                                onClick={() => setCurrentView('users')}
+                                onMouseEnter={() => setNavHover('dashboard')}
+                                onMouseLeave={() => setNavHover(null)}
+                                onClick={() => setCurrentView('dashboard')}
                                 style={{
                                     width: '100%',
                                     padding: '12px 15px',
                                     marginBottom: '10px',
-                                    backgroundColor: currentView === 'users' ? '#1E402C' : 'transparent',
-                                    color: currentView === 'users' ? '#36E27B' : '#fff',
-                                    border: currentView === 'users' ? '1px solid #36E27B' : '1px solid transparent',
-                                    borderRadius: '8px',
+                                    backgroundColor: currentView === 'dashboard' || navHover === 'dashboard' ? palette.accentSoft : 'transparent',
+                                    color: currentView === 'dashboard' || navHover === 'dashboard' ? palette.accent : palette.text,
+                                    border: currentView === 'dashboard' || navHover === 'dashboard' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                    borderRadius: '10px',
                                     textAlign: 'left',
                                     cursor: 'pointer',
                                     fontSize: '14px',
-                                    transition: 'all 0.2s'
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: navHover === 'dashboard' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
                                 }}
                             >
-                                 User Management
+                                Dashboard
                             </button>
-                        )}
-                    </nav>
 
-                    <button
-                        onClick={handleLogout}
-                        style={{
-                            width: '100%',
-                            padding: '12px 15px',
-                            marginTop: '30px',
-                            backgroundColor: '#282828',
-                            color: '#fff',
-                            border: '1px solid #444',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                         Logout
-                    </button>
-                </div>
+                            <button
+                                onMouseEnter={() => setNavHover('vpn')}
+                                onMouseLeave={() => setNavHover(null)}
+                                onClick={() => setCurrentView('vpn')}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px 15px',
+                                    marginBottom: '10px',
+                                    backgroundColor: currentView === 'vpn' || navHover === 'vpn' ? palette.accentSoft : 'transparent',
+                                    color: currentView === 'vpn' || navHover === 'vpn' ? palette.accent : palette.text,
+                                    border: currentView === 'vpn' || navHover === 'vpn' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                    borderRadius: '10px',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: navHover === 'vpn' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                }}
+                            >
+                                VPN Configurations
+                            </button>
 
-                {/* Main Content */}
-                <div style={{
-                    flex: 1,
-                    padding: '40px',
-                    overflowY: 'auto'
-                }}>
-                    {/* Dashboard View */}
-                    {currentView === 'dashboard' && (
-                        <div>
-                            <h1 style={{
-                                fontSize: '32px',
-                                marginBottom: '10px',
-                                color: '#fff'
-                            }}>Welcome to NeoSec</h1>
-                            <p style={{
-                                color: '#888',
-                                marginBottom: '30px'
-                            }}>VPN & Firewall Manager Dashboard</p>
+                            <button
+                                onMouseEnter={() => setNavHover('firewall')}
+                                onMouseLeave={() => setNavHover(null)}
+                                onClick={() => setCurrentView('firewall')}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px 15px',
+                                    marginBottom: '10px',
+                                    backgroundColor: currentView === 'firewall' || navHover === 'firewall' ? palette.accentSoft : 'transparent',
+                                    color: currentView === 'firewall' || navHover === 'firewall' ? palette.accent : palette.text,
+                                    border: currentView === 'firewall' || navHover === 'firewall' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                    borderRadius: '10px',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: navHover === 'firewall' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                }}
+                            >
+                                Firewall Rules
+                            </button>
 
-                            {!user.isApproved && (
+                            <button
+                                onMouseEnter={() => setNavHover('profiles')}
+                                onMouseLeave={() => setNavHover(null)}
+                                onClick={() => setCurrentView('profiles')}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px 15px',
+                                    marginBottom: '10px',
+                                    backgroundColor: currentView === 'profiles' || navHover === 'profiles' ? palette.accentSoft : 'transparent',
+                                    color: currentView === 'profiles' || navHover === 'profiles' ? palette.accent : palette.text,
+                                    border: currentView === 'profiles' || navHover === 'profiles' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                    borderRadius: '10px',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: navHover === 'profiles' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                }}
+                            >
+                                Security Profiles
+                            </button>
+
+                            {user.role === 'admin' && (
+                                <button
+                                    onMouseEnter={() => setNavHover('users')}
+                                    onMouseLeave={() => setNavHover(null)}
+                                    onClick={() => setCurrentView('users')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px 15px',
+                                        marginBottom: '10px',
+                                        backgroundColor: currentView === 'users' || navHover === 'users' ? palette.accentSoft : 'transparent',
+                                        color: currentView === 'users' || navHover === 'users' ? palette.accent : palette.text,
+                                        border: currentView === 'users' || navHover === 'users' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                        borderRadius: '10px',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        fontSize: '14px',
+                                        transition: 'all 0.15s ease',
+                                        boxShadow: navHover === 'users' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                    }}
+                                >
+                                    User Management
+                                </button>
+                            )}
+                        </nav>
+
+                        <button
+                            onClick={handleLogout}
+                            onMouseEnter={() => setLogoutHover(true)}
+                            onMouseLeave={() => setLogoutHover(false)}
+                            style={{
+                                width: '100%',
+                                padding: '12px 15px',
+                                marginTop: '30px',
+                                backgroundColor: logoutHover
+                                    ? (theme === 'dark' ? 'rgba(54,226,123,0.2)' : 'rgba(31,164,90,0.15)')
+                                    : palette.accentSoft,
+                                color: logoutHover ? palette.accent : palette.text,
+                                border: logoutHover
+                                    ? `1px solid ${palette.accent}`
+                                    : `1px solid ${palette.border}`,
+                                borderRadius: '10px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                fontWeight: logoutHover ? 600 : 500,
+                                transition: 'all 0.15s ease',
+                                boxShadow: logoutHover ? '0 6px 14px rgba(0,0,0,0.08)' : 'none',
+                                transform: logoutHover ? 'translateY(-1px)' : 'translateY(0)'
+                            }}
+                        >
+                            Logout
+                        </button>
+                    </div>
+
+                    {/* Main Content */}
+                    <div style={{
+                        flex: 1,
+                        padding: '40px',
+                        transition: 'background-color 0.3s ease, color 0.3s ease',
+                        overflowY: 'auto',
+                        backgroundColor: palette.bgMain,
+                        color: palette.text
+                    }}>
+                        {/* Dashboard View */}
+                        {currentView === 'dashboard' && (
+                            <div>
+                                <h1 style={{
+                                    fontSize: '28px',
+                                    marginBottom: '6px',
+                                    color: palette.text
+                                }}>Welcome to NeoSec</h1>
+                                <p style={{
+                                    color: palette.textMuted,
+                                    marginBottom: '24px'
+                                }}>VPN & Firewall Manager Dashboard</p>
+
+                                {!user.isApproved && (
+                                    <div style={{
+                                        padding: '18px',
+                                        backgroundColor: palette.accentSoft,
+                                        border: `1px solid ${palette.warning}`,
+                                        borderRadius: '12px',
+                                        marginBottom: '24px'
+                                    }}>
+                                        <strong style={{ color: palette.warning }}>⚠️ Account Pending Approval</strong>
+                                        <p style={{ margin: '8px 0 0 0', color: palette.textMuted }}>
+                                            Your account is awaiting admin approval. Some features may be restricted.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Stats Cards */}
                                 <div style={{
-                                    padding: '20px',
-                                    backgroundColor: '#282828',
-                                    border: '1px solid #FF9800',
-                                    borderRadius: '8px',
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                                    gap: '16px',
+                                    marginBottom: '24px'
+                                }}>
+                                    <div style={{ ...cardBase, padding: '22px' }}>
+                                        <div style={{ fontSize: '14px', color: palette.textMuted, marginBottom: '8px' }}>
+                                            VPN Status
+                                        </div>
+                                        {dashboardLoading ? (
+                                            <div style={{ fontSize: '14px', color: palette.textMuted }}>Loading...</div>
+                                        ) : (
+                                            <>
+                                                <div style={{
+                                                    fontSize: '24px',
+                                                    color: dashboardData?.vpnStatus?.connected ? palette.accent : palette.warning,
+                                                    fontWeight: 'bold'
+                                                }}>
+                                                    {dashboardData?.vpnStatus?.connected ? 'Connected' : 'Disconnected'}
+                                                </div>
+                                                <div style={{ fontSize: '12px', color: palette.textMuted, marginTop: '8px' }}>
+                                                    {dashboardData?.vpnStatus?.server
+                                                        ? `Server: ${dashboardData.vpnStatus.server}`
+                                                        : 'No active connection'}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    <div style={{ ...cardBase, padding: '22px' }}>
+                                        <div style={{ fontSize: '14px', color: palette.textMuted, marginBottom: '8px' }}>
+                                            Threats Blocked
+                                        </div>
+                                        {dashboardLoading ? (
+                                            <div style={{ fontSize: '14px', color: palette.textMuted }}>Loading...</div>
+                                        ) : (
+                                            <>
+                                                <div style={{ fontSize: '24px', color: palette.accent, fontWeight: 'bold' }}>
+                                                    {dashboardData?.threatsBlocked?.last24Hours || 0}
+                                                </div>
+                                                <div style={{ fontSize: '12px', color: palette.textMuted, marginTop: '8px' }}>
+                                                    Last 24 hours (Total: {dashboardData?.threatsBlocked?.total || 0})
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    <div style={{ ...cardBase, padding: '22px' }}>
+                                        <div style={{ fontSize: '14px', color: palette.textMuted, marginBottom: '8px' }}>
+                                            Active Rules
+                                        </div>
+                                        <div style={{ fontSize: '24px', color: palette.accent, fontWeight: 'bold' }}>
+                                            {firewallRules.length}
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: palette.textMuted, marginTop: '8px' }}>
+                                            Firewall rules active
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* User Info Card */}
+                                <div style={{ ...cardBase, padding: '22px' }}>
+                                    <h2 style={{
+                                        fontSize: '20px',
+                                        marginBottom: '20px',
+                                        color: palette.text
+                                    }}>Account Information</h2>
+                                    <div style={{ display: 'grid', gap: '15px' }}>
+                                        <div>
+                                            <span style={{ color: palette.textMuted }}>Email: </span>
+                                            <span style={{ color: palette.text }}>{user.email}</span>
+                                        </div>
+                                        <div>
+                                            <span style={{ color: palette.textMuted }}>Role: </span>
+                                            <span style={{
+                                                color: user.role === 'admin' ? palette.accent : palette.text,
+                                                fontWeight: user.role === 'admin' ? 'bold' : 'normal'
+                                            }}>{user.role}</span>
+                                        </div>
+                                        <div>
+                                            <span style={{ color: palette.textMuted }}>Status: </span>
+                                            <span style={{ color: user.isApproved ? palette.accent : palette.warning }}>
+                                                {user.isApproved ? '✅ Approved' : '⏳ Pending'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* VPN View */}
+                        {currentView === 'vpn' && (
+                            <div>
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
                                     marginBottom: '30px'
                                 }}>
-                                    <strong style={{ color: '#FF9800' }}>⚠️ Account Pending Approval</strong>
-                                    <p style={{ margin: '10px 0 0 0', color: '#ccc' }}>
-                                        Your account is awaiting admin approval. Some features may be restricted.
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* Stats Cards */}
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                                gap: '20px',
-                                marginBottom: '30px'
-                            }}>
-                                <div style={{
-                                    padding: '25px',
-                                    backgroundColor: '#181818',
-                                    border: '1px solid #282828',
-                                    borderRadius: '10px'
-                                }}>
-                                    <div style={{ fontSize: '14px', color: '#888', marginBottom: '10px' }}>
-                                        VPN Status
-                                    </div>
-                                    {dashboardLoading ? (
-                                        <div style={{ fontSize: '14px', color: '#888' }}>Loading...</div>
-                                    ) : (
-                                        <>
-                                            <div style={{ 
-                                                fontSize: '24px', 
-                                                color: dashboardData?.vpnStatus?.connected ? '#36E27B' : '#FF9800', 
-                                                fontWeight: 'bold' 
-                                            }}>
-                                                {dashboardData?.vpnStatus?.connected ? 'Connected' : 'Disconnected'}
-                                            </div>
-                                            <div style={{ fontSize: '12px', color: '#888', marginTop: '10px' }}>
-                                                {dashboardData?.vpnStatus?.server 
-                                                    ? `Server: ${dashboardData.vpnStatus.server}` 
-                                                    : 'No active connection'}
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-
-                                <div style={{
-                                    padding: '25px',
-                                    backgroundColor: '#181818',
-                                    border: '1px solid #282828',
-                                    borderRadius: '10px'
-                                }}>
-                                    <div style={{ fontSize: '14px', color: '#888', marginBottom: '10px' }}>
-                                        Threats Blocked
-                                    </div>
-                                    {dashboardLoading ? (
-                                        <div style={{ fontSize: '14px', color: '#888' }}>Loading...</div>
-                                    ) : (
-                                        <>
-                                            <div style={{ fontSize: '24px', color: '#36E27B', fontWeight: 'bold' }}>
-                                                {dashboardData?.threatsBlocked?.last24Hours || 0}
-                                            </div>
-                                            <div style={{ fontSize: '12px', color: '#888', marginTop: '10px' }}>
-                                                Last 24 hours (Total: {dashboardData?.threatsBlocked?.total || 0})
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-
-                                <div style={{
-                                    padding: '25px',
-                                    backgroundColor: '#181818',
-                                    border: '1px solid #282828',
-                                    borderRadius: '10px'
-                                }}>
-                                    <div style={{ fontSize: '14px', color: '#888', marginBottom: '10px' }}>
-                                        Active Rules
-                                    </div>
-                                    <div style={{ fontSize: '24px', color: '#36E27B', fontWeight: 'bold' }}>
-                                        12
-                                    </div>
-                                    <div style={{ fontSize: '12px', color: '#888', marginTop: '10px' }}>
-                                        Firewall rules active
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* User Info Card */}
-                            <div style={{
-                                padding: '25px',
-                                backgroundColor: '#181818',
-                                border: '1px solid #282828',
-                                borderRadius: '10px'
-                            }}>
-                                <h2 style={{
-                                    fontSize: '20px',
-                                    marginBottom: '20px',
-                                    color: '#fff'
-                                }}>Account Information</h2>
-                                <div style={{ display: 'grid', gap: '15px' }}>
-                                    <div>
-                                        <span style={{ color: '#888' }}>Email: </span>
-                                        <span style={{ color: '#fff' }}>{user.email}</span>
-                                    </div>
-                                    <div>
-                                        <span style={{ color: '#888' }}>Role: </span>
-                                        <span style={{
-                                            color: user.role === 'admin' ? '#36E27B' : '#fff',
-                                            fontWeight: user.role === 'admin' ? 'bold' : 'normal'
-                                        }}>{user.role}</span>
-                                    </div>
-                                    <div>
-                                        <span style={{ color: '#888' }}>Status: </span>
-                                        <span style={{ color: user.isApproved ? '#36E27B' : '#FF9800' }}>
-                      {user.isApproved ? '✅ Approved' : '⏳ Pending'}
-                    </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* VPN View */}
-                    {currentView === 'vpn' && (
-                        <div>
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: '30px'
-                            }}>
-                                <h1 style={{ fontSize: '32px', margin: 0 }}>VPN Configurations</h1>
-                                <button style={{
-                                    padding: '12px 24px',
-                                    backgroundColor: '#36E27B',
-                                    color: '#121212',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    fontWeight: 'bold',
-                                    cursor: 'pointer',
-                                    fontSize: '14px'
-                                }}>
-                                    + Add VPN Config
-                                </button>
-                            </div>
-
-                            <div style={{
-                                padding: '25px',
-                                backgroundColor: '#181818',
-                                border: '1px solid #282828',
-                                borderRadius: '10px',
-                                textAlign: 'center',
-                                color: '#888'
-                            }}>
-                                <p>No VPN configurations yet. Click "Add VPN Config" to create your first configuration.</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Firewall View */}
-                    {currentView === 'firewall' && (
-                        <div>
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: '30px'
-                            }}>
-                                <h1 style={{ fontSize: '32px', margin: 0 }}>Firewall Rules</h1>
-                                <button
-                                    onClick={resetFirewallForm}
-                                    style={{
+                                    <h1 style={{ fontSize: '32px', margin: 0 }}>VPN Configurations</h1>
+                                    <button style={{
                                         padding: '12px 24px',
                                         backgroundColor: '#36E27B',
                                         color: '#121212',
@@ -638,603 +931,1312 @@ function App() {
                                         cursor: 'pointer',
                                         fontSize: '14px'
                                     }}>
-                                    {editingRuleId ? 'Cancel Edit' : 'Reset Form'}
-                                </button>
-                            </div>
-
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: '1fr 1fr',
-                                gap: '20px',
-                                marginBottom: '30px'
-                            }}>
-                                {/* Add / Edit Rule Form */}
-                                <div style={{
-                                    padding: '25px',
-                                    backgroundColor: '#181818',
-                                    border: '1px solid #282828',
-                                    borderRadius: '10px'
-                                }}>
-                                    <h2 style={{ color: '#fff', marginTop: 0, marginBottom: '16px' }}>
-                                        {editingRuleId ? 'Edit Firewall Rule' : 'Add Firewall Rule'}
-                                    </h2>
-                                    {firewallError && (
-                                        <div style={{
-                                            padding: '12px',
-                                            marginBottom: '12px',
-                                            borderRadius: '6px',
-                                            backgroundColor: '#2a1515',
-                                            border: '1px solid #ff4444',
-                                            color: '#ff6666',
-                                            fontSize: '13px'
-                                        }}>
-                                            {firewallError}
-                                        </div>
-                                    )}
-                                    <form onSubmit={handleSaveRule} style={{ display: 'grid', gap: '14px' }}>
-                                        <div>
-                                            <label style={{ display: 'block', color: '#888', marginBottom: '6px', fontSize: '13px' }}>
-                                                Action
-                                            </label>
-                                            <select
-                                                name="action"
-                                                value={firewallForm.action}
-                                                onChange={handleFirewallChange}
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '10px',
-                                                    backgroundColor: '#121212',
-                                                    border: '1px solid #282828',
-                                                    borderRadius: '6px',
-                                                    color: '#fff'
-                                                }}
-                                            >
-                                                <option value="allow">Allow</option>
-                                                <option value="deny">Deny</option>
-                                            </select>
-                                        </div>
-
-                                        <div>
-                                            <label style={{ display: 'block', color: '#888', marginBottom: '6px', fontSize: '13px' }}>
-                                                Direction
-                                            </label>
-                                            <select
-                                                name="direction"
-                                                value={firewallForm.direction}
-                                                onChange={handleFirewallChange}
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '10px',
-                                                    backgroundColor: '#121212',
-                                                    border: '1px solid #282828',
-                                                    borderRadius: '6px',
-                                                    color: '#fff'
-                                                }}
-                                            >
-                                                <option value="inbound">Inbound</option>
-                                                <option value="outbound">Outbound</option>
-                                            </select>
-                                        </div>
-
-                                        <div>
-                                            <label style={{ display: 'block', color: '#888', marginBottom: '6px', fontSize: '13px' }}>
-                                                IP Address (optional)
-                                            </label>
-                                            <input
-                                                type="text"
-                                                name="ipAddress"
-                                                value={firewallForm.ipAddress}
-                                                onChange={handleFirewallChange}
-                                                placeholder="e.g., 192.168.1.10"
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '10px',
-                                                    backgroundColor: '#121212',
-                                                    border: '1px solid #282828',
-                                                    borderRadius: '6px',
-                                                    color: '#fff'
-                                                }}
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label style={{ display: 'block', color: '#888', marginBottom: '6px', fontSize: '13px' }}>
-                                                Port (optional)
-                                            </label>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                max="65535"
-                                                name="port"
-                                                value={firewallForm.port}
-                                                onChange={handleFirewallChange}
-                                                placeholder="e.g., 443"
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '10px',
-                                                    backgroundColor: '#121212',
-                                                    border: '1px solid #282828',
-                                                    borderRadius: '6px',
-                                                    color: '#fff'
-                                                }}
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label style={{ display: 'block', color: '#888', marginBottom: '6px', fontSize: '13px' }}>
-                                                Description (optional)
-                                            </label>
-                                            <textarea
-                                                name="description"
-                                                value={firewallForm.description}
-                                                onChange={handleFirewallChange}
-                                                rows={3}
-                                                placeholder="Describe the rule"
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '10px',
-                                                    backgroundColor: '#121212',
-                                                    border: '1px solid #282828',
-                                                    borderRadius: '6px',
-                                                    color: '#fff',
-                                                    resize: 'vertical'
-                                                }}
-                                            />
-                                        </div>
-
-                                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                                            <button
-                                                type="button"
-                                                onClick={resetFirewallForm}
-                                                style={{
-                                                    padding: '10px 16px',
-                                                    backgroundColor: '#282828',
-                                                    color: '#fff',
-                                                    border: '1px solid #444',
-                                                    borderRadius: '6px',
-                                                    cursor: 'pointer'
-                                                }}
-                                            >
-                                                Clear
-                                            </button>
-                                            <button
-                                                type="submit"
-                                                disabled={firewallLoading}
-                                                style={{
-                                                    padding: '10px 16px',
-                                                    backgroundColor: '#36E27B',
-                                                    color: '#121212',
-                                                    border: 'none',
-                                                    borderRadius: '6px',
-                                                    cursor: 'pointer',
-                                                    fontWeight: '600'
-                                                }}
-                                            >
-                                                {editingRuleId ? 'Update Rule' : 'Add Rule'}
-                                            </button>
-                                        </div>
-                                    </form>
+                                        + Add VPN Config
+                                    </button>
                                 </div>
 
-                                {/* Rules List */}
                                 <div style={{
                                     padding: '25px',
-                                    backgroundColor: '#181818',
+                                    backgroundColor: palette.bgCard,
                                     border: '1px solid #282828',
-                                    borderRadius: '10px'
+                                    borderRadius: '10px',
+                                    textAlign: 'center',
+                                    color: '#888'
                                 }}>
-                                    <h2 style={{ color: '#fff', marginTop: 0, marginBottom: '16px' }}>Your Rules</h2>
-                                    {firewallLoading ? (
-                                        <div style={{ color: '#888' }}>Loading rules...</div>
-                                    ) : firewallRules.length === 0 ? (
-                                        <div style={{ color: '#888' }}>No firewall rules yet. Add one using the form.</div>
-                                    ) : (
-                                        <div style={{ display: 'grid', gap: '12px' }}>
-                                            {firewallRules.map((rule) => (
-                                                <div key={rule.id} style={{
-                                                    padding: '15px',
-                                                    backgroundColor: '#121212',
-                                                    border: '1px solid #282828',
-                                                    borderRadius: '8px',
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    gap: '12px',
-                                                    alignItems: 'center'
-                                                }}>
-                                                    <div style={{ display: 'grid', gap: '4px' }}>
-                                                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                                            <span style={{
-                                                                padding: '4px 10px',
-                                                                borderRadius: '12px',
-                                                                backgroundColor: rule.action === 'allow' ? '#1E402C' : '#40201E',
-                                                                color: rule.action === 'allow' ? '#36E27B' : '#FF7777',
-                                                                border: rule.action === 'allow' ? '1px solid #36E27B' : '1px solid #FF7777',
-                                                                fontSize: '12px',
-                                                                fontWeight: '600'
-                                                            }}>
-                                                                {rule.action.toUpperCase()}
-                                                            </span>
-                                                            <span style={{
-                                                                padding: '4px 10px',
-                                                                borderRadius: '12px',
-                                                                backgroundColor: '#222',
-                                                                color: '#fff',
-                                                                border: '1px solid #333',
-                                                                fontSize: '12px',
-                                                                fontWeight: '600'
-                                                            }}>
-                                                                {rule.direction.toUpperCase()}
-                                                            </span>
-                                                        </div>
-                                                        <div style={{ color: '#fff', fontSize: '14px' }}>
-                                                            {rule.ipAddress ? `IP: ${rule.ipAddress}` : 'Any IP'} | {rule.port ? `Port: ${rule.port}` : 'Any Port'}
-                                                        </div>
-                                                        <div style={{ color: '#888', fontSize: '12px' }}>
-                                                            {rule.description || 'No description'}
-                                                        </div>
-                                                    </div>
-                                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                                        <button
-                                                            onClick={() => handleEditRule(rule)}
-                                                            style={{
-                                                                padding: '8px 12px',
-                                                                backgroundColor: '#36E27B',
-                                                                color: '#121212',
-                                                                border: 'none',
-                                                                borderRadius: '6px',
-                                                                cursor: 'pointer',
-                                                                fontSize: '12px',
-                                                                fontWeight: '600'
-                                                            }}
-                                                        >
-                                                            Edit
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteRule(rule.id)}
-                                                            style={{
-                                                                padding: '8px 12px',
-                                                                backgroundColor: '#FF4444',
-                                                                color: '#fff',
-                                                                border: 'none',
-                                                                borderRadius: '6px',
-                                                                cursor: 'pointer',
-                                                                fontSize: '12px',
-                                                                fontWeight: '600'
-                                                            }}
-                                                        >
-                                                            Delete
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                    <p>No VPN configurations yet. Click "Add VPN Config" to create your first configuration.</p>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {/* Profiles View */}
-                    {currentView === 'profiles' && (
-                        <ProfileManager />
-                    )}
-
-                    {/* User Management View (Admin Only) */}
-                    {currentView === 'users' && user.role === 'admin' && (
-                        <div>
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: '30px'
-                            }}>
-                                <h1 style={{ fontSize: '32px', margin: 0 }}>User Management</h1>
-                            </div>
-
-                            {/* Admin Statistics */}
-                            {adminStats && (
+                        {/* Firewall View */}
+                        {currentView === 'firewall' && (
+                            <div>
                                 <div style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                                    gap: '20px',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
                                     marginBottom: '30px'
                                 }}>
-                                    <div style={{
-                                        padding: '20px',
-                                        backgroundColor: '#181818',
-                                        border: '1px solid #282828',
-                                        borderRadius: '10px'
-                                    }}>
-                                        <div style={{ fontSize: '14px', color: '#888', marginBottom: '10px' }}>Total Users</div>
-                                        <div style={{ fontSize: '24px', color: '#36E27B', fontWeight: 'bold' }}>
-                                            {adminStats.users?.total || 0}
-                                        </div>
-                                    </div>
-                                    <div style={{
-                                        padding: '20px',
-                                        backgroundColor: '#181818',
-                                        border: '1px solid #282828',
-                                        borderRadius: '10px'
-                                    }}>
-                                        <div style={{ fontSize: '14px', color: '#888', marginBottom: '10px' }}>Pending Approvals</div>
-                                        <div style={{ fontSize: '24px', color: '#FF9800', fontWeight: 'bold' }}>
-                                            {adminStats.users?.pendingApprovals || 0}
-                                        </div>
-                                    </div>
-                                    <div style={{
-                                        padding: '20px',
-                                        backgroundColor: '#181818',
-                                        border: '1px solid #282828',
-                                        borderRadius: '10px'
-                                    }}>
-                                        <div style={{ fontSize: '14px', color: '#888', marginBottom: '10px' }}>Total Threats Blocked</div>
-                                        <div style={{ fontSize: '24px', color: '#36E27B', fontWeight: 'bold' }}>
-                                            {adminStats.threats?.totalBlocked || 0}
-                                        </div>
-                                    </div>
-                                    <div style={{
-                                        padding: '20px',
-                                        backgroundColor: '#181818',
-                                        border: '1px solid #282828',
-                                        borderRadius: '10px'
-                                    }}>
-                                        <div style={{ fontSize: '14px', color: '#888', marginBottom: '10px' }}>Application Health</div>
-                                        <div style={{ fontSize: '24px', color: '#36E27B', fontWeight: 'bold' }}>
-                                            {adminStats.applicationHealth?.status || 'Unknown'}
-                                        </div>
-                                    </div>
+                                    <h1 style={{ fontSize: '24px', margin: 0, color: palette.text, fontWeight: 600 }}>Firewall Rule Management</h1>
+                                    <button
+                                        onClick={() => {
+                                            openFirewallModal();
+                                        }}
+                                        style={{
+                                            padding: '10px 20px',
+                                            backgroundColor: palette.accent,
+                                            color: theme === 'dark' ? '#121212' : '#fff',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            fontSize: '14px'
+                                        }}>
+                                        + Add New Rule
+                                    </button>
                                 </div>
-                            )}
 
-                            {/* Users Table */}
-                            <div style={{
-                                padding: '25px',
-                                backgroundColor: '#181818',
-                                border: '1px solid #282828',
-                                borderRadius: '10px'
-                            }}>
-                                <h2 style={{ color: '#fff', marginTop: 0, marginBottom: '20px' }}>All Users</h2>
-                                {usersLoading ? (
-                                    <div style={{ color: '#888', textAlign: 'center', padding: '40px' }}>Loading users...</div>
-                                ) : users.length === 0 ? (
-                                    <div style={{ color: '#888', textAlign: 'center', padding: '40px' }}>No users found</div>
-                                ) : (
-                                    <div style={{ overflowX: 'auto' }}>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                            <thead>
-                                                <tr style={{ borderBottom: '1px solid #282828' }}>
-                                                    <th style={{ padding: '12px', textAlign: 'left', color: '#888', fontWeight: '600' }}>Email</th>
-                                                    <th style={{ padding: '12px', textAlign: 'left', color: '#888', fontWeight: '600' }}>Role</th>
-                                                    <th style={{ padding: '12px', textAlign: 'left', color: '#888', fontWeight: '600' }}>Status</th>
-                                                    <th style={{ padding: '12px', textAlign: 'left', color: '#888', fontWeight: '600' }}>Created</th>
-                                                    <th style={{ padding: '12px', textAlign: 'left', color: '#888', fontWeight: '600' }}>Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {users.map((u) => (
-                                                    <tr key={u.id} style={{ borderBottom: '1px solid #282828' }}>
-                                                        <td style={{ padding: '12px', color: '#fff' }}>{u.email}</td>
-                                                        <td style={{ padding: '12px' }}>
-                                                            <span style={{
-                                                                padding: '4px 12px',
-                                                                borderRadius: '12px',
-                                                                fontSize: '12px',
-                                                                backgroundColor: u.role === 'admin' ? '#1E402C' : '#282828',
-                                                                color: u.role === 'admin' ? '#36E27B' : '#fff',
-                                                                border: u.role === 'admin' ? '1px solid #36E27B' : '1px solid #444'
-                                                            }}>
-                                                                {u.role}
-                                                            </span>
-                                                        </td>
-                                                        <td style={{ padding: '12px' }}>
-                                                            <span style={{
-                                                                color: u.isApproved ? '#36E27B' : '#FF9800'
-                                                            }}>
-                                                                {u.isApproved ? '✅ Approved' : '⏳ Pending'}
-                                                            </span>
-                                                        </td>
-                                                        <td style={{ padding: '12px', color: '#888', fontSize: '14px' }}>
-                                                            {new Date(u.createdAt).toLocaleDateString()}
-                                                        </td>
-                                                        <td style={{ padding: '12px' }}>
-                                                            <button
-                                                                onClick={() => handleEditUser(u)}
-                                                                style={{
-                                                                    padding: '6px 12px',
-                                                                    marginRight: '8px',
-                                                                    backgroundColor: '#36E27B',
-                                                                    color: '#121212',
-                                                                    border: 'none',
-                                                                    borderRadius: '6px',
-                                                                    cursor: 'pointer',
-                                                                    fontSize: '12px',
-                                                                    fontWeight: '600'
-                                                                }}
-                                                            >
-                                                                Edit
-                                                            </button>
-                                                            {u.id !== user.id && (
-                                                                <button
-                                                                    onClick={() => handleDeleteUser(u.id)}
-                                                                    style={{
-                                                                        padding: '6px 12px',
-                                                                        backgroundColor: '#FF4444',
-                                                                        color: '#fff',
-                                                                        border: 'none',
-                                                                        borderRadius: '6px',
-                                                                        cursor: 'pointer',
-                                                                        fontSize: '12px',
-                                                                        fontWeight: '600'
-                                                                    }}
-                                                                >
-                                                                    Delete
-                                                                </button>
-                                                            )}
-                                                        </td>
+                                {/* Rules Table */}
+                                <div style={{ ...cardBase, padding: 0, overflow: 'hidden' }}>
+                                    {firewallLoading ? (
+                                        <div style={{ padding: '40px', textAlign: 'center', color: palette.textMuted }}>Loading rules...</div>
+                                    ) : firewallRules.length === 0 ? (
+                                        <div style={{ padding: '40px', textAlign: 'center', color: palette.textMuted }}>No firewall rules yet. Click "+ Add New Rule" to create your first rule.</div>
+                                    ) : (
+                                        <div style={{ overflowX: 'auto' }}>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                <thead>
+                                                    <tr style={{ borderBottom: `1px solid ${palette.border}`, backgroundColor: theme === 'light' ? '#f8f9fa' : palette.bgPanel }}>
+                                                        <th style={{ padding: '14px 12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Order</th>
+                                                        <th style={{ padding: '14px 12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Action</th>
+                                                        <th style={{ padding: '14px 12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Source</th>
+                                                        <th style={{ padding: '14px 12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Destination</th>
+                                                        <th style={{ padding: '14px 12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Protocol</th>
+                                                        <th style={{ padding: '14px 12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Port</th>
+                                                        <th style={{ padding: '14px 12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Description</th>
+                                                        <th style={{ padding: '14px 12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Actions</th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                                </thead>
+                                                <tbody>
+                                                    {firewallRules.map((rule, idx) => (
+                                                        <tr key={rule.id} style={{
+                                                            borderBottom: idx === firewallRules.length - 1 ? 'none' : `1px solid ${palette.border}`
+                                                        }}>
+                                                            <td style={{ padding: '14px 12px' }}>
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                                                                    <button
+                                                                        onClick={() => handleMoveRuleUp(rule.id, idx)}
+                                                                        style={{
+                                                                            background: 'none',
+                                                                            border: 'none',
+                                                                            color: palette.textMuted,
+                                                                            cursor: idx === 0 ? 'not-allowed' : 'pointer',
+                                                                            opacity: idx === 0 ? 0.3 : 1,
+                                                                            fontSize: '12px',
+                                                                            padding: '2px'
+                                                                        }}
+                                                                        disabled={idx === 0}
+                                                                    >
+                                                                        ▲
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleMoveRuleDown(rule.id, idx)}
+                                                                        style={{
+                                                                            background: 'none',
+                                                                            border: 'none',
+                                                                            color: palette.textMuted,
+                                                                            cursor: idx === firewallRules.length - 1 ? 'not-allowed' : 'pointer',
+                                                                            opacity: idx === firewallRules.length - 1 ? 0.3 : 1,
+                                                                            fontSize: '12px',
+                                                                            padding: '2px'
+                                                                        }}
+                                                                        disabled={idx === firewallRules.length - 1}
+                                                                    >
+                                                                        ▼
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                            <td style={{ padding: '14px 12px' }}>
+                                                                <span style={{
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '6px',
+                                                                    padding: '4px 10px',
+                                                                    borderRadius: '12px',
+                                                                    fontSize: '12px',
+                                                                    fontWeight: 600,
+                                                                    backgroundColor: rule.action === 'allow'
+                                                                        ? (theme === 'dark' ? '#1E402C' : '#e6f4ed')
+                                                                        : (theme === 'dark' ? '#40201E' : '#fee2e2'),
+                                                                    color: rule.action === 'allow'
+                                                                        ? (theme === 'dark' ? '#36E27B' : '#1fa45a')
+                                                                        : (theme === 'dark' ? '#FF7777' : '#d4183d'),
+                                                                    border: rule.action === 'allow'
+                                                                        ? (theme === 'dark' ? '1px solid #36E27B' : '1px solid #1fa45a')
+                                                                        : (theme === 'dark' ? '1px solid #FF7777' : '1px solid #d4183d')
+                                                                }}>
+                                                                    {rule.action === 'allow' ? '✓' : '✗'} {rule.action === 'allow' ? 'Allow' : 'Deny'}
+                                                                </span>
+                                                            </td>
+                                                            <td style={{ padding: '14px 12px', color: palette.text, fontSize: '14px' }}>
+                                                                {rule.sourceIP || 'Any'}
+                                                            </td>
+                                                            <td style={{ padding: '14px 12px', color: palette.text, fontSize: '14px' }}>
+                                                                {rule.destinationIP || 'Any'}
+                                                            </td>
+                                                            <td style={{ padding: '14px 12px' }}>
+                                                                <span style={{
+                                                                    padding: '4px 10px',
+                                                                    borderRadius: '12px',
+                                                                    fontSize: '12px',
+                                                                    backgroundColor: theme === 'light' ? '#f1f3f5' : '#2a2a2a',
+                                                                    color: palette.textMuted,
+                                                                    fontWeight: 500
+                                                                }}>
+                                                                    {(rule.protocol || 'any').toUpperCase()}
+                                                                </span>
+                                                            </td>
+                                                            <td style={{ padding: '14px 12px', color: palette.text, fontSize: '14px' }}>
+                                                                {rule.destinationPort || rule.sourcePort || 'Any'}
+                                                            </td>
+                                                            <td style={{ padding: '14px 12px', color: palette.text, fontSize: '14px' }}>
+                                                                {rule.description || '—'}
+                                                            </td>
+                                                            <td style={{ padding: '14px 12px' }}>
+                                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                                    <button
+                                                                        onClick={() => handleResetRule(rule.id)}
+                                                                        onMouseEnter={() => setActionButtonHover(`reset-${rule.id}`)}
+                                                                        onMouseLeave={() => setActionButtonHover(null)}
+                                                                        title="Reset/Refresh"
+                                                                        style={{
+                                                                            background: actionButtonHover === `reset-${rule.id}`
+                                                                                ? (theme === 'dark' ? 'rgba(54,226,123,0.15)' : 'rgba(31,164,90,0.1)')
+                                                                                : 'none',
+                                                                            border: 'none',
+                                                                            color: actionButtonHover === `reset-${rule.id}`
+                                                                                ? palette.accent
+                                                                                : palette.textMuted,
+                                                                            cursor: 'pointer',
+                                                                            fontSize: '16px',
+                                                                            padding: '4px 6px',
+                                                                            borderRadius: '6px',
+                                                                            transition: 'all 0.15s ease',
+                                                                            transform: actionButtonHover === `reset-${rule.id}` ? 'scale(1.1)' : 'scale(1)'
+                                                                        }}
+                                                                    >
+                                                                        ⟳
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleEditRule(rule)}
+                                                                        onMouseEnter={() => setActionButtonHover(`edit-${rule.id}`)}
+                                                                        onMouseLeave={() => setActionButtonHover(null)}
+                                                                        title="Edit"
+                                                                        style={{
+                                                                            background: actionButtonHover === `edit-${rule.id}`
+                                                                                ? (theme === 'dark' ? 'rgba(54,226,123,0.15)' : 'rgba(31,164,90,0.1)')
+                                                                                : 'none',
+                                                                            border: 'none',
+                                                                            color: actionButtonHover === `edit-${rule.id}`
+                                                                                ? palette.accent
+                                                                                : palette.textMuted,
+                                                                            cursor: 'pointer',
+                                                                            fontSize: '16px',
+                                                                            padding: '4px 6px',
+                                                                            borderRadius: '6px',
+                                                                            transition: 'all 0.15s ease',
+                                                                            transform: actionButtonHover === `edit-${rule.id}` ? 'scale(1.1)' : 'scale(1)'
+                                                                        }}
+                                                                    >
+                                                                        ✏️
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDeleteRule(rule.id)}
+                                                                        onMouseEnter={() => setActionButtonHover(`delete-${rule.id}`)}
+                                                                        onMouseLeave={() => setActionButtonHover(null)}
+                                                                        title="Delete"
+                                                                        style={{
+                                                                            background: actionButtonHover === `delete-${rule.id}`
+                                                                                ? (theme === 'dark' ? 'rgba(224,72,72,0.15)' : 'rgba(212,24,61,0.1)')
+                                                                                : 'none',
+                                                                            border: 'none',
+                                                                            color: palette.danger,
+                                                                            cursor: 'pointer',
+                                                                            fontSize: '16px',
+                                                                            padding: '4px 6px',
+                                                                            borderRadius: '6px',
+                                                                            transition: 'all 0.15s ease',
+                                                                            transform: actionButtonHover === `delete-${rule.id}` ? 'scale(1.1)' : 'scale(1)',
+                                                                            opacity: actionButtonHover === `delete-${rule.id}` ? 1 : 0.8
+                                                                        }}
+                                                                    >
+                                                                        🗑️
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Delete Confirmation Modal */}
+                                {confirmDeleteRuleId && (
+                                    <div style={{
+                                        position: 'fixed',
+                                        top: 0,
+                                        left: 0,
+                                        right: 0,
+                                        bottom: 0,
+                                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        zIndex: 1000,
+                                        opacity: 1,
+                                        transition: 'opacity 0.2s ease, background-color 0.2s ease'
+                                    }}>
+                                        <div style={{
+                                            ...cardBase,
+                                            padding: '30px',
+                                            maxWidth: '400px',
+                                            width: '90%',
+                                            transform: 'scale(1) translateY(0)',
+                                            transition: 'transform 0.2s ease, opacity 0.2s ease'
+                                        }}>
+                                            <h3 style={{ marginTop: 0, marginBottom: '16px', color: palette.text }}>Confirm Delete</h3>
+                                            <p style={{ color: palette.textMuted, marginBottom: '24px' }}>
+                                                Are you sure you want to delete this firewall rule? This action cannot be undone.
+                                            </p>
+                                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                                                <button
+                                                    onClick={() => setConfirmDeleteRuleId(null)}
+                                                    style={{
+                                                        padding: '10px 20px',
+                                                        backgroundColor: 'transparent',
+                                                        color: palette.text,
+                                                        border: `1px solid ${palette.border}`,
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer',
+                                                        fontWeight: 600
+                                                    }}
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    onClick={confirmDeleteRule}
+                                                    style={{
+                                                        padding: '10px 20px',
+                                                        backgroundColor: palette.danger,
+                                                        color: '#fff',
+                                                        border: 'none',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer',
+                                                        fontWeight: 600
+                                                    }}
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Add/Edit Firewall Rule Modal */}
+                                {showFirewallModal && (
+                                    <div style={{
+                                        position: 'fixed',
+                                        top: 0,
+                                        left: 0,
+                                        right: 0,
+                                        bottom: 0,
+                                        backgroundColor: firewallModalAnimating ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        zIndex: 1000,
+                                        overflowY: 'auto',
+                                        padding: '20px',
+                                        opacity: firewallModalAnimating ? 1 : 0,
+                                        transition: 'opacity 0.2s ease, background-color 0.2s ease',
+                                        pointerEvents: firewallModalAnimating ? 'auto' : 'none'
+                                    }}
+                                        onClick={(e) => {
+                                            if (e.target === e.currentTarget) {
+                                                resetFirewallForm();
+                                            }
+                                        }}
+                                    >
+                                        <div style={{
+                                            ...cardBase,
+                                            padding: '30px',
+                                            maxWidth: '600px',
+                                            width: '100%',
+                                            maxHeight: '90vh',
+                                            overflowY: 'auto',
+                                            transform: firewallModalAnimating ? 'scale(1) translateY(0)' : 'scale(0.9) translateY(-20px)',
+                                            opacity: firewallModalAnimating ? 1 : 0,
+                                            transition: 'transform 0.2s ease, opacity 0.2s ease'
+                                        }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                                <h2 style={{ margin: 0, color: palette.text, fontSize: '20px', fontWeight: 600 }}>
+                                                    {editingRuleId ? 'Edit Firewall Rule' : 'Add New Firewall Rule'}
+                                                </h2>
+                                                <button
+                                                    onClick={resetFirewallForm}
+                                                    style={{
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        color: palette.textMuted,
+                                                        cursor: 'pointer',
+                                                        fontSize: '24px',
+                                                        padding: '0',
+                                                        width: '30px',
+                                                        height: '30px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center'
+                                                    }}
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                            <p style={{ color: palette.textMuted, fontSize: '14px', marginBottom: '24px' }}>
+                                                Configure the firewall rule settings below
+                                            </p>
+
+                                            {firewallError && (
+                                                <div style={{
+                                                    padding: '12px',
+                                                    marginBottom: '16px',
+                                                    borderRadius: '6px',
+                                                    backgroundColor: theme === 'dark' ? '#2a1515' : '#fee2e2',
+                                                    border: `1px solid ${palette.danger}`,
+                                                    color: palette.danger,
+                                                    fontSize: '13px'
+                                                }}>
+                                                    {firewallError}
+                                                </div>
+                                            )}
+
+                                            <form onSubmit={handleSaveRule} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                                {/* Rule Description */}
+                                                <div>
+                                                    <label htmlFor="ruleDescription" style={{ display: 'block', color: palette.text, marginBottom: '8px', fontSize: '14px', fontWeight: 500 }}>
+                                                        Rule Description
+                                                    </label>
+                                                    <input
+                                                        id="ruleDescription"
+                                                        type="text"
+                                                        name="description"
+                                                        value={firewallForm.description}
+                                                        onChange={handleFirewallChange}
+                                                        placeholder="e.g., Allow HTTPS traffic from anywhere."
+                                                        style={{
+                                                            width: '100%',
+                                                            padding: '12px',
+                                                            backgroundColor: palette.inputBg,
+                                                            border: `1px solid ${palette.inputBorder}`,
+                                                            borderRadius: '8px',
+                                                            color: palette.text,
+                                                            fontSize: '14px',
+                                                            boxSizing: 'border-box'
+                                                        }}
+                                                    />
+                                                </div>
+
+                                                {/* Action */}
+                                                <div>
+                                                    <label style={{ display: 'block', color: palette.text, marginBottom: '12px', fontSize: '14px', fontWeight: 500 }}>
+                                                        Action
+                                                    </label>
+                                                    <div style={{ display: 'flex', gap: '16px' }}>
+                                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                            <input
+                                                                type="radio"
+                                                                name="action"
+                                                                value="allow"
+                                                                checked={firewallForm.action === 'allow'}
+                                                                onChange={handleFirewallChange}
+                                                                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                            />
+                                                            <span style={{ color: palette.text, fontSize: '14px' }}>Allow</span>
+                                                        </label>
+                                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                            <input
+                                                                type="radio"
+                                                                name="action"
+                                                                value="deny"
+                                                                checked={firewallForm.action === 'deny'}
+                                                                onChange={handleFirewallChange}
+                                                                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                            />
+                                                            <span style={{ color: palette.text, fontSize: '14px' }}>Deny</span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+
+                                                {/* Protocol */}
+                                                <div>
+                                                    <label htmlFor="protocolSelect" style={{ display: 'block', color: palette.text, marginBottom: '8px', fontSize: '14px', fontWeight: 500 }}>
+                                                        Protocol
+                                                    </label>
+                                                    <select
+                                                        id="protocolSelect"
+                                                        name="protocol"
+                                                        value={firewallForm.protocol}
+                                                        onChange={handleFirewallChange}
+                                                        style={{
+                                                            width: '100%',
+                                                            padding: '12px',
+                                                            backgroundColor: palette.inputBg,
+                                                            border: `1px solid ${palette.inputBorder}`,
+                                                            borderRadius: '8px',
+                                                            color: palette.text,
+                                                            fontSize: '14px',
+                                                            boxSizing: 'border-box'
+                                                        }}
+                                                    >
+                                                        <option value="any">Any</option>
+                                                        <option value="tcp">TCP</option>
+                                                        <option value="udp">UDP</option>
+                                                        <option value="icmp">ICMP</option>
+                                                    </select>
+                                                </div>
+
+                                                {/* Source IP/Range */}
+                                                <div>
+                                                    <label style={{ display: 'block', color: palette.text, marginBottom: '12px', fontSize: '14px', fontWeight: 500 }}>
+                                                        Source IP/Range
+                                                    </label>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                        <div style={{ display: 'flex', gap: '16px' }}>
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="radio"
+                                                                    name="sourceIPType"
+                                                                    value="any"
+                                                                    checked={firewallForm.sourceIPType === 'any'}
+                                                                    onChange={handleFirewallChange}
+                                                                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                                />
+                                                                <span style={{ color: palette.text, fontSize: '14px' }}>Any</span>
+                                                            </label>
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="radio"
+                                                                    name="sourceIPType"
+                                                                    value="specific"
+                                                                    checked={firewallForm.sourceIPType === 'specific'}
+                                                                    onChange={handleFirewallChange}
+                                                                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                                />
+                                                                <span style={{ color: palette.text, fontSize: '14px' }}>Specific IP</span>
+                                                            </label>
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="radio"
+                                                                    name="sourceIPType"
+                                                                    value="range"
+                                                                    checked={firewallForm.sourceIPType === 'range'}
+                                                                    onChange={handleFirewallChange}
+                                                                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                                />
+                                                                <span style={{ color: palette.text, fontSize: '14px' }}>IP Range/CIDR</span>
+                                                            </label>
+                                                        </div>
+                                                        {(firewallForm.sourceIPType === 'specific' || firewallForm.sourceIPType === 'range') && (
+                                                            <input
+                                                                id="sourceIpInput"
+                                                                type="text"
+                                                                name="sourceIP"
+                                                                value={firewallForm.sourceIP}
+                                                                onChange={handleFirewallChange}
+                                                                placeholder={firewallForm.sourceIPType === 'specific' ? "e.g., 192.168.1.1" : "e.g., 192.168.1.0/24"}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    padding: '12px',
+                                                                    backgroundColor: palette.inputBg,
+                                                                    border: `1px solid ${palette.inputBorder}`,
+                                                                    borderRadius: '8px',
+                                                                    color: palette.text,
+                                                                    fontSize: '14px',
+                                                                    boxSizing: 'border-box'
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Destination IP/Range */}
+                                                <div>
+                                                    <label style={{ display: 'block', color: palette.text, marginBottom: '12px', fontSize: '14px', fontWeight: 500 }}>
+                                                        Destination IP/Range
+                                                    </label>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                        <div style={{ display: 'flex', gap: '16px' }}>
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="radio"
+                                                                    name="destinationIPType"
+                                                                    value="any"
+                                                                    checked={firewallForm.destinationIPType === 'any'}
+                                                                    onChange={handleFirewallChange}
+                                                                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                                />
+                                                                <span style={{ color: palette.text, fontSize: '14px' }}>Any</span>
+                                                            </label>
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="radio"
+                                                                    name="destinationIPType"
+                                                                    value="specific"
+                                                                    checked={firewallForm.destinationIPType === 'specific'}
+                                                                    onChange={handleFirewallChange}
+                                                                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                                />
+                                                                <span style={{ color: palette.text, fontSize: '14px' }}>Specific IP</span>
+                                                            </label>
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="radio"
+                                                                    name="destinationIPType"
+                                                                    value="range"
+                                                                    checked={firewallForm.destinationIPType === 'range'}
+                                                                    onChange={handleFirewallChange}
+                                                                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                                />
+                                                                <span style={{ color: palette.text, fontSize: '14px' }}>IP Range/CIDR</span>
+                                                            </label>
+                                                        </div>
+                                                        {(firewallForm.destinationIPType === 'specific' || firewallForm.destinationIPType === 'range') && (
+                                                            <input
+                                                                id="destinationIpInput"
+                                                                type="text"
+                                                                name="destinationIP"
+                                                                value={firewallForm.destinationIP}
+                                                                onChange={handleFirewallChange}
+                                                                placeholder={firewallForm.destinationIPType === 'specific' ? "e.g., 8.8.8.8" : "e.g., 10.0.0.0/8"}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    padding: '12px',
+                                                                    backgroundColor: palette.inputBg,
+                                                                    border: `1px solid ${palette.inputBorder}`,
+                                                                    borderRadius: '8px',
+                                                                    color: palette.text,
+                                                                    fontSize: '14px',
+                                                                    boxSizing: 'border-box'
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Source Port */}
+                                                <div>
+                                                    <label style={{ display: 'block', color: palette.text, marginBottom: '12px', fontSize: '14px', fontWeight: 500 }}>
+                                                        Source Port
+                                                    </label>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                        <div style={{ display: 'flex', gap: '16px' }}>
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="radio"
+                                                                    name="sourcePortType"
+                                                                    value="any"
+                                                                    checked={firewallForm.sourcePortType === 'any'}
+                                                                    onChange={handleFirewallChange}
+                                                                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                                />
+                                                                <span style={{ color: palette.text, fontSize: '14px' }}>Any</span>
+                                                            </label>
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="radio"
+                                                                    name="sourcePortType"
+                                                                    value="specific"
+                                                                    checked={firewallForm.sourcePortType === 'specific'}
+                                                                    onChange={handleFirewallChange}
+                                                                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                                />
+                                                                <span style={{ color: palette.text, fontSize: '14px' }}>Specific Port</span>
+                                                            </label>
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="radio"
+                                                                    name="sourcePortType"
+                                                                    value="range"
+                                                                    checked={firewallForm.sourcePortType === 'range'}
+                                                                    onChange={handleFirewallChange}
+                                                                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                                />
+                                                                <span style={{ color: palette.text, fontSize: '14px' }}>Port Range</span>
+                                                            </label>
+                                                        </div>
+                                                        {(firewallForm.sourcePortType === 'specific' || firewallForm.sourcePortType === 'range') && (
+                                                            <input
+                                                                id="sourcePortInput"
+                                                                type="text"
+                                                                name="sourcePort"
+                                                                value={firewallForm.sourcePort}
+                                                                onChange={handleFirewallChange}
+                                                                placeholder={firewallForm.sourcePortType === 'specific' ? "e.g., 8080" : "e.g., 5000-6000"}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    padding: '12px',
+                                                                    backgroundColor: palette.inputBg,
+                                                                    border: `1px solid ${palette.inputBorder}`,
+                                                                    borderRadius: '8px',
+                                                                    color: palette.text,
+                                                                    fontSize: '14px',
+                                                                    boxSizing: 'border-box'
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Destination Port */}
+                                                <div>
+                                                    <label style={{ display: 'block', color: palette.text, marginBottom: '12px', fontSize: '14px', fontWeight: 500 }}>
+                                                        Destination Port
+                                                    </label>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                        <div style={{ display: 'flex', gap: '16px' }}>
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="radio"
+                                                                    name="destinationPortType"
+                                                                    value="any"
+                                                                    checked={firewallForm.destinationPortType === 'any'}
+                                                                    onChange={handleFirewallChange}
+                                                                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                                />
+                                                                <span style={{ color: palette.text, fontSize: '14px' }}>Any</span>
+                                                            </label>
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="radio"
+                                                                    name="destinationPortType"
+                                                                    value="specific"
+                                                                    checked={firewallForm.destinationPortType === 'specific'}
+                                                                    onChange={handleFirewallChange}
+                                                                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                                />
+                                                                <span style={{ color: palette.text, fontSize: '14px' }}>Specific Port</span>
+                                                            </label>
+                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                                <input
+                                                                    type="radio"
+                                                                    name="destinationPortType"
+                                                                    value="range"
+                                                                    checked={firewallForm.destinationPortType === 'range'}
+                                                                    onChange={handleFirewallChange}
+                                                                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                                />
+                                                                <span style={{ color: palette.text, fontSize: '14px' }}>Port Range</span>
+                                                            </label>
+                                                        </div>
+                                                        {(firewallForm.destinationPortType === 'specific' || firewallForm.destinationPortType === 'range') && (
+                                                            <input
+                                                                id="destinationPortInput"
+                                                                type="text"
+                                                                name="destinationPort"
+                                                                value={firewallForm.destinationPort}
+                                                                onChange={handleFirewallChange}
+                                                                placeholder={firewallForm.destinationPortType === 'specific' ? "e.g., 443" : "e.g., 80-443"}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    padding: '12px',
+                                                                    backgroundColor: palette.inputBg,
+                                                                    border: `1px solid ${palette.inputBorder}`,
+                                                                    borderRadius: '8px',
+                                                                    color: palette.text,
+                                                                    fontSize: '14px',
+                                                                    boxSizing: 'border-box'
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Enable Rule */}
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ color: palette.text, fontSize: '14px' }}>Rule is enabled and will be applied.</span>
+                                                    <label style={{ position: 'relative', display: 'inline-block', width: '50px', height: '26px', cursor: 'pointer' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            name="enabled"
+                                                            checked={firewallForm.enabled}
+                                                            onChange={handleFirewallChange}
+                                                            style={{ opacity: 0, width: 0, height: 0 }}
+                                                        />
+                                                        <span style={{
+                                                            position: 'absolute',
+                                                            top: 0,
+                                                            left: 0,
+                                                            right: 0,
+                                                            bottom: 0,
+                                                            backgroundColor: firewallForm.enabled ? palette.accent : (theme === 'light' ? '#ccc' : '#555'),
+                                                            borderRadius: '26px',
+                                                            transition: '0.3s'
+                                                        }}>
+                                                            <span style={{
+                                                                position: 'absolute',
+                                                                content: '""',
+                                                                height: '20px',
+                                                                width: '20px',
+                                                                left: '3px',
+                                                                bottom: '3px',
+                                                                backgroundColor: '#fff',
+                                                                borderRadius: '50%',
+                                                                transition: '0.3s',
+                                                                transform: firewallForm.enabled ? 'translateX(24px)' : 'translateX(0)'
+                                                            }} />
+                                                        </span>
+                                                    </label>
+                                                </div>
+
+                                                {/* Form Buttons */}
+                                                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={resetFirewallForm}
+                                                        style={{
+                                                            padding: '12px 24px',
+                                                            backgroundColor: 'transparent',
+                                                            color: palette.text,
+                                                            border: `1px solid ${palette.border}`,
+                                                            borderRadius: '8px',
+                                                            cursor: 'pointer',
+                                                            fontWeight: 600,
+                                                            fontSize: '14px'
+                                                        }}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        type="submit"
+                                                        disabled={firewallLoading}
+                                                        style={{
+                                                            padding: '12px 24px',
+                                                            backgroundColor: palette.accent,
+                                                            color: theme === 'dark' ? '#121212' : '#fff',
+                                                            border: 'none',
+                                                            borderRadius: '8px',
+                                                            cursor: firewallLoading ? 'not-allowed' : 'pointer',
+                                                            fontWeight: 600,
+                                                            fontSize: '14px',
+                                                            opacity: firewallLoading ? 0.6 : 1
+                                                        }}
+                                                    >
+                                                        {firewallLoading ? 'Saving...' : 'Save Rule'}
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
                                     </div>
                                 )}
                             </div>
+                        )}
 
-                            {/* Edit User Modal */}
-                            {showEditModal && editingUser && (
+                        {/* Profiles View */}
+                        {currentView === 'profiles' && (
+                            <ProfileManager />
+                        )}
+
+                        {/* User Management View (Admin Only) */}
+                        {currentView === 'users' && user.role === 'admin' && (
+                            <div>
                                 <div style={{
-                                    position: 'fixed',
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
                                     display: 'flex',
+                                    justifyContent: 'space-between',
                                     alignItems: 'center',
-                                    justifyContent: 'center',
-                                    zIndex: 1000
+                                    marginBottom: '24px'
                                 }}>
+                                    <h1 style={{ fontSize: '24px', margin: 0, color: palette.text }}>User Management</h1>
+                                </div>
+
+                                {/* Users Table */}
+                                <div style={{ ...cardBase, padding: '18px' }}>
                                     <div style={{
-                                        backgroundColor: '#181818',
-                                        padding: '30px',
-                                        borderRadius: '10px',
-                                        border: '1px solid #282828',
-                                        width: '90%',
-                                        maxWidth: '500px'
+                                        display: 'flex',
+                                        gap: '12px',
+                                        flexWrap: 'wrap',
+                                        marginBottom: '16px'
                                     }}>
-                                        <h2 style={{ color: '#fff', marginTop: 0 }}>Edit User</h2>
-                                        <div style={{ marginBottom: '15px' }}>
-                                            <label style={{ display: 'block', color: '#888', marginBottom: '5px', fontSize: '14px' }}>Email</label>
-                                            <input
-                                                type="email"
-                                                value={editingUser.email}
-                                                onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '10px',
-                                                    backgroundColor: '#121212',
-                                                    border: '1px solid #282828',
-                                                    borderRadius: '6px',
-                                                    color: '#fff',
-                                                    fontSize: '14px'
-                                                }}
-                                            />
+                                        <input
+                                            type="text"
+                                            placeholder="Search by username or ID..."
+                                            style={{
+                                                flex: '1 1 260px',
+                                                minWidth: '240px',
+                                                padding: '10px 12px',
+                                                backgroundColor: theme === 'light' ? '#fff' : '#121212',
+                                                border: theme === 'light' ? `1px solid ${palette.border}` : `1px solid ${palette.border}`,
+                                                borderRadius: '10px',
+                                                color: palette.text,
+                                                fontSize: '14px'
+                                            }}
+                                            readOnly
+                                        />
+                                        <select
+                                            style={{
+                                                flex: '0 0 160px',
+                                                padding: '10px',
+                                                backgroundColor: theme === 'light' ? '#fff' : '#121212',
+                                                border: theme === 'light' ? `1px solid ${palette.border}` : `1px solid ${palette.border}`,
+                                                borderRadius: '10px',
+                                                color: palette.text,
+                                                fontSize: '14px'
+                                            }}
+                                            readOnly
+                                        >
+                                            <option>All Roles</option>
+                                        </select>
+                                        <select
+                                            style={{
+                                                flex: '0 0 160px',
+                                                padding: '10px',
+                                                backgroundColor: theme === 'light' ? '#fff' : '#121212',
+                                                border: theme === 'light' ? `1px solid ${palette.border}` : `1px solid ${palette.border}`,
+                                                borderRadius: '10px',
+                                                color: palette.text,
+                                                fontSize: '14px'
+                                            }}
+                                            readOnly
+                                        >
+                                            <option>All Status</option>
+                                        </select>
+                                        <button
+                                            style={{
+                                                padding: '10px 16px',
+                                                backgroundColor: palette.text,
+                                                color: theme === 'light' ? '#fff' : '#121212',
+                                                border: 'none',
+                                                borderRadius: '10px',
+                                                fontWeight: 600,
+                                                fontSize: '14px',
+                                                cursor: 'pointer'
+                                            }}
+                                            disabled
+                                        >
+                                            + Add New User
+                                        </button>
+                                    </div>
+
+                                    {usersLoading ? (
+                                        <div style={{ color: palette.textMuted, textAlign: 'center', padding: '40px' }}>Loading users...</div>
+                                    ) : users.length === 0 ? (
+                                        <div style={{ color: palette.textMuted, textAlign: 'center', padding: '40px' }}>No users found</div>
+                                    ) : (
+                                        <div style={{ overflowX: 'auto' }}>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                <thead>
+                                                    <tr style={{ borderBottom: `1px solid ${palette.border}` }}>
+                                                        <th style={{ padding: '12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>User ID</th>
+                                                        <th style={{ padding: '12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Username (Email)</th>
+                                                        <th style={{ padding: '12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Role</th>
+                                                        <th style={{ padding: '12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Status</th>
+                                                        <th style={{ padding: '12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Last Login</th>
+                                                        <th style={{ padding: '12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {users.map((u, idx) => (
+                                                        <tr key={u.id} style={{
+                                                            borderBottom: idx === users.length - 1 ? 'none' : `1px solid ${palette.border}`
+                                                        }}>
+                                                            <td style={{ padding: '12px', color: palette.text, fontSize: '14px' }}>{String(idx + 1).padStart(3, '0')}</td>
+                                                            <td style={{ padding: '12px', color: palette.text, fontSize: '14px' }}>{u.email}</td>
+                                                            <td style={{ padding: '12px' }}>
+                                                                <span style={{
+                                                                    padding: '4px 10px',
+                                                                    borderRadius: '12px',
+                                                                    fontSize: '12px',
+                                                                    backgroundColor: u.role === 'admin' ? '#0b0b14' : palette.accentSoft,
+                                                                    color: u.role === 'admin' ? '#fff' : palette.accent,
+                                                                    border: u.role === 'admin' ? '1px solid #0b0b14' : `1px solid ${palette.border}`,
+                                                                    fontWeight: 600
+                                                                }}>
+                                                                    {u.role === 'admin' ? 'Admin' : 'User'}
+                                                                </span>
+                                                            </td>
+                                                            <td style={{ padding: '12px' }}>
+                                                                <span style={{
+                                                                    display: 'inline-block',
+                                                                    minWidth: '78px',
+                                                                    textAlign: 'center',
+                                                                    padding: '4px 10px',
+                                                                    borderRadius: '12px',
+                                                                    fontSize: '12px',
+                                                                    backgroundColor: u.isApproved
+                                                                        ? (theme === 'dark' ? palette.accentSoft : '#e6f6ed')
+                                                                        : (theme === 'dark' ? '#2b1b12' : '#fff5e6'),
+                                                                    color: u.isApproved
+                                                                        ? (theme === 'dark' ? palette.accent : '#1fa45a')
+                                                                        : (theme === 'dark' ? '#f6ae4c' : '#d97706'),
+                                                                    border: u.isApproved
+                                                                        ? (theme === 'dark' ? `1px solid ${palette.accent}` : '1px solid #c9ecd8')
+                                                                        : (theme === 'dark' ? '1px solid #3a2a1f' : '1px solid #f3d9a4'),
+                                                                    fontWeight: 600
+                                                                }}>
+                                                                    {u.isApproved ? 'Active' : 'Inactive'}
+                                                                </span>
+                                                            </td>
+                                                            <td style={{ padding: '12px', color: palette.textMuted, fontSize: '13px' }}>
+                                                                {/* placeholder since we don't store last login */}
+                                                                —
+                                                            </td>
+                                                            <td style={{ padding: '12px' }}>
+                                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                                    {/* Edit - 1st button */}
+                                                                    <button
+                                                                        onClick={() => handleEditUser(u)}
+                                                                        onMouseEnter={() => setActionButtonHover(`edit-user-${u.id}`)}
+                                                                        onMouseLeave={() => setActionButtonHover(null)}
+                                                                        title="Edit user"
+                                                                        style={{
+                                                                            background: actionButtonHover === `edit-user-${u.id}`
+                                                                                ? (theme === 'dark' ? 'rgba(54,226,123,0.15)' : 'rgba(31,164,90,0.1)')
+                                                                                : 'none',
+                                                                            border: 'none',
+                                                                            color: actionButtonHover === `edit-user-${u.id}`
+                                                                                ? palette.accent
+                                                                                : palette.textMuted,
+                                                                            cursor: 'pointer',
+                                                                            fontSize: '16px',
+                                                                            padding: '4px 6px',
+                                                                            borderRadius: '6px',
+                                                                            transition: 'all 0.15s ease',
+                                                                            transform: actionButtonHover === `edit-user-${u.id}` ? 'scale(1.1)' : 'scale(1)'
+                                                                        }}
+                                                                    >
+                                                                        ✏️
+                                                                    </button>
+                                                                    {/* Toggle status - 2nd button */}
+                                                                    {u.id !== user.id && (
+                                                                        <button
+                                                                            onClick={() => handleToggleUserStatus(u)}
+                                                                            onMouseEnter={() => setActionButtonHover(`toggle-user-${u.id}`)}
+                                                                            onMouseLeave={() => setActionButtonHover(null)}
+                                                                            title={u.isApproved ? 'Mark inactive' : 'Mark active'}
+                                                                            style={{
+                                                                                background: actionButtonHover === `toggle-user-${u.id}`
+                                                                                    ? (theme === 'dark' ? 'rgba(54,226,123,0.20)' : 'rgba(31,164,90,0.15)')
+                                                                                    : (u.isApproved
+                                                                                        ? (theme === 'dark' ? 'rgba(54,226,123,0.08)' : '#e6f6ed')
+                                                                                        : (theme === 'dark' ? 'rgba(246,174,76,0.10)' : '#fff7e6')),
+                                                                                border: u.isApproved
+                                                                                    ? (theme === 'dark' ? `1px solid ${palette.accent}` : '1px solid #c9ecd8')
+                                                                                    : (theme === 'dark' ? '1px solid #3a2a1f' : '1px solid #f3d9a4'),
+                                                                                color: actionButtonHover === `toggle-user-${u.id}`
+                                                                                    ? palette.accent
+                                                                                    : (u.isApproved
+                                                                                        ? (theme === 'dark' ? palette.accent : '#1fa45a')
+                                                                                        : (theme === 'dark' ? '#f6ae4c' : '#d97706')),
+                                                                                cursor: 'pointer',
+                                                                                fontSize: '16px',
+                                                                                padding: '6px 10px',
+                                                                                borderRadius: '12px',
+                                                                                transition: 'all 0.2s ease',
+                                                                                transform: actionButtonHover === `toggle-user-${u.id}` ? 'scale(1.08)' : 'scale(1)',
+                                                                                boxShadow: actionButtonHover === `toggle-user-${u.id}` ? '0 6px 14px rgba(0,0,0,0.12)' : 'none'
+                                                                            }}
+                                                                        >
+                                                                            {u.isApproved ? '⟳' : '▶'}
+                                                                        </button>
+                                                                    )}
+                                                                    {/* Delete - 3rd button */}
+                                                                    {u.id !== user.id && (
+                                                                        <button
+                                                                            onClick={() => handleDeleteUser(u.id)}
+                                                                            onMouseEnter={() => setActionButtonHover(`delete-user-${u.id}`)}
+                                                                            onMouseLeave={() => setActionButtonHover(null)}
+                                                                            title="Delete user"
+                                                                            style={{
+                                                                                background: actionButtonHover === `delete-user-${u.id}`
+                                                                                    ? (theme === 'dark' ? 'rgba(224,72,72,0.15)' : 'rgba(212,24,61,0.1)')
+                                                                                    : 'none',
+                                                                                border: 'none',
+                                                                                color: palette.danger,
+                                                                                cursor: 'pointer',
+                                                                                fontSize: '16px',
+                                                                                padding: '4px 6px',
+                                                                                borderRadius: '6px',
+                                                                                transition: 'all 0.15s ease',
+                                                                                transform: actionButtonHover === `delete-user-${u.id}` ? 'scale(1.1)' : 'scale(1)',
+                                                                                opacity: actionButtonHover === `delete-user-${u.id}` ? 1 : 0.8
+                                                                            }}
+                                                                        >
+                                                                            🗑️
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
                                         </div>
-                                        <div style={{ marginBottom: '15px' }}>
-                                            <label style={{ display: 'block', color: '#888', marginBottom: '5px', fontSize: '14px' }}>Role</label>
-                                            <select
-                                                value={editingUser.role}
-                                                onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
-                                                disabled={editingUser.id === user.id}
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '10px',
-                                                    backgroundColor: '#121212',
-                                                    border: '1px solid #282828',
-                                                    borderRadius: '6px',
-                                                    color: '#fff',
-                                                    fontSize: '14px'
-                                                }}
-                                            >
-                                                <option value="user">User</option>
-                                                <option value="admin">Admin</option>
-                                            </select>
-                                        </div>
-                                        <div style={{ marginBottom: '20px' }}>
-                                            <label style={{ display: 'flex', alignItems: 'center', color: '#888', fontSize: '14px', cursor: 'pointer' }}>
+                                    )}
+                                </div>
+
+                                {/* Edit User Modal */}
+                                {showEditModal && editingUser && (
+                                    <div style={{
+                                        position: 'fixed',
+                                        top: 0,
+                                        left: 0,
+                                        right: 0,
+                                        bottom: 0,
+                                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        zIndex: 1000,
+                                        opacity: 1,
+                                        transition: 'opacity 0.2s ease, background-color 0.2s ease'
+                                    }}>
+                                        <div style={{
+                                            backgroundColor: palette.bgCard,
+                                            padding: '30px',
+                                            borderRadius: '10px',
+                                            border: `1px solid ${palette.border}`,
+                                            width: '90%',
+                                            maxWidth: '500px',
+                                            transform: 'scale(1) translateY(0)',
+                                            transition: 'transform 0.2s ease, opacity 0.2s ease, background-color 0.3s ease, border-color 0.3s ease'
+                                        }}>
+                                            <h2 style={{ color: '#fff', marginTop: 0 }}>Edit User</h2>
+                                            <div style={{ marginBottom: '15px' }}>
+                                                <label style={{ display: 'block', color: '#888', marginBottom: '5px', fontSize: '14px' }}>Email</label>
                                                 <input
-                                                    type="checkbox"
-                                                    checked={editingUser.isApproved}
-                                                    onChange={(e) => setEditingUser({ ...editingUser, isApproved: e.target.checked })}
+                                                    type="email"
+                                                    value={editingUser.email}
+                                                    onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
                                                     style={{
-                                                        marginRight: '8px',
-                                                        cursor: 'pointer'
+                                                        width: '100%',
+                                                        padding: '10px',
+                                                        backgroundColor: '#121212',
+                                                        border: '1px solid #282828',
+                                                        borderRadius: '6px',
+                                                        color: '#fff',
+                                                        fontSize: '14px'
                                                     }}
                                                 />
-                                                Approved
-                                            </label>
-                                        </div>
-                                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                                            <button
-                                                onClick={() => {
-                                                    setShowEditModal(false);
-                                                    setEditingUser(null);
-                                                }}
-                                                style={{
-                                                    padding: '10px 20px',
-                                                    backgroundColor: '#282828',
-                                                    color: '#fff',
-                                                    border: '1px solid #444',
-                                                    borderRadius: '6px',
-                                                    cursor: 'pointer',
-                                                    fontSize: '14px'
-                                                }}
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                onClick={handleSaveUser}
-                                                style={{
-                                                    padding: '10px 20px',
-                                                    backgroundColor: '#36E27B',
-                                                    color: '#121212',
-                                                    border: 'none',
-                                                    borderRadius: '6px',
-                                                    cursor: 'pointer',
-                                                    fontSize: '14px',
-                                                    fontWeight: '600'
-                                                }}
-                                            >
-                                                Save
-                                            </button>
+                                            </div>
+                                            <div style={{ marginBottom: '15px' }}>
+                                                <label style={{ display: 'block', color: '#888', marginBottom: '5px', fontSize: '14px' }}>Role</label>
+                                                <select
+                                                    value={editingUser.role}
+                                                    onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
+                                                    disabled={editingUser.id === user.id}
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '10px',
+                                                        backgroundColor: '#121212',
+                                                        border: '1px solid #282828',
+                                                        borderRadius: '6px',
+                                                        color: '#fff',
+                                                        fontSize: '14px'
+                                                    }}
+                                                >
+                                                    <option value="user">User</option>
+                                                    <option value="admin">Admin</option>
+                                                </select>
+                                            </div>
+                                            <div style={{ marginBottom: '20px' }}>
+                                                <label style={{ display: 'flex', alignItems: 'center', color: '#888', fontSize: '14px', cursor: 'pointer' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={editingUser.isApproved}
+                                                        onChange={(e) => setEditingUser({ ...editingUser, isApproved: e.target.checked })}
+                                                        style={{
+                                                            marginRight: '8px',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    />
+                                                    Approved
+                                                </label>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                                <button
+                                                    onClick={() => {
+                                                        setShowEditModal(false);
+                                                        setEditingUser(null);
+                                                    }}
+                                                    style={{
+                                                        padding: '10px 20px',
+                                                        backgroundColor: '#282828',
+                                                        color: '#fff',
+                                                        border: '1px solid #444',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer',
+                                                        fontSize: '14px'
+                                                    }}
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    onClick={handleSaveUser}
+                                                    style={{
+                                                        padding: '10px 20px',
+                                                        backgroundColor: '#36E27B',
+                                                        color: '#121212',
+                                                        border: 'none',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer',
+                                                        fontSize: '14px',
+                                                        fontWeight: '600'
+                                                    }}
+                                                >
+                                                    Save
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
+
+                {/* Confirm delete dialog for firewall */}
+                {confirmDeleteRuleId && (
+                    <div style={{
+                        position: 'fixed',
+                        inset: 0,
+                        backgroundColor: 'rgba(0,0,0,0.6)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000
+                    }}>
+                        <div style={{
+                            backgroundColor: palette.bgCard,
+                            color: palette.text,
+                            padding: '24px',
+                            borderRadius: '10px',
+                            border: `1px solid ${palette.border}`,
+                            width: '90%',
+                            maxWidth: '420px',
+                            boxShadow: '0 10px 40px rgba(0,0,0,0.35)'
+                        }}>
+                            <h3 style={{ marginTop: 0, marginBottom: '12px' }}>Delete Firewall Rule</h3>
+                            <p style={{ marginTop: 0, marginBottom: '20px', color: palette.textMuted }}>
+                                Are you sure you want to delete this rule? This action cannot be undone.
+                            </p>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                                <button
+                                    onClick={() => setConfirmDeleteRuleId(null)}
+                                    style={{
+                                        padding: '10px 16px',
+                                        backgroundColor: palette.bgPanel,
+                                        color: palette.text,
+                                        border: `1px solid ${palette.border}`,
+                                        borderRadius: '8px',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmDeleteRule}
+                                    style={{
+                                        padding: '10px 16px',
+                                        backgroundColor: palette.danger,
+                                        color: '#fff',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        fontWeight: 600
+                                    }}
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Toasts */}
+                <div style={{
+                    position: 'fixed',
+                    bottom: '20px',
+                    right: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                    zIndex: 1500
+                }}>
+                    {toasts.map((t) => (
+                        <div key={t.id} style={{
+                            minWidth: '260px',
+                            padding: '12px 14px',
+                            borderRadius: '10px',
+                            backgroundColor: t.type === 'error' ? palette.danger : t.type === 'success' ? palette.accent : palette.bgCard,
+                            color: t.type === 'error' || t.type === 'success' ? '#fff' : palette.text,
+                            border: `1px solid ${palette.border}`,
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
+                        }}>
+                            {t.message}
+                        </div>
+                    ))}
+                </div>
+            </>
         );
     }
 
     // Show login/register forms
     return (
-        <div className="app-container">
-            <div className="auth-container">
-                <div className="auth-header">
-                    <h1>NeoSec</h1>
-                    <p>Welcome! Please login or register to continue.</p>
-                </div>
+        <>
+            <div className="app-container" style={{ backgroundColor: palette.bgMain, color: palette.text }}>
+                <div className="auth-container" style={{ backgroundColor: palette.bgCard, color: palette.text }}>
+                    <div className="auth-header">
+                        <h1>NeoSec</h1>
+                        <p>Welcome! Please login or register to continue.</p>
+                    </div>
 
-                <div className="auth-tabs">
-                    <button
-                        className={`tab-button ${activeTab === 'login' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('login')}
-                    >
-                        Login
-                    </button>
-                    <button
-                        className={`tab-button ${activeTab === 'register' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('register')}
-                    >
-                        Register
-                    </button>
-                </div>
+                    <div className="auth-tabs">
+                        <button
+                            className={`tab-button ${activeTab === 'login' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('login')}
+                        >
+                            Login
+                        </button>
+                        <button
+                            className={`tab-button ${activeTab === 'register' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('register')}
+                        >
+                            Register
+                        </button>
+                    </div>
 
-                <div className="auth-content">
-                    {activeTab === 'login' ? (
-                        <Login
-                            onSwitchToRegister={() => setActiveTab('register')}
-                            onLoginSuccess={handleLoginSuccess}
-                        />
-                    ) : (
-                        <Register
-                            onSwitchToLogin={() => setActiveTab('login')}
-                        />
-                    )}
+                    <div className="auth-content">
+                        {activeTab === 'login' ? (
+                            <Login
+                                onSwitchToRegister={() => setActiveTab('register')}
+                                onLoginSuccess={handleLoginSuccess}
+                            />
+                        ) : (
+                            <Register
+                                onSwitchToLogin={() => setActiveTab('login')}
+                            />
+                        )}
+                    </div>
                 </div>
             </div>
-        </div>
+
+            {/* Toasts */}
+            <div style={{
+                position: 'fixed',
+                bottom: '20px',
+                right: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                zIndex: 1500
+            }}>
+                {toasts.map((t) => (
+                    <div key={t.id} style={{
+                        minWidth: '260px',
+                        padding: '12px 14px',
+                        borderRadius: '10px',
+                        backgroundColor: t.type === 'error' ? palette.danger : t.type === 'success' ? palette.accent : palette.bgCard,
+                        color: t.type === 'error' || t.type === 'success' ? '#fff' : palette.text,
+                        border: `1px solid ${palette.border}`,
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
+                    }}>
+                        {t.message}
+                    </div>
+                ))}
+            </div>
+        </>
     );
 }
 

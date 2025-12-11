@@ -9,8 +9,8 @@ const validateRulePayload = (payload) => {
   if (!payload.direction || !['inbound', 'outbound'].includes(payload.direction)) {
     errors.push('direction must be inbound or outbound');
   }
-  if (!payload.ipAddress && !payload.port) {
-    errors.push('at least one criteria (ipAddress or port) is required');
+  if (!payload.protocol || !['any', 'tcp', 'udp', 'icmp'].includes(payload.protocol)) {
+    errors.push('protocol must be any, tcp, udp, or icmp');
   }
   return errors;
 };
@@ -18,10 +18,21 @@ const validateRulePayload = (payload) => {
 // Get all firewall rules for the current user
 const getRules = async (req, res) => {
   try {
-    const rules = await FirewallRule.findAll({
-      where: { userId: req.user.userId },
-      order: [['createdAt', 'DESC']]
-    });
+    // Try to order by 'order' column, fallback to createdAt if column doesn't exist
+    let rules;
+    try {
+      rules = await FirewallRule.findAll({
+        where: { userId: req.user.userId },
+        order: [['order', 'ASC'], ['createdAt', 'ASC']]
+      });
+    } catch (orderError) {
+      // If order column doesn't exist, just order by createdAt
+      console.log('Order column not found, using createdAt for ordering');
+      rules = await FirewallRule.findAll({
+        where: { userId: req.user.userId },
+        order: [['createdAt', 'ASC']]
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -29,9 +40,12 @@ const getRules = async (req, res) => {
     });
   } catch (error) {
     console.error('Get firewall rules error:', error);
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
-      message: 'Server error fetching firewall rules'
+      message: 'Server error fetching firewall rules',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -39,8 +53,8 @@ const getRules = async (req, res) => {
 // Create a new firewall rule
 const createRule = async (req, res) => {
   try {
-    const { action, direction, ipAddress, port, description } = req.body;
-    const errors = validateRulePayload({ action, direction, ipAddress, port });
+    const { action, direction, protocol, sourceIP, destinationIP, sourcePort, destinationPort, description, enabled, order } = req.body;
+    const errors = validateRulePayload({ action, direction, protocol: protocol || 'any' });
     if (errors.length) {
       return res.status(400).json({
         success: false,
@@ -49,12 +63,22 @@ const createRule = async (req, res) => {
       });
     }
 
+    // Get max order for this user to set default
+    const maxOrder = await FirewallRule.max('order', {
+      where: { userId: req.user.userId }
+    }) || 0;
+
     const rule = await FirewallRule.create({
       action,
       direction,
-      ipAddress: ipAddress || null,
-      port: port || null,
+      protocol: protocol || 'any',
+      sourceIP: sourceIP || null,
+      destinationIP: destinationIP || null,
+      sourcePort: sourcePort || null,
+      destinationPort: destinationPort || null,
       description: description || null,
+      enabled: enabled !== undefined ? enabled : true,
+      order: order !== undefined ? order : maxOrder + 1,
       userId: req.user.userId
     });
 
@@ -75,7 +99,7 @@ const createRule = async (req, res) => {
 const updateRule = async (req, res) => {
   try {
     const { id } = req.params;
-    const { action, direction, ipAddress, port, description } = req.body;
+    const { action, direction, protocol, sourceIP, destinationIP, sourcePort, destinationPort, description, enabled, order } = req.body;
 
     const rule = await FirewallRule.findOne({
       where: { id, userId: req.user.userId }
@@ -91,8 +115,7 @@ const updateRule = async (req, res) => {
     const errors = validateRulePayload({
       action: action ?? rule.action,
       direction: direction ?? rule.direction,
-      ipAddress: ipAddress ?? rule.ipAddress,
-      port: port ?? rule.port
+      protocol: protocol ?? rule.protocol
     });
     if (errors.length) {
       return res.status(400).json({
@@ -104,9 +127,14 @@ const updateRule = async (req, res) => {
 
     rule.action = action ?? rule.action;
     rule.direction = direction ?? rule.direction;
-    rule.ipAddress = ipAddress ?? rule.ipAddress;
-    rule.port = port ?? rule.port;
-    rule.description = description ?? rule.description;
+    rule.protocol = protocol ?? rule.protocol;
+    rule.sourceIP = sourceIP !== undefined ? sourceIP : rule.sourceIP;
+    rule.destinationIP = destinationIP !== undefined ? destinationIP : rule.destinationIP;
+    rule.sourcePort = sourcePort !== undefined ? sourcePort : rule.sourcePort;
+    rule.destinationPort = destinationPort !== undefined ? destinationPort : rule.destinationPort;
+    rule.description = description !== undefined ? description : rule.description;
+    rule.enabled = enabled !== undefined ? enabled : rule.enabled;
+    rule.order = order !== undefined ? order : rule.order;
 
     await rule.save();
 

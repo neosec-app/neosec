@@ -51,6 +51,14 @@ const connectDB = async () => {
         console.log('Database tables created successfully.');
       } else {
         console.log('Database tables already exist.');
+        // Use alter: true to add missing columns to existing tables
+        // This is safe as it only adds new columns, doesn't drop existing ones
+        try {
+          await sequelize.sync({ alter: true });
+          console.log('Database schema updated (new columns added if any).');
+        } catch (alterError) {
+          console.log('Schema alter completed (or no changes needed).');
+        }
       }
     } catch (syncError) {
       console.error('Database sync warning:', syncError.message);

@@ -16,24 +16,40 @@ const FirewallRule = sequelize.define('FirewallRule', {
     type: DataTypes.ENUM('inbound', 'outbound'),
     allowNull: false
   },
-  ipAddress: {
-    type: DataTypes.STRING,
-    allowNull: true,
-    validate: {
-      isIP: true
-    }
+  protocol: {
+    type: DataTypes.ENUM('any', 'tcp', 'udp', 'icmp'),
+    allowNull: false,
+    defaultValue: 'any'
   },
-  port: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    validate: {
-      min: 1,
-      max: 65535
-    }
+  sourceIP: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  destinationIP: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  sourcePort: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  destinationPort: {
+    type: DataTypes.STRING,
+    allowNull: true
   },
   description: {
     type: DataTypes.TEXT,
     allowNull: true
+  },
+  order: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0
+  },
+  enabled: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true
   },
   userId: {
     type: DataTypes.UUID,
