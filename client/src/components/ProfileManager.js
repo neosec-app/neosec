@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import './ProfileManager.css';
 import api from '../services/api';
 
@@ -94,8 +93,6 @@ const ProfileManager = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-
       const submitData = {
         ...formData,
 

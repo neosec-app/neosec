@@ -135,13 +135,16 @@ function App() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isMobile, sidebarOpen]);
     const [firewallLoading, setFirewallLoading] = useState(false);
+    // eslint-disable-next-line no-unused-vars
     const [firewallError, setFirewallError] = useState('');
     const [editingRuleId, setEditingRuleId] = useState(null);
     const [confirmDeleteRuleId, setConfirmDeleteRuleId] = useState(null);
     const [navHover, setNavHover] = useState(null);
     const [logoutHover, setLogoutHover] = useState(false);
     const [actionButtonHover, setActionButtonHover] = useState(null); // Track hovered action button: 'reset-{id}', 'edit-{id}', 'delete-{id}', etc.
+    // eslint-disable-next-line no-unused-vars
     const [showFirewallModal, setShowFirewallModal] = useState(false);
+    // eslint-disable-next-line no-unused-vars
     const [firewallModalAnimating, setFirewallModalAnimating] = useState(false);
     const initialFirewallForm = {
         action: 'allow',
