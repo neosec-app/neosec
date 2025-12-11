@@ -22,14 +22,25 @@ const protect = async (req, res, next) => {
     try {
       // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
-      // Get user from token
 
-    req.user = {
-      userId: decoded.userId,
-      role: decoded.role
-    };
+      // Get user from database to include role
+      const user = await User.findByPk(decoded.userId, {
+        attributes: ['id', 'role', 'email']
+      });
 
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      // Attach user info to request
+      req.user = {
+        userId: user.id,
+        role: user.role,
+        email: user.email
+      };
 
       next();
     } catch (error) {
@@ -47,5 +58,16 @@ const protect = async (req, res, next) => {
   }
 };
 
-module.exports = { protect };
+// Admin middleware - must be used after protect
+const admin = (req, res, next) => {
+  if (req.user && req.user.role === 'admin') {
+    next();
+  } else {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Admin privileges required.'
+    });
+  }
+};
 
+module.exports = { protect, admin };
