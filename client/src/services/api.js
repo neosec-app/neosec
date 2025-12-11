@@ -150,16 +150,15 @@ export const scanAPI = {
   // Submit a URL for scanning
   scanUrl: async (url) => {
     const response = await api.post('/scan/url', { url });
-    return response.data;
+    return response.data; 
   },
 
   // Get scan status
   getStatus: async (scanId) => {
     const response = await api.get(`/scan/status/${scanId}`);
-    return response.data;
+    return response.data; 
   },
 
-  // Get scan history
   getHistory: async () => {
     const response = await api.get('/scan/history');
     return response.data;

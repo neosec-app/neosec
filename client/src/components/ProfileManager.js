@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './ProfileManager.css';
-
-const API_URL = process.env.REACT_APP_API_URL;
+import api from '../services/api';
 
 const ProfileManager = () => {
   const [profiles, setProfiles] = useState([]);
@@ -51,10 +50,7 @@ const ProfileManager = () => {
 
   const fetchProfiles = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/profiles`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/profiles');
       setProfiles(response.data.profiles);
       setLoading(false);
     } catch (error) {
@@ -65,10 +61,7 @@ const ProfileManager = () => {
 
   const fetchLogs = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/profiles/logs/all`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/profiles/logs/all');
       setLogs(response.data.logs);
     } catch (error) {
       console.error('Error fetching logs:', error);
@@ -151,14 +144,10 @@ const ProfileManager = () => {
 
       
       if (editingProfile) {
-        await axios.put(`${API_URL}/profiles/${editingProfile.id}`, submitData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await api.put(`/profiles/${editingProfile.id}`, submitData);
         alert('Profile updated successfully!');
       } else {
-        await axios.post(`${API_URL}/profiles`, submitData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await api.post(`/profiles`, submitData);
         alert('Profile created successfully!');
       }
       
@@ -214,10 +203,7 @@ const ProfileManager = () => {
 const handleDeactivate = async (id) => {
   if (window.confirm('Are you sure you want to deactivate this profile?')) {
     try {
-      const token = localStorage.getItem('token');
-      await axios.put(`${API_URL}/profiles/${id}/deactivate`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.put(`/profiles/${id}/deactivate`, {});
       alert('Profile deactivated successfully!');
       fetchProfiles();
       fetchLogs();
@@ -232,10 +218,7 @@ const handleDeactivate = async (id) => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this profile?')) {
       try {
-        const token = localStorage.getItem('token');
-        await axios.delete(`${API_URL}/profiles/${id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await api.delete(`/profiles/${id}`);
         alert('Profile deleted successfully!');
         fetchProfiles();
         fetchLogs();
@@ -248,10 +231,7 @@ const handleDeactivate = async (id) => {
 
   const handleActivate = async (id) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.put(`${API_URL}/profiles/${id}/activate`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.put(`/profiles/${id}/activate`, {});
       alert('Profile activated successfully!');
       fetchProfiles();
       fetchLogs();

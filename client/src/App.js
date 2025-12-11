@@ -376,6 +376,7 @@ function App() {
         setTimeout(() => setFirewallModalAnimating(true), 10);
     };
 
+    // eslint-disable-next-line no-unused-vars
     const handleFirewallChange = (e) => {
         const { name, value, type, checked } = e.target;
         setFirewallForm((prev) => ({
@@ -384,6 +385,7 @@ function App() {
         }));
     };
 
+    // eslint-disable-next-line no-unused-vars
     const handleSaveRule = async (e) => {
         e.preventDefault();
         setFirewallError('');
