@@ -1623,8 +1623,8 @@ function App() {
                         {currentView === 'scan' && <ScanDashboard />}
 
                         {/* User Management View (Admin Only) */}
-                    {currentView === 'users' && user.role === 'admin' && (
-                        <div>
+                        {currentView === 'users' && user.role === 'admin' && (
+                            <div>
                                 <div style={{
                                     display: 'flex',
                                     justifyContent: 'space-between',
@@ -2383,8 +2383,8 @@ function App() {
                     </div>
                 </div>
 
-            {/* Confirm delete dialog for firewall */}
-            {confirmDeleteRuleId && (
+                {/* Confirm delete dialog for firewall */}
+                {confirmDeleteRuleId && (
                     <div style={{
                         position: 'fixed',
                         inset: 0,
@@ -2441,8 +2441,8 @@ function App() {
                     </div>
                 )}
 
-            {/* Toasts */}
-            <div style={{
+                {/* Toasts */}
+                <div style={{
                     position: 'fixed',
                     bottom: '20px',
                     right: '20px',
