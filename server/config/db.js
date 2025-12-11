@@ -41,13 +41,17 @@ const connectDB = async () => {
       
       const tableExists = results[0].exists;
       
-      if (!tableExists) {
-        console.log('Tables not found. Creating database tables...');
-        await sequelize.sync({ force: false }); // Create tables without dropping
-        console.log('Database tables created successfully.');
-      } else {
-        console.log('Database tables already exist.');
-      }
+      // if (!tableExists) {
+      //   console.log('Tables not found. Creating database tables...');
+      //   await sequelize.sync({ force: false }); // Create tables without dropping
+      //   console.log('Database tables created successfully.');
+      // } else {
+      //   console.log('Database tables already exist.');
+      // }
+      console.log("Synchronizing database tables...");
+      await sequelize.sync({ alter: true });
+      console.log("Database sync complete.");
+
     } catch (syncError) {
       // If sync fails, log but don't crash (tables might already exist)
       console.error('Database sync warning:', syncError.message);

@@ -143,4 +143,35 @@ export const adminAPI = {
   }
 };
 
+
+// Scan API (VirusTotal)
+
+export const scanAPI = {
+  // Submit a URL for scanning
+  scanUrl: async (url) => {
+    const response = await api.post('/scan/url', { url });
+    return response.data; 
+  },
+
+  // Get scan status
+  getStatus: async (scanId) => {
+    const response = await api.get(`/scan/status/${scanId}`);
+    return response.data; 
+  },
+
+  getHistory: async () => {
+    const response = await api.get('/scan/history');
+    return response.data;
+  }
+};
+
+export const fetchScanHistory = async () => {
+  const token = localStorage.getItem('token');
+  const res = await api.get('/scan/history', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+};
+
+
 export default api;

@@ -1,6 +1,7 @@
 const User = require('./User');
 const Profile = require('./Profile');
 const ProfileLog = require('./ProfileLog');
+const ScanHistory = require('./scanhistory');
 
 User.hasMany(Profile, {
   foreignKey: 'userId',
@@ -38,5 +39,6 @@ ProfileLog.belongsTo(Profile, {
 module.exports = {
   User,
   Profile,
-  ProfileLog
+  ProfileLog,
+  ScanHistory
 };
