@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import './ProfileManager.css';
 import api from '../services/api';
 
 // Same idea as App.js / ScanDashboard
