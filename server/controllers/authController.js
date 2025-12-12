@@ -15,8 +15,18 @@ const register = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Find existing user
+    let existingUser;
+    try {
+      existingUser = await User.findOne({ where: { email } });
+    } catch (dbError) {
+      console.error('Database error checking existing user:', dbError);
+      return res.status(500).json({
+        success: false,
+        message: 'Database error. Please try again later.'
+      });
+    }
 
-    const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -25,18 +35,41 @@ const register = async (req, res) => {
     }
 
     // First user becomes admin
-    const userCount = await User.count();
+    let userCount;
+    try {
+      userCount = await User.count();
+    } catch (dbError) {
+      console.error('Database error counting users:', dbError);
+      return res.status(500).json({
+        success: false,
+        message: 'Database error. Please try again later.'
+      });
+    }
+
     const isFirstUser = userCount === 0;
 
-    const user = await User.create({
-      email,
-      password,
-      isApproved: true,
-      role: isFirstUser ? 'admin' : 'user',
-      accountType: isFirstUser ? 'admin' : 'user',
-      subscriptionTier: 'free',
-      isPaid: false
-    });
+    // Create user
+    let user;
+    try {
+      user = await User.create({
+        email,
+        password,
+        isApproved: true,
+        role: isFirstUser ? 'admin' : 'user',
+        accountType: isFirstUser ? 'admin' : 'user',
+        subscriptionTier: 'free',
+        isPaid: false
+      });
+    } catch (createError) {
+      console.error('Error creating user:', createError);
+      console.error('Create error details:', createError.message);
+      console.error('Create error stack:', createError.stack);
+      return res.status(500).json({
+        success: false,
+        message: 'Error creating user account. Please try again.',
+        error: process.env.NODE_ENV === 'development' ? createError.message : undefined
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -46,9 +79,11 @@ const register = async (req, res) => {
     });
   } catch (error) {
     console.error('Register error:', error);
+    console.error('Register error stack:', error.stack);
     res.status(500).json({
       success: false,
-      message: 'Server error during registration'
+      message: 'Server error during registration',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

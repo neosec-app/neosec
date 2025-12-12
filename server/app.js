@@ -38,8 +38,12 @@ const firewallRoutes = require('./routes/firewallRoutes');
 // Initialize Express app
 const app = express();
 
-// Connect to database
-connectDB();
+// Connect to database (async, but don't block server startup)
+connectDB().catch(err => {
+    console.error('Failed to connect to database:', err);
+    // In production, we might want to retry or handle this differently
+    // For now, log the error and let the server start
+});
 
 // CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS
@@ -50,15 +54,15 @@ app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-        
+
         // Check if origin is in allowed list
         if (allowedOrigins.includes(origin)) {
             callback(null, true);
-        } 
+        }
         // Also allow any Vercel preview URL in production
         else if (process.env.NODE_ENV === 'production' && origin.includes('.vercel.app')) {
             callback(null, true);
-        } 
+        }
         else {
             console.log('CORS blocked origin:', origin);
             console.log('Allowed origins:', allowedOrigins);

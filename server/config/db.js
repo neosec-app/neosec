@@ -100,8 +100,12 @@ const connectDB = async () => {
         }
     } catch (err) {
         console.error('Database connection/sync error:', err.message);
-        console.error(err);
-        process.exit(1);
+        console.error('Full error:', err);
+        console.error('Error stack:', err.stack);
+        // Don't exit in production - let the server start and log errors
+        if (process.env.NODE_ENV !== 'production') {
+            process.exit(1);
+        }
     }
 };
 
