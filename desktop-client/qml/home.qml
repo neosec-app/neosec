@@ -3,9 +3,6 @@ import QtQuick.Controls
 
 Page {
     id: page
-    Component.onCompleted: {
-        leftBarMenuStack.push(dashboardPage)
-    }
     anchors.centerIn: parent
     height: 720
     width: 1080
@@ -91,9 +88,6 @@ Page {
                 width: parent.width
                 onClicked: {
                     page.currentSelection = "dashboardBtn"
-                    if (leftBarMenuStack.currentItem !== dashboardPage) {
-                        leftBarMenuStack.push(dashboardPage)
-                    }
                 }
                 contentItem: Row {
                     spacing: 10
@@ -127,9 +121,6 @@ Page {
                 width: parent.width
                 onClicked: {
                     page.currentSelection = "vpnBtn"
-                    if (leftBarMenuStack.currentItem !== vpnPage) {
-                        leftBarMenuStack.push(vpnPage)
-                    }
                 }
                 contentItem: Row {
                     spacing: 10
@@ -163,9 +154,6 @@ Page {
                 width: parent.width
                 onClicked: {
                     page.currentSelection = "firewallBtn"
-                    if (leftBarMenuStack.currentItem !== firewallPage) {
-                        leftBarMenuStack.push(firewallPage)
-                    }
                 }
                 contentItem: Row {
                     spacing: 10
