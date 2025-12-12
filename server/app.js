@@ -10,9 +10,19 @@ const Threat = require('./models/Threat');
 const FirewallRule = require('./models/FirewallRule');
 const DataTransfer = require('./models/DataTransfer');
 
+// NEW: Add hierarchy models
+const Group = require('./models/Group');
+const GroupMember = require('./models/GroupMember');
+const Invitation = require('./models/Invitation');
+const Subscription = require('./models/Subscription');
+
+// NEW: Set up associations
+require('./models/associations');
+
 // Now connect to database (this will sync the models)
 const { connectDB } = require('./config/db');
 
+// Import routes
 const authRoutes = require('./routes/authRoutes');
 require("./scheduler");
 
@@ -20,6 +30,7 @@ const VpnRoutes = require('./routes/VpnRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const hierarchyRoutes = require('./routes/hierarchyRoutes');
 const scanRoutes = require('./routes/scanRoutes');
 const firewallRoutes = require('./routes/firewallRoutes');
 
@@ -74,6 +85,7 @@ app.use('/api/vpn', VpnRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/hierarchy', hierarchyRoutes);
 app.use('/api/scan', scanRoutes);
 app.use('/api/firewall', firewallRoutes);
 const dataTransferRoutes = require('./routes/dataTransferRoutes');

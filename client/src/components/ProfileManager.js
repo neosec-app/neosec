@@ -383,27 +383,278 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
       scheduleCondition: profile.scheduleCondition || '',
       autoActivate: profile.autoActivate,
     });
-    setShowForm(true);
-  };
 
-  const handleDeactivate = async (id) => {
-    if (window.confirm('Are you sure you want to deactivate this profile?')) {
-      try {
-        const response = await profilesAPI.deactivateProfile(id);
-        if (response.success) {
-          alert('Profile deactivated successfully!');
-          fetchProfiles();
-          fetchLogs();
-        } else {
-          throw new Error(response.message || 'Failed to deactivate profile');
+    useEffect(() => {
+        fetchProfiles();
+        fetchLogs();
+    }, []);
+
+    const fetchProfiles = async () => {
+        try {
+            const response = await api.get('/profiles');
+            setProfiles(response.data.profiles);
+            setLoading(false);
+        } catch (error) {
+            console.error('Error fetching profiles:', error);
+            setLoading(false);
         }
-      } catch (error) {
-        console.error('Error deactivating profile:', error);
-        const errorMessage = getErrorMessage(error, 'Failed to deactivate profile');
-        alert(errorMessage);
-      }
+    };
+
+    const fetchLogs = async () => {
+        try {
+            const response = await api.get('/profiles/logs/all');
+            setLogs(response.data.logs);
+        } catch (error) {
+            console.error('Error fetching logs:', error);
+        }
+    };
+
+    const handleInputChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        setFormData({
+            ...formData,
+            [name]: type === 'checkbox' ? checked : value,
+        });
+    };
+
+    const handleDayToggle = (day) => {
+        const days = formData.scheduleDays || [];
+        if (days.includes(day)) {
+            setFormData({
+                ...formData,
+                scheduleDays: days.filter((d) => d !== day),
+            });
+        } else {
+            setFormData({
+                ...formData,
+                scheduleDays: [...days, day],
+            });
+        }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            const submitData = {
+                ...formData,
+
+                vpnPort:
+                    formData.vpnPort && !isNaN(formData.vpnPort)
+                        ? parseInt(formData.vpnPort)
+                        : null,
+
+                firewallRules: formData.firewallRules
+                    ? formData.firewallRules
+                        .split(',')
+                        .map((r) => r.trim())
+                        .filter((r) => r !== '')
+                    : [],
+
+                allowedIps: formData.allowedIps
+                    ? formData.allowedIps
+                        .split(',')
+                        .map((ip) => ip.trim())
+                        .filter((ip) => ip !== '')
+                    : [],
+
+                blockedIps: formData.blockedIps
+                    ? formData.blockedIps
+                        .split(',')
+                        .map((ip) => ip.trim())
+                        .filter((ip) => ip !== '')
+                    : [],
+
+                allowedPorts: formData.allowedPorts
+                    ? formData.allowedPorts
+                        .split(',')
+                        .map((p) => p.trim())
+                        .filter((p) => p !== '' && !isNaN(p))
+                        .map(Number)
+                    : [],
+
+                blockedPorts: formData.blockedPorts
+                    ? formData.blockedPorts
+                        .split(',')
+                        .map((p) => p.trim())
+                        .filter((p) => p !== '' && !isNaN(p))
+                        .map(Number)
+                    : [],
+            };
+
+            if (editingProfile) {
+                await api.put(`/profiles/${editingProfile.id}`, submitData);
+                alert('Profile updated successfully!');
+            } else {
+                await api.post(`/profiles`, submitData);
+                alert('Profile created successfully!');
+            }
+
+            setShowForm(false);
+            setEditingProfile(null);
+            resetForm();
+            fetchProfiles();
+            fetchLogs();
+        } catch (error) {
+            console.error('Error saving profile:', error);
+            alert(
+                'Error saving profile: ' +
+                (error.response?.data?.message || error.message)
+            );
+        }
+    };
+
+    const handleEdit = (profile) => {
+        setEditingProfile(profile);
+        setFormData({
+            name: profile.name,
+            description: profile.description || '',
+            profileType: profile.profileType,
+
+            vpnEnabled: profile.vpnEnabled,
+            vpnServer: profile.vpnServer || '',
+            vpnProtocol: profile.vpnProtocol || 'OpenVPN',
+            vpnPort: profile.vpnPort || '',
+            vpnUsername: profile.vpnUsername || '',
+
+            firewallEnabled: profile.firewallEnabled,
+            defaultFirewallAction: profile.defaultFirewallAction || 'DENY',
+            firewallRules: Array.isArray(profile.firewallRules)
+                ? profile.firewallRules.join(', ')
+                : '',
+
+            dnsEnabled: profile.dnsEnabled,
+            primaryDns: profile.primaryDns || '',
+            secondaryDns: profile.secondaryDns || '',
+            dnsSecurity: profile.dnsSecurity,
+
+            allowedIps: Array.isArray(profile.allowedIps)
+                ? profile.allowedIps.join(', ')
+                : '',
+            blockedIps: Array.isArray(profile.blockedIps)
+                ? profile.blockedIps.join(', ')
+                : '',
+            allowedPorts: Array.isArray(profile.allowedPorts)
+                ? profile.allowedPorts.join(', ')
+                : '',
+            blockedPorts: Array.isArray(profile.blockedPorts)
+                ? profile.blockedPorts.join(', ')
+                : '',
+
+            isScheduled: profile.isScheduled,
+            scheduleType: profile.scheduleType || 'NONE',
+            scheduleStartTime: profile.scheduleStartTime || '',
+            scheduleEndTime: profile.scheduleEndTime || '',
+            scheduleDays: profile.scheduleDays || [],
+            scheduleCondition: profile.scheduleCondition || '',
+            autoActivate: profile.autoActivate,
+        });
+        setShowForm(true);
+    };
+
+    const handleDeactivate = async (id) => {
+        if (window.confirm('Are you sure you want to deactivate this profile?')) {
+            try {
+                await api.put(`/profiles/${id}/deactivate`, {});
+                alert('Profile deactivated successfully!');
+                fetchProfiles();
+                fetchLogs();
+            } catch (error) {
+                console.error('Error deactivating profile:', error);
+                alert('Error deactivating profile');
+            }
+        }
+    };
+
+    const handleDelete = async (id) => {
+        if (window.confirm('Are you sure you want to delete this profile?')) {
+            try {
+                await api.delete(`/profiles/${id}`);
+                alert('Profile deleted successfully!');
+                fetchProfiles();
+                fetchLogs();
+            } catch (error) {
+                console.error('Error deleting profile:', error);
+                alert('Error deleting profile');
+            }
+        }
+    };
+
+    const handleActivate = async (id) => {
+        try {
+            await api.put(`/profiles/${id}/activate`, {});
+            alert('Profile activated successfully!');
+            fetchProfiles();
+            fetchLogs();
+        } catch (error) {
+            console.error('Error activating profile:', error);
+            alert('Error activating profile');
+        }
+    };
+
+    const resetForm = () => {
+        setFormData({
+            name: '',
+            description: '',
+            profileType: 'Custom',
+            vpnEnabled: false,
+            vpnServer: '',
+            vpnProtocol: 'OpenVPN',
+            vpnPort: '',
+            vpnUsername: '',
+            firewallEnabled: true,
+            defaultFirewallAction: 'DENY',
+            firewallRules: '',
+            dnsEnabled: false,
+            primaryDns: '',
+            secondaryDns: '',
+            allowedIps: '',
+            blockedIps: '',
+            allowedPorts: '',
+            blockedPorts: '',
+            isScheduled: false,
+            scheduleType: 'NONE',
+            scheduleStartTime: '',
+            scheduleEndTime: '',
+            scheduleDays: [],
+            scheduleCondition: '',
+            autoActivate: false,
+        });
+    };
+
+    const handleCancel = () => {
+        setShowForm(false);
+        setEditingProfile(null);
+        resetForm();
+    };
+
+    const formatDate = (date) => {
+        return new Date(date).toLocaleString();
+    };
+
+    const getActionBadgeClass = (action) => {
+        switch (action) {
+            case 'CREATED':
+                return 'badge-created';
+            case 'UPDATED':
+                return 'badge-updated';
+            case 'DELETED':
+                return 'badge-deleted';
+            case 'ACTIVATED':
+                return 'badge-activated';
+            case 'DEACTIVATED':
+                return 'badge-deactivated';
+            default:
+                return 'badge-default';
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="loading-container" style={{ color: colors.text }}>
+                Loading profiles...
+            </div>
+        );
     }
-  };
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this profile?')) {
@@ -591,7 +842,6 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
                         {log.description}
                       </p>
                     )}
-                  </div>
                 </div>
               ))}
             </div>
@@ -983,7 +1233,89 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
                           "Outside office hours"
                         </small>
                       </div>
-                    )}
+
+                      <div className="form-group">
+                        <label>Active Days</label>
+                        <div className="days-selector">
+                          {[
+                            'Monday',
+                            'Tuesday',
+                            'Wednesday',
+                            'Thursday',
+                            'Friday',
+                            'Saturday',
+                            'Sunday',
+                          ].map((day) => (
+                            <label key={day} className="day-checkbox">
+                              <input
+                                type="checkbox"
+                                checked={formData.scheduleDays.includes(day)}
+                                onChange={() => handleDayToggle(day)}
+                              />
+                              <span>{day}</span>
+                            </label>
+
+                            {formData.firewallEnabled && (
+                                <div className="nested-fields">
+                                    <div className="form-group">
+                                        <label>Default Action</label>
+                                        <select
+                                            name="defaultFirewallAction"
+                                            value={formData.defaultFirewallAction}
+                                            onChange={handleInputChange}
+                                            className="form-select"
+                                            style={styles.select}
+                                        >
+                                            <option value="ALLOW">
+                                                Allow All (Blacklist Mode)
+                                            </option>
+                                            <option value="DENY">
+                                                Deny All (Whitelist Mode)
+                                            </option>
+                                        </select>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Custom Rules (comma-separated)</label>
+                                        <input
+                                            type="text"
+                                            name="firewallRules"
+                                            placeholder="rule1, rule2, rule3"
+                                            value={formData.firewallRules}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                            style={styles.formInput}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {(formData.scheduleType === 'CONDITION' ||
+                    formData.scheduleType === 'BOTH') && (
+                    <div className="form-group">
+                      <label>Activation Condition</label>
+                      <input
+                        type="text"
+                        name="scheduleCondition"
+                        placeholder="e.g., WiFi network name, IP range"
+                        value={formData.scheduleCondition}
+                        onChange={handleInputChange}
+                        className="form-input"
+                        style={styles.formInput}
+                      />
+                      <small
+                        className="field-hint"
+                        style={styles.fieldHint}
+                      >
+                        Example: "Public WiFi", "192.168.1.x",
+                        "Outside office hours"
+                      </small>
+                    </div>
+                  )}
 
                   <label className="checkbox-label">
                     <input
@@ -1143,46 +1475,10 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
                         </p>
                       )}
                     </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="profile-actions">
-                    {!profile.isActive ? (
-                      <button
-                        onClick={() => handleActivate(profile.id)}
-                        className="btn btn-activate"
-                      >
-                        Activate
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleDeactivate(profile.id)}
-                        className="btn btn-deactivate"
-                      >
-                        Deactivate
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleEdit(profile)}
-                      className="btn btn-edit"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(profile.id)}
-                      className="btn btn-delete"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+                )}
+            </div>
+        </div>
+    );
 };
 
 export default ProfileManager;

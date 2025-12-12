@@ -66,6 +66,6 @@ const VpnConfig = sequelize.define('VpnConfig', {
 
 // Define association
 VpnConfig.belongsTo(User, { foreignKey: 'userId', as: 'user' });
-User.hasMany(VpnConfig, { foreignKey: 'userId', as: 'vpnConfigs' });
+//User.hasMany(VpnConfig, { foreignKey: 'userId', as: 'vpnConfigs' });
 
 module.exports = VpnConfig;

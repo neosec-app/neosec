@@ -1,3 +1,13 @@
+/* =========================================
+   🚀 TAILWIND INITIALIZATION
+   ========================================= */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================
+   🌈 GLOBAL RESET & BODY
+   ========================================= */
 * {
   margin: 0;
   padding: 0;
@@ -144,6 +154,7 @@ code {
   outline: none;
 }
 
+/* LOGIN PAGE Primary Button */
 .btn-primary {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
@@ -302,5 +313,16 @@ code {
   }
 }
 
+.btn-secondary {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg
+    bg-[#282828] text-white border border-[#444]
+    hover:bg-[#333] transition;
+}
+
+.btn-danger {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg
+    bg-[#D32F2F] text-white text-sm font-semibold
+    hover:bg-red-700 transition;
+}
 
 
