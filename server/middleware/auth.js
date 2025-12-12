@@ -2,48 +2,42 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+
 // Protect routes - verify JWT token
 const protect = async (req, res, next) => {
-    let token;
-
-    // Check for token in Authorization header
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-        token = req.headers.authorization.split(' ')[1];
-    }
-
-    // Check if token exists
-    if (!token) {
-        return res.status(401).json({
-            success: false,
-            message: 'Not authorized, no token'
-        });
-    }
-
     try {
-        // Verify token
+        let token;
+
+        if (req.headers.authorization?.startsWith('Bearer')) {
+            token = req.headers.authorization.split(' ')[1];
+        }
+
+        if (!token) {
+            return res.status(401).json({ success: false, message: 'Not authorized' });
+        }
+
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        // Get user from token
-        req.user = await User.findByPk(decoded.userId, {
-            attributes: { exclude: ['password'] }
+        // IMPORTANT: controllers expect req.user.id, accountType, isPaid, subscriptionTier, role
+        const user = await User.findByPk(decoded.userId ?? decoded.id, {
+            attributes: ['id', 'role', 'email', 'accountType', 'subscriptionTier', 'isPaid', 'isApproved'],
         });
 
-        if (!req.user) {
-            return res.status(401).json({
-                success: false,
-                message: 'User not found'
-            });
+        if (!user) {
+            return res.status(401).json({ success: false, message: 'User not found' });
         }
+
+        // Attach the FULL user object so controllers can use req.user.id etc.
+        req.user = user;
 
         next();
     } catch (error) {
-        console.error('Token verification error:', error);
-        return res.status(401).json({
-            success: false,
-            message: 'Not authorized, token failed'
-        });
+        return res.status(401).json({ success: false, message: 'Not authorized' });
     }
 };
+
+
+
 
 // Require admin role
 const requireAdmin = async (req, res, next) => {

@@ -7,6 +7,8 @@ const User = require('./models/User');
 const VpnConfig = require('./models/VpnConfig');
 const Notification = require('./models/Notification');
 const Threat = require('./models/Threat');
+const FirewallRule = require('./models/FirewallRule');
+const DataTransfer = require('./models/DataTransfer');
 
 // NEW: Add hierarchy models
 const Group = require('./models/Group');
@@ -22,11 +24,16 @@ const { connectDB } = require('./config/db');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
+require("./scheduler");
+
 const VpnRoutes = require('./routes/VpnRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const hierarchyRoutes = require('./routes/hierarchyRoutes');
+const scanRoutes = require('./routes/scanRoutes');
+const firewallRoutes = require('./routes/firewallRoutes');
+
 
 // Initialize Express app
 const app = express();
@@ -43,15 +50,15 @@ app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-
+        
         // Check if origin is in allowed list
         if (allowedOrigins.includes(origin)) {
             callback(null, true);
-        }
+        } 
         // Also allow any Vercel preview URL in production
         else if (process.env.NODE_ENV === 'production' && origin.includes('.vercel.app')) {
             callback(null, true);
-        }
+        } 
         else {
             console.log('CORS blocked origin:', origin);
             console.log('Allowed origins:', allowedOrigins);
@@ -71,11 +78,19 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', authRoutes);
+const profileRoutes = require('./routes/profileRoutes');
+app.use('/api/profiles', profileRoutes);
+
 app.use('/api/vpn', VpnRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/hierarchy', hierarchyRoutes);
+app.use('/api/scan', scanRoutes);
+app.use('/api/firewall', firewallRoutes);
+const dataTransferRoutes = require('./routes/dataTransferRoutes');
+app.use('/api/data-transfer', dataTransferRoutes);
+
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -120,4 +135,6 @@ app.listen(PORT, () => {
     console.log(`Server started on port ${PORT}`);
 });
 
+
 module.exports = app;
+
