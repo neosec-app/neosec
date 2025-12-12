@@ -2,7 +2,41 @@
 import React, { useState, useEffect } from 'react';
 import { scanAPI } from '../services/api';
 
-function ScanDashboard() {
+const darkPalette = {
+  bgMain: '#121212',
+  bgCard: '#181818',
+  bgPanel: '#0a0a0a',
+  text: '#ffffff',
+  textMuted: '#9aa3b5',
+  border: '#242424',
+  accent: '#36E27B',
+  accentSoft: 'rgba(54,226,123,0.12)',
+  warning: '#f0a500',
+  danger: '#e04848',
+  inputBg: '#1c1c1c',
+  inputBorder: '#2c2c2c',
+};
+
+const lightPalette = {
+  bgMain: '#f6f8fb',
+  bgCard: '#ffffff',
+  bgPanel: '#eef3f8',
+  text: '#0b172a',
+  textMuted: '#5b6b7a',
+  border: '#d9e2ec',
+  accent: '#1fa45a',
+  accentSoft: '#e6f4ed',
+  warning: '#d97706',
+  danger: '#d4183d',
+  inputBg: '#ffffff',
+  inputBorder: '#d9e2ec',
+};
+
+function ScanDashboard({ theme = 'dark', palette }) {
+  // fall back to local palettes if App.js didn’t pass one
+  const colors =
+    palette || (theme === 'light' ? lightPalette : darkPalette);
+
   const [url, setUrl] = useState('');
   const [scanId, setScanId] = useState(null);
   const [status, setStatus] = useState(null);
@@ -28,26 +62,25 @@ function ScanDashboard() {
         console.error('Status check error:', err);
         clearInterval(interval);
       }
-    }, 5000); // every 5 seconds
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [scanId]);
-  
 
-// Load scan history on component mount
-useEffect(() => {
-  const loadHistory = async () => {
-    try {
-      const data = await scanAPI.getHistory(); 
-      setHistory(data);
-    } catch (err) {
-      console.error("Failed to load history:", err);
-      setError("Could not load scan history.");
-    }
-  };
+  // Load scan history on component mount
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const data = await scanAPI.getHistory();
+        setHistory(data);
+      } catch (err) {
+        console.error('Failed to load history:', err);
+        setError('Could not load scan history.');
+      }
+    };
 
-  loadHistory();
-}, []);
+    loadHistory();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -72,18 +105,17 @@ useEffect(() => {
       setLoading(false);
     }
   };
-  
 
   const getStatusColor = (s) => {
-    if (s === 'COMPLETED') return '#36E27B';
-    if (s === 'ERROR') return '#FF4444';
-    return '#FF9800';
+    if (s === 'COMPLETED') return colors.accent;
+    if (s === 'ERROR') return colors.danger;
+    return colors.warning;
   };
 
   return (
-    <div>
+    <div style={{ color: colors.text }}>
       <h1 style={{ fontSize: '32px', marginBottom: '10px' }}>URL Scanner</h1>
-      <p style={{ color: '#888', marginBottom: '30px' }}>
+      <p style={{ color: colors.textMuted, marginBottom: '30px' }}>
         Scan URLs with VirusTotal and see threat results.
       </p>
 
@@ -97,11 +129,11 @@ useEffect(() => {
             style={{
               flex: 1,
               padding: '12px',
-              backgroundColor: '#121212',
-              border: '1px solid #282828',
+              backgroundColor: colors.inputBg,
+              border: `1px solid ${colors.inputBorder}`,
               borderRadius: '8px',
-              color: '#fff',
-              fontSize: '14px'
+              color: colors.text,
+              fontSize: '14px',
             }}
           />
           <button
@@ -109,14 +141,14 @@ useEffect(() => {
             disabled={loading}
             style={{
               padding: '12px 24px',
-              backgroundColor: '#36E27B',
-              color: '#121212',
+              backgroundColor: colors.accent,
+              color: theme === 'dark' ? '#121212' : '#ffffff',
               border: 'none',
               borderRadius: '8px',
               fontWeight: 'bold',
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
               fontSize: '14px',
-              opacity: loading ? 0.7 : 1
+              opacity: loading ? 0.7 : 1,
             }}
           >
             {loading ? 'Submitting…' : 'Scan URL'}
@@ -125,91 +157,140 @@ useEffect(() => {
       </form>
 
       {error && (
-        <div style={{
-          marginBottom: '20px',
-          padding: '12px 16px',
-          borderRadius: '8px',
-          border: '1px solid #FF4444',
-          backgroundColor: '#2A1515',
-          color: '#FFB3B3',
-          fontSize: '14px'
-        }}>
+        <div
+          style={{
+            marginBottom: '20px',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            border: `1px solid ${colors.danger}`,
+            backgroundColor:
+              theme === 'dark' ? '#2A1515' : 'rgba(212,24,61,0.08)',
+            color: theme === 'dark' ? '#FFB3B3' : colors.danger,
+            fontSize: '14px',
+          }}
+        >
           {error}
         </div>
       )}
 
-      {/* Status + current scan result – only when there is a scanId */}
-    `{scanId && (
-    <div style={{ padding: '20px', backgroundColor: '#181818', border: '1px solid #282828', borderRadius: '10px', marginTop: '10px' }}>
-        <div style={{ marginBottom: '10px', fontSize: '14px', color: '#888' }}>Scan ID:</div>
-        <div style={{ fontFamily: 'monospace', fontSize: '13px', color: '#ccc', wordBreak: 'break-all', marginBottom: '15px' }}>
-        {scanId}
+      {/* Status + current scan result */}
+      {scanId && (
+        <div
+          style={{
+            padding: '20px',
+            backgroundColor: colors.bgCard,
+            border: `1px solid ${colors.border}`,
+            borderRadius: '10px',
+            marginTop: '10px',
+          }}
+        >
+          <div
+            style={{ marginBottom: '10px', fontSize: '14px', color: colors.textMuted }}
+          >
+            Scan ID:
+          </div>
+          <div
+            style={{
+              fontFamily: 'monospace',
+              fontSize: '13px',
+              color: colors.textMuted,
+              wordBreak: 'break-all',
+              marginBottom: '15px',
+            }}
+          >
+            {scanId}
+          </div>
+
+          <div
+            style={{ marginBottom: '10px', fontSize: '14px', color: colors.textMuted }}
+          >
+            Status:
+          </div>
+          <div
+            style={{
+              fontSize: '18px',
+              fontWeight: 'bold',
+              color: getStatusColor(status),
+            }}
+          >
+            {status || 'Waiting…'}
+          </div>
+
+          {result && result.positives != null && (
+            <div
+              style={{ marginTop: '15px', fontSize: '14px', color: colors.textMuted }}
+            >
+              <div>
+                Detections: {result.positives} / {result.total}
+              </div>
+
+              {result.permalink && (
+                <div style={{ marginTop: '8px' }}>
+                  <a
+                    href={result.permalink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: colors.accent, textDecoration: 'underline' }}
+                  >
+                    View full report on VirusTotal
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
         </div>
+      )}
 
-        <div style={{ marginBottom: '10px', fontSize: '14px', color: '#888' }}>Status:</div>
-        <div style={{ fontSize: '18px', fontWeight: 'bold', color: getStatusColor(status) }}>
-        {status || 'Waiting…'}
-        </div>
+      {/* HISTORY */}
+      <h2 style={{ marginTop: '40px', color: colors.text }}>Scan History</h2>
 
-        {result && result.positives != null && (
-        <div style={{ marginTop: '15px', fontSize: '14px', color: '#ccc' }}>
-            <div>Detections: {result.positives} / {result.total}</div>
+      {history.length === 0 ? (
+        <p style={{ color: colors.textMuted }}>No previous scans.</p>
+      ) : (
+        history.map((item) => (
+          <div
+            key={item.id}
+            style={{
+              background: colors.bgCard,
+              padding: '12px',
+              borderRadius: '8px',
+              marginTop: '10px',
+              borderLeft:
+                item.positives > 0
+                  ? `4px solid ${colors.danger}`
+                  : `4px solid ${colors.accent}`,
+            }}
+          >
+            <div style={{ color: colors.text, fontWeight: 'bold' }}>
+              {item.target}
+            </div>
+            <div style={{ color: colors.textMuted }}>
+              Status: {item.status}
+            </div>
 
-            {result.permalink && (
-            <div style={{ marginTop: '8px' }}>
-                <a
-                href={result.permalink}
+            {item.positives != null && item.total != null && (
+              <div style={{ color: colors.textMuted }}>
+                Detections: {item.positives} / {item.total}
+              </div>
+            )}
+
+            {item.permalink && (
+              <a
+                href={item.permalink}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ color: '#36E27B', textDecoration: 'underline' }}
-                >
-                View full report on VirusTotal
-                </a>
-            </div>
+                style={{
+                  color: colors.accent,
+                  display: 'block',
+                  marginTop: '6px',
+                }}
+              >
+                View full VirusTotal Report
+              </a>
             )}
-        </div>
-        )}
-    </div>
-    )}
-
-    {/* 🔽 HISTORY: always rendered, even when scanId is null */}
-    <h2 style={{ marginTop: '40px', color: '#fff' }}>Scan History</h2>
-
-    {history.length === 0 ? (
-    <p style={{ color: '#888' }}>No previous scans.</p>
-    ) : (
-    history.map((item) => (
-        <div
-        key={item.id}
-        style={{
-            background: '#1b1b1b',
-            padding: '12px',
-            borderRadius: '8px',
-            marginTop: '10px',
-            borderLeft: item.positives > 0 ? '4px solid #E23636' : '4px solid #36E27B',
-        }}
-        >
-        <div style={{ color: '#fff', fontWeight: 'bold' }}>{item.target}</div>
-        <div style={{ color: '#bbb' }}>Status: {item.status}</div>
-
-        {/* Optional: show detections if you have them in DB */}
-        {item.positives != null && item.total != null && (
-            <div style={{ color: '#bbb' }}>Detections: {item.positives} / {item.total}</div>
-        )}
-
-        {item.permalink && (
-            <a
-            href={item.permalink}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: '#36E27B', display: 'block', marginTop: '6px' }}
-            >
-            View full VirusTotal Report
-            </a>
-        )}
-        </div>
-    ))
-    )}`
+          </div>
+        ))
+      )}
     </div>
   );
 }

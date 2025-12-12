@@ -1,8 +1,162 @@
 import React, { useState, useEffect } from 'react';
-import './ProfileManager.css';
 import api from '../services/api';
 
-const ProfileManager = () => {
+// Same idea as App.js / ScanDashboard
+const darkPalette = {
+  bgMain: '#121212',
+  bgCard: '#181818',
+  bgPanel: '#0a0a0a',
+  text: '#ffffff',
+  textMuted: '#9aa3b5',
+  border: '#242424',
+  accent: '#36E27B',
+  accentSoft: 'rgba(54,226,123,0.12)',
+  warning: '#f0a500',
+  danger: '#e04848',
+  inputBg: '#18181b',
+  inputBorder: '#27272a',
+};
+
+const lightPalette = {
+  bgMain: '#f6f8fb',
+  bgCard: '#ffffff',
+  bgPanel: '#eef3f8',
+  text: '#0b172a',
+  textMuted: '#5b6b7a',
+  border: '#d9e2ec',
+  accent: '#1fa45a',
+  accentSoft: '#e6f4ed',
+  warning: '#d97706',
+  danger: '#d4183d',
+  inputBg: '#ffffff',
+  inputBorder: '#d9e2ec',
+};
+
+const makeStyles = (c) => ({
+  container: {
+    padding: 20,
+    maxWidth: 1400,
+    margin: '0 auto',
+    color: c.text,
+    fontFamily: 'sans-serif',
+  },
+  headerTitle: {
+    margin: 0,
+    color: c.text,
+    fontSize: 30,
+    fontWeight: 700,
+  },
+  logsSection: {
+    backgroundColor: c.bgCard,
+    border: `1px solid ${c.border}`,
+    borderRadius: 12,
+    padding: 24,
+    marginBottom: 24,
+  },
+  logsEmpty: {
+    textAlign: 'center',
+    color: c.textMuted,
+    padding: 20,
+  },
+  logCard: {
+    backgroundColor: c.bgPanel,
+    border: `1px solid ${c.border}`,
+    borderRadius: 8,
+    padding: 16,
+  },
+  logDate: {
+    fontSize: 14,
+    color: c.accent,
+    fontFamily: 'monospace',
+  },
+  logDescription: {
+    color: c.textMuted,
+    marginTop: 4,
+    fontSize: 14,
+  },
+  profileFormContainer: {
+    backgroundColor: c.bgCard,
+    border: `1px solid ${c.border}`,
+    borderRadius: 8,
+    padding: 24,
+    marginBottom: 28,
+  },
+  formSection: {
+    backgroundColor: c.bgPanel,
+    border: `1px solid ${c.border}`,
+    borderRadius: 8,
+    padding: 20,
+  },
+  formInput: {
+    width: '100%',
+    padding: 8,
+    backgroundColor: c.inputBg,
+    border: `1px solid ${c.inputBorder}`,
+    borderRadius: 8,
+    fontSize: 14,
+    color: c.text,
+  },
+  textArea: {
+    width: '100%',
+    padding: 8,
+    backgroundColor: c.inputBg,
+    border: `1px solid ${c.inputBorder}`,
+    borderRadius: 8,
+    fontSize: 14,
+    color: c.text,
+    resize: 'vertical',
+    fontFamily: 'inherit',
+  },
+  select: {
+    width: '100%',
+    padding: 8,
+    backgroundColor: c.inputBg,
+    border: `1px solid ${c.inputBorder}`,
+    borderRadius: 8,
+    fontSize: 14,
+    color: c.text,
+  },
+  fieldHint: {
+    display: 'block',
+    marginTop: 4,
+    color: c.textMuted,
+    fontSize: 12,
+  },
+  profileCard: {
+    backgroundColor: c.bgCard,
+    border: `1px solid ${c.border}`,
+    borderRadius: 12,
+    padding: 20,
+  },
+  profileCardActive: (isActive) =>
+    isActive
+      ? {
+          backgroundColor: c.bgCard,
+          border: `1px solid ${c.accent}`,
+          borderRadius: 12,
+          padding: 20,
+        }
+      : undefined,
+  profileDescription: {
+    color: c.textMuted,
+  },
+  profileMeta: {
+    fontSize: 12,
+    color: c.textMuted,
+    marginTop: 12,
+  },
+  statusEnabled: {
+    color: c.accent,
+  },
+  statusDisabled: {
+    color: c.danger,
+  },
+});
+
+const ProfileManager = ({ theme = 'dark', palette }) => {
+  const colors = palette || (theme === 'light' ? lightPalette : darkPalette);
+  const styles = makeStyles(colors);
+
   const [profiles, setProfiles] = useState([]);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,7 +193,7 @@ const ProfileManager = () => {
     scheduleEndTime: '',
     scheduleDays: [],
     scheduleCondition: '',
-    autoActivate: false
+    autoActivate: false,
   });
 
   useEffect(() => {
@@ -71,7 +225,7 @@ const ProfileManager = () => {
     const { name, value, type, checked } = e.target;
     setFormData({
       ...formData,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
     });
   };
 
@@ -80,12 +234,12 @@ const ProfileManager = () => {
     if (days.includes(day)) {
       setFormData({
         ...formData,
-        scheduleDays: days.filter(d => d !== day)
+        scheduleDays: days.filter((d) => d !== day),
       });
     } else {
       setFormData({
         ...formData,
-        scheduleDays: [...days, day]
+        scheduleDays: [...days, day],
       });
     }
   };
@@ -103,42 +257,41 @@ const ProfileManager = () => {
 
         firewallRules: formData.firewallRules
           ? formData.firewallRules
-            .split(',')
-            .map(r => r.trim())
-            .filter(r => r !== '')
+              .split(',')
+              .map((r) => r.trim())
+              .filter((r) => r !== '')
           : [],
 
         allowedIps: formData.allowedIps
           ? formData.allowedIps
-            .split(',')
-            .map(ip => ip.trim())
-            .filter(ip => ip !== '')
+              .split(',')
+              .map((ip) => ip.trim())
+              .filter((ip) => ip !== '')
           : [],
 
         blockedIps: formData.blockedIps
           ? formData.blockedIps
-            .split(',')
-            .map(ip => ip.trim())
-            .filter(ip => ip !== '')
+              .split(',')
+              .map((ip) => ip.trim())
+              .filter((ip) => ip !== '')
           : [],
 
         allowedPorts: formData.allowedPorts
           ? formData.allowedPorts
-            .split(',')
-            .map(p => p.trim())
-            .filter(p => p !== '' && !isNaN(p))
-            .map(Number)
+              .split(',')
+              .map((p) => p.trim())
+              .filter((p) => p !== '' && !isNaN(p))
+              .map(Number)
           : [],
 
         blockedPorts: formData.blockedPorts
           ? formData.blockedPorts
-            .split(',')
-            .map(p => p.trim())
-            .filter(p => p !== '' && !isNaN(p))
-            .map(Number)
-          : []
+              .split(',')
+              .map((p) => p.trim())
+              .filter((p) => p !== '' && !isNaN(p))
+              .map(Number)
+          : [],
       };
-
 
       if (editingProfile) {
         await api.put(`/profiles/${editingProfile.id}`, submitData);
@@ -155,7 +308,10 @@ const ProfileManager = () => {
       fetchLogs();
     } catch (error) {
       console.error('Error saving profile:', error);
-      alert('Error saving profile: ' + (error.response?.data?.message || error.message));
+      alert(
+        'Error saving profile: ' +
+          (error.response?.data?.message || error.message)
+      );
     }
   };
 
@@ -174,17 +330,27 @@ const ProfileManager = () => {
 
       firewallEnabled: profile.firewallEnabled,
       defaultFirewallAction: profile.defaultFirewallAction || 'DENY',
-      firewallRules: Array.isArray(profile.firewallRules) ? profile.firewallRules.join(', ') : '',
+      firewallRules: Array.isArray(profile.firewallRules)
+        ? profile.firewallRules.join(', ')
+        : '',
 
       dnsEnabled: profile.dnsEnabled,
       primaryDns: profile.primaryDns || '',
       secondaryDns: profile.secondaryDns || '',
       dnsSecurity: profile.dnsSecurity,
 
-      allowedIps: Array.isArray(profile.allowedIps) ? profile.allowedIps.join(', ') : '',
-      blockedIps: Array.isArray(profile.blockedIps) ? profile.blockedIps.join(', ') : '',
-      allowedPorts: Array.isArray(profile.allowedPorts) ? profile.allowedPorts.join(', ') : '',
-      blockedPorts: Array.isArray(profile.blockedPorts) ? profile.blockedPorts.join(', ') : '',
+      allowedIps: Array.isArray(profile.allowedIps)
+        ? profile.allowedIps.join(', ')
+        : '',
+      blockedIps: Array.isArray(profile.blockedIps)
+        ? profile.blockedIps.join(', ')
+        : '',
+      allowedPorts: Array.isArray(profile.allowedPorts)
+        ? profile.allowedPorts.join(', ')
+        : '',
+      blockedPorts: Array.isArray(profile.blockedPorts)
+        ? profile.blockedPorts.join(', ')
+        : '',
 
       isScheduled: profile.isScheduled,
       scheduleType: profile.scheduleType || 'NONE',
@@ -192,7 +358,7 @@ const ProfileManager = () => {
       scheduleEndTime: profile.scheduleEndTime || '',
       scheduleDays: profile.scheduleDays || [],
       scheduleCondition: profile.scheduleCondition || '',
-      autoActivate: profile.autoActivate
+      autoActivate: profile.autoActivate,
     });
     setShowForm(true);
   };
@@ -210,7 +376,6 @@ const ProfileManager = () => {
       }
     }
   };
-
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this profile?')) {
@@ -238,7 +403,6 @@ const ProfileManager = () => {
     }
   };
 
-
   const resetForm = () => {
     setFormData({
       name: '',
@@ -265,7 +429,7 @@ const ProfileManager = () => {
       scheduleEndTime: '',
       scheduleDays: [],
       scheduleCondition: '',
-      autoActivate: false
+      autoActivate: false,
     });
   };
 
@@ -281,24 +445,34 @@ const ProfileManager = () => {
 
   const getActionBadgeClass = (action) => {
     switch (action) {
-      case 'CREATED': return 'badge-created';
-      case 'UPDATED': return 'badge-updated';
-      case 'DELETED': return 'badge-deleted';
-      case 'ACTIVATED': return 'badge-activated';
-      case 'DEACTIVATED': return 'badge-deactivated';
-      default: return 'badge-default';
+      case 'CREATED':
+        return 'badge-created';
+      case 'UPDATED':
+        return 'badge-updated';
+      case 'DELETED':
+        return 'badge-deleted';
+      case 'ACTIVATED':
+        return 'badge-activated';
+      case 'DEACTIVATED':
+        return 'badge-deactivated';
+      default:
+        return 'badge-default';
     }
   };
 
   if (loading) {
-    return <div className="loading-container">Loading profiles...</div>;
+    return (
+      <div className="loading-container" style={{ color: colors.text }}>
+        Loading profiles...
+      </div>
+    );
   }
 
   return (
-    <div className="profile-manager">
+    <div className="profile-manager" style={styles.container}>
       {/* Header */}
       <div className="pm-header">
-        <h2>Security Profile Management</h2>
+        <h2 style={styles.headerTitle}>Security Profile Management</h2>
         <div className="header-actions">
           <button
             onClick={() => setShowLogs(!showLogs)}
@@ -317,27 +491,45 @@ const ProfileManager = () => {
 
       {/* Activity Logs Section */}
       {showLogs && (
-        <div className="logs-section">
-          <h3>Activity Logs</h3>
+        <div className="logs-section" style={styles.logsSection}>
+          <h3 style={{ marginTop: 0, marginBottom: 16, color: colors.text }}>
+            Activity Logs
+          </h3>
           {logs.length === 0 ? (
-            <p className="no-logs">No activity logs yet.</p>
+            <p className="no-logs" style={styles.logsEmpty}>
+              No activity logs yet.
+            </p>
           ) : (
             <div className="logs-container">
               {logs.map((log) => (
-                <div key={log.id} className="log-card">
+                <div
+                  key={log.id}
+                  className="log-card"
+                  style={styles.logCard}
+                >
                   <div className="log-card-header">
-                    <span className="log-date">{formatDate(log.createdAt)}</span>
-                    <span className={`action-badge ${getActionBadgeClass(log.action)}`}>
+                    <span className="log-date" style={styles.logDate}>
+                      {formatDate(log.createdAt)}
+                    </span>
+                    <span
+                      className={`action-badge ${getActionBadgeClass(
+                        log.action
+                      )}`}
+                    >
                       {log.action}
                     </span>
                   </div>
                   <div className="log-card-body">
                     <p>
                       <span className="log-label">Profile:</span>{' '}
-                      <span className={`log-profile ${!log.profile?.name ? 'deleted' : ''}`}>
-                        {log.profile?.name || (
-                          log.description?.match(/"([^"]+)"/)?.[1] || "Deleted"
-                        )}
+                      <span
+                        className={`log-profile ${
+                          !log.profile?.name ? 'deleted' : ''
+                        }`}
+                      >
+                        {log.profile?.name ||
+                          log.description?.match(/"([^"]+)"/)?.[1] ||
+                          'Deleted'}
                       </span>
                     </p>
                     <p>
@@ -345,7 +537,12 @@ const ProfileManager = () => {
                       <span className="log-email">{log.userEmail}</span>
                     </p>
                     {log.description && (
-                      <p className="log-description">{log.description}</p>
+                      <p
+                        className="log-description"
+                        style={styles.logDescription}
+                      >
+                        {log.description}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -357,13 +554,35 @@ const ProfileManager = () => {
 
       {/* Profile Form */}
       {showForm && (
-        <div className="profile-form-container">
-          <h3>{editingProfile ? 'Edit Profile' : 'Create New Profile'}</h3>
+        <div
+          className="profile-form-container"
+          style={styles.profileFormContainer}
+        >
+          <h3
+            style={{
+              marginTop: 0,
+              marginBottom: 16,
+              color: colors.text,
+              fontSize: 24,
+              fontWeight: 'bold',
+            }}
+          >
+            {editingProfile ? 'Edit Profile' : 'Create New Profile'}
+          </h3>
           <form onSubmit={handleSubmit} className="profile-form">
-
             {/* Basic Information */}
-            <div className="form-section">
-              <h4>Basic Information</h4>
+            <div className="form-section" style={styles.formSection}>
+              <h4
+                style={{
+                  marginTop: 0,
+                  marginBottom: 16,
+                  color: colors.accent,
+                  fontSize: 18,
+                  fontWeight: 600,
+                }}
+              >
+                Basic Information
+              </h4>
 
               <div className="form-group">
                 <label>Profile Name *</label>
@@ -374,6 +593,7 @@ const ProfileManager = () => {
                   onChange={handleInputChange}
                   required
                   className="form-input"
+                  style={styles.formInput}
                 />
               </div>
 
@@ -385,13 +605,24 @@ const ProfileManager = () => {
                   onChange={handleInputChange}
                   rows="3"
                   className="form-textarea"
+                  style={styles.textArea}
                 />
               </div>
             </div>
 
             {/* VPN Settings */}
-            <div className="form-section">
-              <h4>VPN Settings</h4>
+            <div className="form-section" style={styles.formSection}>
+              <h4
+                style={{
+                  marginTop: 0,
+                  marginBottom: 16,
+                  color: colors.accent,
+                  fontSize: 18,
+                  fontWeight: 600,
+                }}
+              >
+                VPN Settings
+              </h4>
 
               <label className="checkbox-label">
                 <input
@@ -414,6 +645,7 @@ const ProfileManager = () => {
                       value={formData.vpnServer}
                       onChange={handleInputChange}
                       className="form-input"
+                      style={styles.formInput}
                     />
                   </div>
 
@@ -424,6 +656,7 @@ const ProfileManager = () => {
                       value={formData.vpnProtocol}
                       onChange={handleInputChange}
                       className="form-select"
+                      style={styles.select}
                     >
                       <option value="OpenVPN">OpenVPN</option>
                       <option value="WireGuard">WireGuard</option>
@@ -440,6 +673,7 @@ const ProfileManager = () => {
                       value={formData.vpnPort}
                       onChange={handleInputChange}
                       className="form-input"
+                      style={styles.formInput}
                     />
                   </div>
 
@@ -452,6 +686,7 @@ const ProfileManager = () => {
                       value={formData.vpnUsername}
                       onChange={handleInputChange}
                       className="form-input"
+                      style={styles.formInput}
                     />
                   </div>
                 </div>
@@ -459,8 +694,18 @@ const ProfileManager = () => {
             </div>
 
             {/* Firewall Settings */}
-            <div className="form-section">
-              <h4>Firewall Settings</h4>
+            <div className="form-section" style={styles.formSection}>
+              <h4
+                style={{
+                  marginTop: 0,
+                  marginBottom: 16,
+                  color: colors.accent,
+                  fontSize: 18,
+                  fontWeight: 600,
+                }}
+              >
+                Firewall Settings
+              </h4>
 
               <label className="checkbox-label">
                 <input
@@ -481,9 +726,14 @@ const ProfileManager = () => {
                       value={formData.defaultFirewallAction}
                       onChange={handleInputChange}
                       className="form-select"
+                      style={styles.select}
                     >
-                      <option value="ALLOW">Allow All (Blacklist Mode)</option>
-                      <option value="DENY">Deny All (Whitelist Mode)</option>
+                      <option value="ALLOW">
+                        Allow All (Blacklist Mode)
+                      </option>
+                      <option value="DENY">
+                        Deny All (Whitelist Mode)
+                      </option>
                     </select>
                   </div>
 
@@ -496,6 +746,7 @@ const ProfileManager = () => {
                       value={formData.firewallRules}
                       onChange={handleInputChange}
                       className="form-input"
+                      style={styles.formInput}
                     />
                   </div>
                 </div>
@@ -503,8 +754,18 @@ const ProfileManager = () => {
             </div>
 
             {/* Access Control */}
-            <div className="form-section">
-              <h4>Access Control</h4>
+            <div className="form-section" style={styles.formSection}>
+              <h4
+                style={{
+                  marginTop: 0,
+                  marginBottom: 16,
+                  color: colors.accent,
+                  fontSize: 18,
+                  fontWeight: 600,
+                }}
+              >
+                Access Control
+              </h4>
 
               <div className="form-group">
                 <label>Allowed IPs (comma-separated)</label>
@@ -515,6 +776,7 @@ const ProfileManager = () => {
                   value={formData.allowedIps}
                   onChange={handleInputChange}
                   className="form-input"
+                  style={styles.formInput}
                 />
               </div>
 
@@ -527,6 +789,7 @@ const ProfileManager = () => {
                   value={formData.blockedIps}
                   onChange={handleInputChange}
                   className="form-input"
+                  style={styles.formInput}
                 />
               </div>
 
@@ -539,6 +802,7 @@ const ProfileManager = () => {
                   value={formData.allowedPorts}
                   onChange={handleInputChange}
                   className="form-input"
+                  style={styles.formInput}
                 />
               </div>
 
@@ -551,13 +815,24 @@ const ProfileManager = () => {
                   value={formData.blockedPorts}
                   onChange={handleInputChange}
                   className="form-input"
+                  style={styles.formInput}
                 />
               </div>
             </div>
 
             {/* Scheduling */}
-            <div className="form-section">
-              <h4>Scheduling</h4>
+            <div className="form-section" style={styles.formSection}>
+              <h4
+                style={{
+                  marginTop: 0,
+                  marginBottom: 16,
+                  color: colors.accent,
+                  fontSize: 18,
+                  fontWeight: 600,
+                }}
+              >
+                Scheduling
+              </h4>
 
               <label className="checkbox-label">
                 <input
@@ -578,6 +853,7 @@ const ProfileManager = () => {
                       value={formData.scheduleType}
                       onChange={handleInputChange}
                       className="form-select"
+                      style={styles.select}
                     >
                       <option value="NONE">None</option>
                       <option value="TIME">Time-Based</option>
@@ -586,7 +862,8 @@ const ProfileManager = () => {
                     </select>
                   </div>
 
-                  {(formData.scheduleType === 'TIME' || formData.scheduleType === 'BOTH') && (
+                  {(formData.scheduleType === 'TIME' ||
+                    formData.scheduleType === 'BOTH') && (
                     <>
                       <div className="form-group">
                         <label>Start Time</label>
@@ -596,6 +873,7 @@ const ProfileManager = () => {
                           value={formData.scheduleStartTime}
                           onChange={handleInputChange}
                           className="form-input"
+                          style={styles.formInput}
                         />
                       </div>
 
@@ -607,13 +885,22 @@ const ProfileManager = () => {
                           value={formData.scheduleEndTime}
                           onChange={handleInputChange}
                           className="form-input"
+                          style={styles.formInput}
                         />
                       </div>
 
                       <div className="form-group">
                         <label>Active Days</label>
                         <div className="days-selector">
-                          {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
+                          {[
+                            'Monday',
+                            'Tuesday',
+                            'Wednesday',
+                            'Thursday',
+                            'Friday',
+                            'Saturday',
+                            'Sunday',
+                          ].map((day) => (
                             <label key={day} className="day-checkbox">
                               <input
                                 type="checkbox"
@@ -628,7 +915,8 @@ const ProfileManager = () => {
                     </>
                   )}
 
-                  {(formData.scheduleType === 'CONDITION' || formData.scheduleType === 'BOTH') && (
+                  {(formData.scheduleType === 'CONDITION' ||
+                    formData.scheduleType === 'BOTH') && (
                     <div className="form-group">
                       <label>Activation Condition</label>
                       <input
@@ -638,9 +926,14 @@ const ProfileManager = () => {
                         value={formData.scheduleCondition}
                         onChange={handleInputChange}
                         className="form-input"
+                        style={styles.formInput}
                       />
-                      <small className="field-hint">
-                        Example: "Public WiFi", "192.168.1.x", "Outside office hours"
+                      <small
+                        className="field-hint"
+                        style={styles.fieldHint}
+                      >
+                        Example: "Public WiFi", "192.168.1.x",
+                        "Outside office hours"
                       </small>
                     </div>
                   )}
@@ -663,7 +956,11 @@ const ProfileManager = () => {
               <button type="submit" className="btn btn-submit">
                 {editingProfile ? 'Update Profile' : 'Create Profile'}
               </button>
-              <button type="button" onClick={handleCancel} className="btn btn-cancel">
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="btn btn-cancel"
+              >
                 Cancel
               </button>
             </div>
@@ -673,32 +970,67 @@ const ProfileManager = () => {
 
       {/* Profiles List */}
       <div className="profiles-section">
-        <h3>Your Profiles ({profiles.length})</h3>
+        <h3
+          style={{
+            marginBottom: 16,
+            color: colors.text,
+            fontSize: 20,
+            fontWeight: 600,
+          }}
+        >
+          Your Profiles ({profiles.length})
+        </h3>
         {profiles.length === 0 ? (
           <div className="empty-state">
-            <p>No profiles yet. Create your first security profile!</p>
+            <p style={{ color: colors.textMuted }}>
+              No profiles yet. Create your first security profile!
+            </p>
           </div>
         ) : (
           <div className="profiles-grid">
             {profiles.map((profile) => (
               <div
                 key={profile.id}
-                className={`profile-card ${profile.isActive ? 'active-profile' : ''}`}
+                className={`profile-card ${
+                  profile.isActive ? 'active-profile' : ''
+                }`}
+                style={
+                  styles.profileCardActive(profile.isActive) ||
+                  styles.profileCard
+                }
               >
                 <div className="profile-content">
                   <div className="profile-info">
                     <div className="profile-title">
-                      <h4>{profile.name}</h4>
+                      <h4
+                        style={{
+                          margin: 0,
+                          color: colors.text,
+                          fontSize: 18,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {profile.name}
+                      </h4>
                       <div className="profile-badges">
                         {profile.isActive && (
-                          <span className="badge badge-active">● ACTIVE</span>
+                          <span className="badge badge-active">
+                            ● ACTIVE
+                          </span>
                         )}
-                        <span className="badge badge-type">{profile.profileType}</span>
+                        <span className="badge badge-type">
+                          {profile.profileType}
+                        </span>
                       </div>
                     </div>
 
                     {profile.description && (
-                      <p className="profile-description">{profile.description}</p>
+                      <p
+                        className="profile-description"
+                        style={styles.profileDescription}
+                      >
+                        {profile.description}
+                      </p>
                     )}
 
                     {/* Settings Summary */}
@@ -706,42 +1038,51 @@ const ProfileManager = () => {
                       <div className="setting-item">
                         <strong>VPN:</strong>
                         {profile.vpnEnabled ? (
-                          <span className="status-enabled">
+                          <span style={styles.statusEnabled}>
                             ✓ Enabled ({profile.vpnProtocol})
                           </span>
                         ) : (
-                          <span className="status-disabled">✗ Disabled</span>
+                          <span style={styles.statusDisabled}>
+                            ✗ Disabled
+                          </span>
                         )}
                       </div>
 
                       <div className="setting-item">
                         <strong>Firewall:</strong>
                         {profile.firewallEnabled ? (
-                          <span className="status-enabled">
+                          <span style={styles.statusEnabled}>
                             ✓ Enabled ({profile.defaultFirewallAction})
                           </span>
                         ) : (
-                          <span className="status-disabled">✗ Disabled</span>
+                          <span style={styles.statusDisabled}>
+                            ✗ Disabled
+                          </span>
                         )}
                       </div>
 
                       <div className="setting-item">
                         <strong>Scheduling:</strong>
                         {profile.isScheduled ? (
-                          <span className="status-enabled">✓ {profile.scheduleType}</span>
+                          <span style={styles.statusEnabled}>
+                            ✓ {profile.scheduleType}
+                          </span>
                         ) : (
-                          <span className="status-disabled">✗ None</span>
+                          <span style={styles.statusDisabled}>
+                            ✗ None
+                          </span>
                         )}
                       </div>
                     </div>
 
                     {/* Additional Info */}
-                    <div className="profile-meta">
+                    <div className="profile-meta" style={styles.profileMeta}>
                       <p>Created: {formatDate(profile.createdAt)}</p>
                       {profile.lastActivatedAt && (
                         <p>
-                          Last Activated: {formatDate(profile.lastActivatedAt)}
-                          ({profile.activationCount} times)
+                          Last Activated:{' '}
+                          {formatDate(profile.lastActivatedAt)} (
+                          {profile.activationCount} times)
                         </p>
                       )}
                     </div>
