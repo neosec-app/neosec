@@ -6,6 +6,7 @@ import './index.css';
 
 import ScanDashboard from './components/ScanDashboard';
 import ProfileManager from './components/ProfileManager';
+import FirewallRuleManagement from './components/FirewallRuleManagement';
 import { SiAlwaysdata } from 'react-icons/si';
 import { GoAlertFill } from 'react-icons/go';
 import { MdModeEdit } from 'react-icons/md';
@@ -230,32 +231,32 @@ function App() {
         }
     }, [currentView, user]);
 
-// Fetch dashboard data when user is logged in
-useEffect(() => {
-    const fetchDashboard = async () => {
-        if (user && currentView === 'dashboard') {
-            try {
-                setDashboardLoading(true);
-                setDashboardError(null);
+    // Fetch dashboard data when user is logged in
+    useEffect(() => {
+        const fetchDashboard = async () => {
+            if (user && currentView === 'dashboard') {
+                try {
+                    setDashboardLoading(true);
+                    setDashboardError(null);
 
-                const response = await dashboardAPI.getDashboard();
+                    const response = await dashboardAPI.getDashboard();
 
-                if (response.success) {
-                    setDashboardData(response.data);
-                } else {
-                    setDashboardError(response.message || 'Failed to load dashboard data');
+                    if (response.success) {
+                        setDashboardData(response.data);
+                    } else {
+                        setDashboardError(response.message || 'Failed to load dashboard data');
+                    }
+
+                } catch (error) {
+                    console.error('Dashboard fetch error:', error);
+                    setDashboardError(getErrorMessage(error, 'Failed to load dashboard data'));
+                } finally {
+                    setDashboardLoading(false);
                 }
-
-            } catch (error) {
-                console.error('Dashboard fetch error:', error);
-                setDashboardError(getErrorMessage(error, 'Failed to load dashboard data'));
-            } finally {
-                setDashboardLoading(false);
             }
-        }
-    };
-    fetchDashboard();
-}, [user, currentView]);
+        };
+        fetchDashboard();
+    }, [user, currentView]);
 
 
     // -------- ADMIN DATA FETCH (USERS + STATS) --
@@ -890,14 +891,14 @@ useEffect(() => {
 
 
                                 {/* HIERARCHY */}
-                                <SidebarButton label="Subscription" view="subscription" currentView={currentView} setCurrentView={setCurrentView} />
+                                <SidebarButton label="Subscription" view="subscription" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
 
                                 {user.accountType === "leader" && (
-                                    <SidebarButton label="My Groups" view="groups" currentView={currentView} setCurrentView={setCurrentView} />
+                                    <SidebarButton label="My Groups" view="groups" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
                                 )}
 
-                                <SidebarButton label="Invitations" view="invitations" currentView={currentView} setCurrentView={setCurrentView} />
-                                <SidebarButton label="My Memberships" view="memberships" currentView={currentView} setCurrentView={setCurrentView} />
+                                <SidebarButton label="Invitations" view="invitations" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
+                                <SidebarButton label="My Memberships" view="memberships" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
                             </nav>
 
 
@@ -1489,228 +1490,7 @@ useEffect(() => {
 
                         {/* Firewall View */}
                         {currentView === 'firewall' && (
-                            <div>
-                                <div style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    marginBottom: isMobile ? '20px' : '30px',
-                                    flexWrap: isMobile ? 'wrap' : 'nowrap',
-                                    gap: isMobile ? '12px' : '0'
-                                }}>
-                                    <h1 style={{
-                                        fontSize: isMobile ? '18px' : '24px',
-                                        margin: 0,
-                                        color: palette.text,
-                                        fontWeight: 600,
-                                        paddingLeft: isMobile ? '48px' : '0',
-                                        transition: 'padding-left 0.3s ease',
-                                        flex: isMobile ? '1 1 100%' : 'none'
-                                    }}>Firewall Rule Management</h1>
-                                    <button
-                                        onClick={() => {
-                                            openFirewallModal();
-                                        }}
-                                        style={{
-                                            padding: '10px 20px',
-                                            backgroundColor: palette.accent,
-                                            color: theme === 'dark' ? '#121212' : '#fff',
-                                            border: 'none',
-                                            borderRadius: '8px',
-                                            fontWeight: 600,
-                                            cursor: 'pointer',
-                                            fontSize: '14px'
-                                        }}>
-                                        + Add New Rule
-                                    </button>
-                                </div>
-
-                                {/* Rules Table */}
-                                <div style={{ ...cardBase, padding: 0, overflow: 'hidden' }}>
-                                    {firewallLoading ? (
-                                        <div style={{ padding: '40px', textAlign: 'center', color: palette.textMuted }}>Loading rules...</div>
-                                    ) : firewallRules.length === 0 ? (
-                                        <div style={{ padding: '40px', textAlign: 'center', color: palette.textMuted }}>No firewall rules yet. Click "+ Add New Rule" to create your first rule.</div>
-                                    ) : (
-                                        <div style={{ overflowX: 'auto' }}>
-                                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                                <thead>
-                                                    <tr style={{ borderBottom: `1px solid ${palette.border}`, backgroundColor: theme === 'light' ? '#f8f9fa' : palette.bgPanel }}>
-                                                        <th style={{ padding: '14px 12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Order</th>
-                                                        <th style={{ padding: '14px 12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Action</th>
-                                                        <th style={{ padding: '14px 12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Source</th>
-                                                        <th style={{ padding: '14px 12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Destination</th>
-                                                        <th style={{ padding: '14px 12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Protocol</th>
-                                                        <th style={{ padding: '14px 12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Port</th>
-                                                        <th style={{ padding: '14px 12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Description</th>
-                                                        <th style={{ padding: '14px 12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Actions</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {firewallRules.map((rule, idx) => (
-                                                        <tr key={rule.id} style={{
-                                                            borderBottom: idx === firewallRules.length - 1 ? 'none' : `1px solid ${palette.border}`
-                                                        }}>
-                                                            <td style={{ padding: '14px 12px' }}>
-                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                                                                    <button
-                                                                        onClick={() => handleMoveRuleUp(rule.id, idx)}
-                                                                        style={{
-                                                                            background: 'none',
-                                                                            border: 'none',
-                                                                            color: palette.textMuted,
-                                                                            cursor: idx === 0 ? 'not-allowed' : 'pointer',
-                                                                            opacity: idx === 0 ? 0.3 : 1,
-                                                                            fontSize: '12px',
-                                                                            padding: '2px'
-                                                                        }}
-                                                                        disabled={idx === 0}
-                                                                    >
-                                                                        ▲
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleMoveRuleDown(rule.id, idx)}
-                                                                        style={{
-                                                                            background: 'none',
-                                                                            border: 'none',
-                                                                            color: palette.textMuted,
-                                                                            cursor: idx === firewallRules.length - 1 ? 'not-allowed' : 'pointer',
-                                                                            opacity: idx === firewallRules.length - 1 ? 0.3 : 1,
-                                                                            fontSize: '12px',
-                                                                            padding: '2px'
-                                                                        }}
-                                                                        disabled={idx === firewallRules.length - 1}
-                                                                    >
-                                                                        ▼
-                                                                    </button>
-                                                                </div>
-                                                            </td>
-                                                            <td style={{ padding: '14px 12px' }}>
-                                                                <span style={{
-                                                                    display: 'inline-flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '6px',
-                                                                    padding: '4px 10px',
-                                                                    borderRadius: '12px',
-                                                                    fontSize: '12px',
-                                                                    fontWeight: 600,
-                                                                    backgroundColor: rule.action === 'allow'
-                                                                        ? (theme === 'dark' ? '#1E402C' : '#e6f4ed')
-                                                                        : (theme === 'dark' ? '#40201E' : '#fee2e2'),
-                                                                    color: rule.action === 'allow'
-                                                                        ? (theme === 'dark' ? '#36E27B' : '#1fa45a')
-                                                                        : (theme === 'dark' ? '#FF7777' : '#d4183d'),
-                                                                    border: rule.action === 'allow'
-                                                                        ? (theme === 'dark' ? '1px solid #36E27B' : '1px solid #1fa45a')
-                                                                        : (theme === 'dark' ? '1px solid #FF7777' : '1px solid #d4183d')
-                                                                }}>
-                                                                    {rule.action === 'allow' ? '✓' : '✗'} {rule.action === 'allow' ? 'Allow' : 'Deny'}
-                                                                </span>
-                                                            </td>
-                                                            <td style={{ padding: '14px 12px', color: palette.text, fontSize: '14px' }}>
-                                                                {rule.sourceIP || 'Any'}
-                                                            </td>
-                                                            <td style={{ padding: '14px 12px', color: palette.text, fontSize: '14px' }}>
-                                                                {rule.destinationIP || 'Any'}
-                                                            </td>
-                                                            <td style={{ padding: '14px 12px' }}>
-                                                                <span style={{
-                                                                    padding: '4px 10px',
-                                                                    borderRadius: '12px',
-                                                                    fontSize: '12px',
-                                                                    backgroundColor: theme === 'light' ? '#f1f3f5' : '#2a2a2a',
-                                                                    color: palette.textMuted,
-                                                                    fontWeight: 500
-                                                                }}>
-                                                                    {(rule.protocol || 'tcp').toUpperCase()}
-                                                                </span>
-                                                            </td>
-                                                            <td style={{ padding: '14px 12px', color: palette.text, fontSize: '14px' }}>
-                                                                {rule.destinationPort || rule.sourcePort || 'Any'}
-                                                            </td>
-                                                            <td style={{ padding: '14px 12px', color: palette.text, fontSize: '14px' }}>
-                                                                {rule.description || '—'}
-                                                            </td>
-                                                            <td style={{ padding: '14px 12px' }}>
-                                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                                    <button
-                                                                        onClick={() => handleResetRule(rule.id)}
-                                                                        onMouseEnter={() => setActionButtonHover(`reset-${rule.id}`)}
-                                                                        onMouseLeave={() => setActionButtonHover(null)}
-                                                                        title="Reset/Refresh"
-                                                                        style={{
-                                                                            background: actionButtonHover === `reset-${rule.id}`
-                                                                                ? (theme === 'dark' ? 'rgba(54,226,123,0.15)' : 'rgba(31,164,90,0.1)')
-                                                                                : 'none',
-                                                                            border: 'none',
-                                                                            color: actionButtonHover === `reset-${rule.id}`
-                                                                                ? palette.accent
-                                                                                : palette.textMuted,
-                                                                            cursor: 'pointer',
-                                                                            fontSize: '16px',
-                                                                            padding: '4px 6px',
-                                                                            borderRadius: '6px',
-                                                                            transition: 'all 0.15s ease',
-                                                                            transform: actionButtonHover === `reset-${rule.id}` ? 'scale(1.1)' : 'scale(1)'
-                                                                        }}
-                                                                    >
-                                                                        <SlReload />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleEditRule(rule)}
-                                                                        onMouseEnter={() => setActionButtonHover(`edit-${rule.id}`)}
-                                                                        onMouseLeave={() => setActionButtonHover(null)}
-                                                                        title="Edit"
-                                                                        style={{
-                                                                            background: actionButtonHover === `edit-${rule.id}`
-                                                                                ? (theme === 'dark' ? 'rgba(54,226,123,0.15)' : 'rgba(31,164,90,0.1)')
-                                                                                : 'none',
-                                                                            border: 'none',
-                                                                            color: actionButtonHover === `edit-${rule.id}`
-                                                                                ? palette.accent
-                                                                                : palette.textMuted,
-                                                                            cursor: 'pointer',
-                                                                            fontSize: '16px',
-                                                                            padding: '4px 6px',
-                                                                            borderRadius: '6px',
-                                                                            transition: 'all 0.15s ease',
-                                                                            transform: actionButtonHover === `edit-${rule.id}` ? 'scale(1.1)' : 'scale(1)'
-                                                                        }}
-                                                                    >
-                                                                        <MdModeEdit />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleDeleteRule(rule.id)}
-                                                                        onMouseEnter={() => setActionButtonHover(`delete-${rule.id}`)}
-                                                                        onMouseLeave={() => setActionButtonHover(null)}
-                                                                        title="Delete"
-                                                                        style={{
-                                                                            background: actionButtonHover === `delete-${rule.id}`
-                                                                                ? (theme === 'dark' ? 'rgba(224,72,72,0.15)' : 'rgba(212,24,61,0.1)')
-                                                                                : 'none',
-                                                                            border: 'none',
-                                                                            color: palette.danger,
-                                                                            cursor: 'pointer',
-                                                                            fontSize: '16px',
-                                                                            padding: '4px 6px',
-                                                                            borderRadius: '6px',
-                                                                            transition: 'all 0.15s ease',
-                                                                            transform: actionButtonHover === `delete-${rule.id}` ? 'scale(1.1)' : 'scale(1)',
-                                                                            opacity: actionButtonHover === `delete-${rule.id}` ? 1 : 0.8
-                                                                        }}
-                                                                    >
-                                                                        <RiDeleteBin6Line />
-                                                                    </button>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                            <FirewallRuleManagement theme={theme} palette={palette} />
                         )}
 
                         {/* Profiles View */}
@@ -2650,15 +2430,35 @@ useEffect(() => {
     );
 }
 
-function SidebarButton({ label, view, currentView, setCurrentView }) {
+function SidebarButton({ label, view, currentView, setCurrentView, theme = 'dark', palette }) {
     const active = currentView === view;
+    const [hover, setHover] = useState(false);
+
     return (
         <button
             onClick={() => setCurrentView(view)}
-            className={`w-full text-left px-4 py-3 rounded-lg text-sm transition border 
-        ${active
-                    ? 'bg-[#1E402C] border-primary text-primary'
-                    : 'bg-transparent border-transparent text-white hover:bg-[#222222]'}`}
+            onMouseEnter={() => setHover(true)}
+            onMouseLeave={() => setHover(false)}
+            style={{
+                width: '100%',
+                padding: '12px 15px',
+                marginBottom: '10px',
+                backgroundColor: active || hover
+                    ? (theme === 'light' ? palette.accentSoft : (active ? '#1E402C' : 'rgba(255, 255, 255, 0.1)'))
+                    : 'transparent',
+                color: active
+                    ? palette.accent
+                    : (theme === 'light' ? palette.text : '#ffffff'),
+                border: active || hover
+                    ? `1px solid ${palette.accent}`
+                    : '1px solid transparent',
+                borderRadius: '10px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                fontSize: '14px',
+                transition: 'all 0.15s ease',
+                boxShadow: hover ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+            }}
         >
             {label}
         </button>

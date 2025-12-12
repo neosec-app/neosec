@@ -26,7 +26,7 @@ const getTimeAgo = (date) => {
 // @access  Private
 const getDashboard = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     // Get user's active VPN config
     const activeVpn = await VpnConfig.findOne({
@@ -141,7 +141,7 @@ const getDashboard = async (req, res) => {
         type: 'notification',
         message: n.message || n.title,
         timestamp: n.createdAt,
-        isBlocked: n.eventType.includes('error') || n.eventType.includes('failed')
+        isBlocked: n.eventType ? (n.eventType.includes('error') || n.eventType.includes('failed')) : false
       }))
     ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 10);
 
@@ -157,8 +157,10 @@ const getDashboard = async (req, res) => {
       raw: true
     });
 
-    const totalBytesSent = BigInt(dataTransferStats[0]?.totalBytesSent || 0);
-    const totalBytesReceived = BigInt(dataTransferStats[0]?.totalBytesReceived || 0);
+    const sentValue = dataTransferStats[0]?.totalBytesSent ?? null;
+    const receivedValue = dataTransferStats[0]?.totalBytesReceived ?? null;
+    const totalBytesSent = BigInt(sentValue ? String(sentValue) : '0');
+    const totalBytesReceived = BigInt(receivedValue ? String(receivedValue) : '0');
     
     // Convert bytes to GB (1 GB = 1,073,741,824 bytes)
     const bytesPerGB = 1073741824;

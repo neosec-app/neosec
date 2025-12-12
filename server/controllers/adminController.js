@@ -82,7 +82,7 @@ const updateUser = async (req, res) => {
     const userId = req.params.id;
 
     // Don't allow updating the current admin user's role
-    if (userId === req.user.userId && role && role !== 'admin') {
+    if (userId === req.user.id && role && role !== 'admin') {
       return res.status(400).json({
         success: false,
         message: 'You cannot change your own admin role'
@@ -130,7 +130,7 @@ const deleteUser = async (req, res) => {
     const userId = req.params.id;
 
     // Don't allow deleting yourself
-    if (userId === req.user.userId) {
+    if (userId === req.user.id) {
       return res.status(400).json({
         success: false,
         message: 'You cannot delete your own account'
