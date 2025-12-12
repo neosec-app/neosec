@@ -160,6 +160,7 @@ Page {
                 height: 50
                 anchors.top: loginPasswordField.bottom
                 anchors.topMargin: 35
+                enabled: false
                 HoverHandler {
                     cursorShape: parent.hovered ?
                     (!parent.enabled ? Qt.ForbiddenCursor : Qt.PointingHandCursor) : Qt.ArrowCursor
