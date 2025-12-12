@@ -131,8 +131,23 @@ app.use((err, req, res, next) => {
 // Start server
 // Render provides PORT environment variable automatically
 const PORT = process.env.PORT || 5000;
+
+// Check required environment variables
+if (!process.env.JWT_SECRET) {
+    console.error('ERROR: JWT_SECRET environment variable is not set!');
+    console.error('Please set JWT_SECRET in your environment variables.');
+}
+
+if (!process.env.DATABASE_URL) {
+    console.error('ERROR: DATABASE_URL environment variable is not set!');
+    console.error('Please set DATABASE_URL in your environment variables.');
+}
+
 app.listen(PORT, () => {
     console.log(`Server started on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`JWT_SECRET: ${process.env.JWT_SECRET ? 'Set' : 'NOT SET - THIS WILL CAUSE ERRORS!'}`);
+    console.log(`DATABASE_URL: ${process.env.DATABASE_URL ? 'Set' : 'NOT SET - THIS WILL CAUSE ERRORS!'}`);
 });
 
 

@@ -2,15 +2,23 @@ const { body, validationResult } = require('express-validator');
 
 // Validation middleware
 const handleValidationErrors = (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+    next();
+  } catch (error) {
+    console.error('Validation middleware error:', error);
+    return res.status(500).json({
       success: false,
-      message: 'Validation failed',
-      errors: errors.array()
+      message: 'Server error during validation'
     });
   }
-  next();
 };
 
 // Register validation rules
