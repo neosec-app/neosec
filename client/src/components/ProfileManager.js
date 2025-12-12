@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../services/api';
+import { profilesAPI, getErrorMessage } from '../services/api';
 
 // Same idea as App.js / ScanDashboard
 const darkPalette = {
@@ -131,11 +131,11 @@ const makeStyles = (c) => ({
   profileCardActive: (isActive) =>
     isActive
       ? {
-          backgroundColor: c.bgCard,
-          border: `1px solid ${c.accent}`,
-          borderRadius: 12,
-          padding: 20,
-        }
+        backgroundColor: c.bgCard,
+        border: `1px solid ${c.accent}`,
+        borderRadius: 12,
+        padding: 20,
+      }
       : undefined,
   profileDescription: {
     color: c.textMuted,
@@ -160,6 +160,8 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
   const [profiles, setProfiles] = useState([]);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [logsError, setLogsError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [editingProfile, setEditingProfile] = useState(null);
@@ -203,21 +205,35 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
 
   const fetchProfiles = async () => {
     try {
-      const response = await api.get('/profiles');
-      setProfiles(response.data.profiles);
+      setError(null);
+      const response = await profilesAPI.getProfiles();
+      if (response.success) {
+        setProfiles(response.profiles || []);
+      } else {
+        setError(response.message || 'Failed to load profiles');
+      }
       setLoading(false);
     } catch (error) {
       console.error('Error fetching profiles:', error);
+      const errorMessage = getErrorMessage(error, 'Failed to load profiles');
+      setError(errorMessage);
       setLoading(false);
     }
   };
 
   const fetchLogs = async () => {
     try {
-      const response = await api.get('/profiles/logs/all');
-      setLogs(response.data.logs);
+      setLogsError(null);
+      const response = await profilesAPI.getLogs();
+      if (response.success) {
+        setLogs(response.logs || []);
+      } else {
+        setLogsError(response.message || 'Failed to load logs');
+      }
     } catch (error) {
       console.error('Error fetching logs:', error);
+      const errorMessage = getErrorMessage(error, 'Failed to load logs');
+      setLogsError(errorMessage);
     }
   };
 
@@ -257,48 +273,57 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
 
         firewallRules: formData.firewallRules
           ? formData.firewallRules
-              .split(',')
-              .map((r) => r.trim())
-              .filter((r) => r !== '')
+            .split(',')
+            .map((r) => r.trim())
+            .filter((r) => r !== '')
           : [],
 
         allowedIps: formData.allowedIps
           ? formData.allowedIps
-              .split(',')
-              .map((ip) => ip.trim())
-              .filter((ip) => ip !== '')
+            .split(',')
+            .map((ip) => ip.trim())
+            .filter((ip) => ip !== '')
           : [],
 
         blockedIps: formData.blockedIps
           ? formData.blockedIps
-              .split(',')
-              .map((ip) => ip.trim())
-              .filter((ip) => ip !== '')
+            .split(',')
+            .map((ip) => ip.trim())
+            .filter((ip) => ip !== '')
           : [],
 
         allowedPorts: formData.allowedPorts
           ? formData.allowedPorts
-              .split(',')
-              .map((p) => p.trim())
-              .filter((p) => p !== '' && !isNaN(p))
-              .map(Number)
+            .split(',')
+            .map((p) => p.trim())
+            .filter((p) => p !== '' && !isNaN(p))
+            .map(Number)
           : [],
 
         blockedPorts: formData.blockedPorts
           ? formData.blockedPorts
-              .split(',')
-              .map((p) => p.trim())
-              .filter((p) => p !== '' && !isNaN(p))
-              .map(Number)
+            .split(',')
+            .map((p) => p.trim())
+            .filter((p) => p !== '' && !isNaN(p))
+            .map(Number)
           : [],
       };
 
+      let response;
       if (editingProfile) {
-        await api.put(`/profiles/${editingProfile.id}`, submitData);
-        alert('Profile updated successfully!');
+        response = await profilesAPI.updateProfile(editingProfile.id, submitData);
+        if (response.success) {
+          alert('Profile updated successfully!');
+        } else {
+          throw new Error(response.message || 'Failed to update profile');
+        }
       } else {
-        await api.post(`/profiles`, submitData);
-        alert('Profile created successfully!');
+        response = await profilesAPI.createProfile(submitData);
+        if (response.success) {
+          alert('Profile created successfully!');
+        } else {
+          throw new Error(response.message || 'Failed to create profile');
+        }
       }
 
       setShowForm(false);
@@ -308,10 +333,8 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
       fetchLogs();
     } catch (error) {
       console.error('Error saving profile:', error);
-      alert(
-        'Error saving profile: ' +
-          (error.response?.data?.message || error.message)
-      );
+      const errorMessage = getErrorMessage(error, 'Failed to save profile');
+      alert(errorMessage);
     }
   };
 
@@ -636,26 +659,36 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this profile?')) {
       try {
-        await api.delete(`/profiles/${id}`);
-        alert('Profile deleted successfully!');
-        fetchProfiles();
-        fetchLogs();
+        const response = await profilesAPI.deleteProfile(id);
+        if (response.success) {
+          alert('Profile deleted successfully!');
+          fetchProfiles();
+          fetchLogs();
+        } else {
+          throw new Error(response.message || 'Failed to delete profile');
+        }
       } catch (error) {
         console.error('Error deleting profile:', error);
-        alert('Error deleting profile');
+        const errorMessage = getErrorMessage(error, 'Failed to delete profile');
+        alert(errorMessage);
       }
     }
   };
 
   const handleActivate = async (id) => {
     try {
-      await api.put(`/profiles/${id}/activate`, {});
-      alert('Profile activated successfully!');
-      fetchProfiles();
-      fetchLogs();
+      const response = await profilesAPI.activateProfile(id);
+      if (response.success) {
+        alert('Profile activated successfully!');
+        fetchProfiles();
+        fetchLogs();
+      } else {
+        throw new Error(response.message || 'Failed to activate profile');
+      }
     } catch (error) {
       console.error('Error activating profile:', error);
-      alert('Error activating profile');
+      const errorMessage = getErrorMessage(error, 'Failed to activate profile');
+      alert(errorMessage);
     }
   };
 
@@ -751,7 +784,17 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
           <h3 style={{ marginTop: 0, marginBottom: 16, color: colors.text }}>
             Activity Logs
           </h3>
-          {logs.length === 0 ? (
+          {logsError ? (
+            <div style={{
+              padding: 16,
+              backgroundColor: colors.danger + '20',
+              border: `1px solid ${colors.danger}`,
+              borderRadius: 8,
+              color: colors.danger
+            }}>
+              <strong>Error loading logs:</strong> {logsError}
+            </div>
+          ) : logs.length === 0 ? (
             <p className="no-logs" style={styles.logsEmpty}>
               No activity logs yet.
             </p>
@@ -779,9 +822,8 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
                     <p>
                       <span className="log-label">Profile:</span>{' '}
                       <span
-                        className={`log-profile ${
-                          !log.profile?.name ? 'deleted' : ''
-                        }`}
+                        className={`log-profile ${!log.profile?.name ? 'deleted' : ''
+                          }`}
                       >
                         {log.profile?.name ||
                           log.description?.match(/"([^"]+)"/)?.[1] ||
@@ -1119,29 +1161,77 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
 
                   {(formData.scheduleType === 'TIME' ||
                     formData.scheduleType === 'BOTH') && (
-                    <>
-                      <div className="form-group">
-                        <label>Start Time</label>
-                        <input
-                          type="time"
-                          name="scheduleStartTime"
-                          value={formData.scheduleStartTime}
-                          onChange={handleInputChange}
-                          className="form-input"
-                          style={styles.formInput}
-                        />
-                      </div>
+                      <>
+                        <div className="form-group">
+                          <label>Start Time</label>
+                          <input
+                            type="time"
+                            name="scheduleStartTime"
+                            value={formData.scheduleStartTime}
+                            onChange={handleInputChange}
+                            className="form-input"
+                            style={styles.formInput}
+                          />
+                        </div>
 
+                        <div className="form-group">
+                          <label>End Time</label>
+                          <input
+                            type="time"
+                            name="scheduleEndTime"
+                            value={formData.scheduleEndTime}
+                            onChange={handleInputChange}
+                            className="form-input"
+                            style={styles.formInput}
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label>Active Days</label>
+                          <div className="days-selector">
+                            {[
+                              'Monday',
+                              'Tuesday',
+                              'Wednesday',
+                              'Thursday',
+                              'Friday',
+                              'Saturday',
+                              'Sunday',
+                            ].map((day) => (
+                              <label key={day} className="day-checkbox">
+                                <input
+                                  type="checkbox"
+                                  checked={formData.scheduleDays.includes(day)}
+                                  onChange={() => handleDayToggle(day)}
+                                />
+                                <span>{day}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                  {(formData.scheduleType === 'CONDITION' ||
+                    formData.scheduleType === 'BOTH') && (
                       <div className="form-group">
-                        <label>End Time</label>
+                        <label>Activation Condition</label>
                         <input
-                          type="time"
-                          name="scheduleEndTime"
-                          value={formData.scheduleEndTime}
+                          type="text"
+                          name="scheduleCondition"
+                          placeholder="e.g., WiFi network name, IP range"
+                          value={formData.scheduleCondition}
                           onChange={handleInputChange}
                           className="form-input"
                           style={styles.formInput}
                         />
+                        <small
+                          className="field-hint"
+                          style={styles.fieldHint}
+                        >
+                          Example: "Public WiFi", "192.168.1.x",
+                          "Outside office hours"
+                        </small>
                       </div>
 
                       <div className="form-group">
@@ -1269,7 +1359,18 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
         >
           Your Profiles ({profiles.length})
         </h3>
-        {profiles.length === 0 ? (
+        {error ? (
+          <div style={{
+            padding: 16,
+            backgroundColor: colors.danger + '20',
+            border: `1px solid ${colors.danger}`,
+            borderRadius: 8,
+            color: colors.danger,
+            marginBottom: 16
+          }}>
+            <strong>Error loading profiles:</strong> {error}
+          </div>
+        ) : profiles.length === 0 ? (
           <div className="empty-state">
             <p style={{ color: colors.textMuted }}>
               No profiles yet. Create your first security profile!
@@ -1280,9 +1381,8 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
             {profiles.map((profile) => (
               <div
                 key={profile.id}
-                className={`profile-card ${
-                  profile.isActive ? 'active-profile' : ''
-                }`}
+                className={`profile-card ${profile.isActive ? 'active-profile' : ''
+                  }`}
                 style={
                   styles.profileCardActive(profile.isActive) ||
                   styles.profileCard
