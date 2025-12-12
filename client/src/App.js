@@ -230,29 +230,33 @@ function App() {
         }
     }, [currentView, user]);
 
-    // Fetch dashboard data when user is logged in
-    useEffect(() => {
-        const fetchDashboard = async () => {
-            if (user && currentView === 'dashboard') {
-                try {
-                    setDashboardLoading(true);
-                    setDashboardError(null);
-                    const response = await dashboardAPI.getDashboard();
-                    if (response.success) {
-                        setDashboardData(response.data);
-                    } else {
-                        setDashboardError(response.message || 'Failed to load dashboard data');
-                    }
-                } catch (error) {
-                    console.error('Dashboard fetch error:', error);
-                    setDashboardError(getErrorMessage(error, 'Failed to load dashboard data'));
-                } finally {
-                    setDashboardLoading(false);
+// Fetch dashboard data when user is logged in
+useEffect(() => {
+    const fetchDashboard = async () => {
+        if (user && currentView === 'dashboard') {
+            try {
+                setDashboardLoading(true);
+                setDashboardError(null);
+
+                const response = await dashboardAPI.getDashboard();
+
+                if (response.success) {
+                    setDashboardData(response.data);
+                } else {
+                    setDashboardError(response.message || 'Failed to load dashboard data');
                 }
+
+            } catch (error) {
+                console.error('Dashboard fetch error:', error);
+                setDashboardError(getErrorMessage(error, 'Failed to load dashboard data'));
+            } finally {
+                setDashboardLoading(false);
             }
-        };
-        fetchDashboard();
-    }, [user, currentView]);
+        }
+    };
+    fetchDashboard();
+}, [user, currentView]);
+
 
     // -------- ADMIN DATA FETCH (USERS + STATS) --
     useEffect(() => {
