@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { impersonationAPI, adminAPI, getErrorMessage } from '../services/api';
-import { FiUser, FiLogIn, FiLogOut, FiAlertCircle } from 'react-icons/fi';
+import { FiLogIn, FiLogOut, FiAlertCircle } from 'react-icons/fi';
 
 const UserImpersonation = ({ theme = 'dark', palette = null }) => {
   const darkPalette = {
@@ -230,6 +230,7 @@ const UserImpersonation = ({ theme = 'dark', palette = null }) => {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };

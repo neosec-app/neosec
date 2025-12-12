@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { loginHistoryAPI, getErrorMessage } from '../services/api';
-import { FiShield, FiLock, FiUnlock, FiAlertTriangle, FiCheckCircle } from 'react-icons/fi';
+import { FiLock, FiUnlock, FiAlertTriangle, FiCheckCircle } from 'react-icons/fi';
 
 const LoginHistory = ({ theme = 'dark', palette = null, userId = null }) => {
   const darkPalette = {
@@ -19,11 +19,7 @@ const LoginHistory = ({ theme = 'dark', palette = null, userId = null }) => {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('history');
 
-  useEffect(() => {
-    fetchData();
-  }, [userId, activeTab]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       if (activeTab === 'history') {
@@ -42,7 +38,11 @@ const LoginHistory = ({ theme = 'dark', palette = null, userId = null }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId, activeTab]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleLockUser = async (targetUserId, locked) => {
     try {

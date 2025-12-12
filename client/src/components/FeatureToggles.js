@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { featureToggleAPI, getErrorMessage } from '../services/api';
-import { FiToggleLeft, FiToggleRight, FiSettings } from 'react-icons/fi';
+import { FiToggleLeft, FiToggleRight } from 'react-icons/fi';
 
 const FeatureToggles = ({ theme = 'dark', palette = null }) => {
   const darkPalette = {
@@ -65,6 +65,12 @@ const FeatureToggles = ({ theme = 'dark', palette = null }) => {
   return (
     <div style={{ padding: '24px', backgroundColor: colors.bgMain, minHeight: '100vh', color: colors.text }}>
       <h1 style={{ marginBottom: '24px', fontSize: '28px', fontWeight: 700 }}>Feature Toggles</h1>
+      
+      {loading && (
+        <div style={{ padding: '20px', textAlign: 'center', color: colors.textMuted }}>
+          Loading feature toggles...
+        </div>
+      )}
       
       {error && (
         <div style={{

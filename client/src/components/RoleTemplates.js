@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { roleTemplateAPI, getErrorMessage } from '../services/api';
-import { FiShield, FiPlus, FiEdit, FiTrash2 } from 'react-icons/fi';
+import { FiShield, FiPlus, FiTrash2 } from 'react-icons/fi';
 
 const RoleTemplates = ({ theme = 'dark', palette = null }) => {
   const darkPalette = {
@@ -87,6 +87,12 @@ const RoleTemplates = ({ theme = 'dark', palette = null }) => {
         </button>
       </div>
 
+      {loading && (
+        <div style={{ padding: '20px', textAlign: 'center', color: colors.textMuted }}>
+          Loading role templates...
+        </div>
+      )}
+
       {error && (
         <div style={{
           padding: '12px',
@@ -99,6 +105,7 @@ const RoleTemplates = ({ theme = 'dark', palette = null }) => {
         </div>
       )}
 
+      {!loading && (
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
@@ -139,6 +146,7 @@ const RoleTemplates = ({ theme = 'dark', palette = null }) => {
           </div>
         ))}
       </div>
+      )}
 
       {showCreateModal && (
         <div
@@ -228,6 +236,7 @@ const RoleTemplates = ({ theme = 'dark', palette = null }) => {
             </div>
           </div>
         </div>
+      )}
       )}
     </div>
   );

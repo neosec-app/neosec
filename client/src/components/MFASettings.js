@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { mfaAPI, getErrorMessage } from '../services/api';
-import { FiShield, FiCheckCircle, FiXCircle, FiCopy } from 'react-icons/fi';
+import { FiShield, FiCopy } from 'react-icons/fi';
 
 const MFASettings = ({ theme = 'dark', palette = null }) => {
   const darkPalette = {
