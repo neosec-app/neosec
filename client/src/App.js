@@ -2483,7 +2483,6 @@ function App() {
                         <h1>NeoSec</h1>
                         <p>Welcome! Please login or register to continue.</p>
                     </div>
-
                     <div className="auth-tabs">
                         <button
                             className={`tab-button ${activeTab === 'login' ? 'active' : ''}`}
