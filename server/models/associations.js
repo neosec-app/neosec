@@ -86,13 +86,71 @@ VpnConfig.belongsTo(User, {
     as: 'vpnOwner'
 });
 
+// Load new models
+const AuditLog = require('./AuditLog');
+const Device = require('./Device');
+const LoginHistory = require('./LoginHistory');
+const FeatureToggle = require('./FeatureToggle');
+const RoleTemplate = require('./RoleTemplate');
+const MFASettings = require('./MFASettings');
+const ImpersonationSession = require('./ImpersonationSession');
+
+// User <-> AuditLog
+User.hasMany(AuditLog, {
+    foreignKey: 'adminUserId',
+    as: 'auditLogs'
+});
+
+// User <-> Device
+User.hasMany(Device, {
+    foreignKey: 'userId',
+    as: 'devices'
+});
+
+// User <-> LoginHistory
+User.hasMany(LoginHistory, {
+    foreignKey: 'userId',
+    as: 'loginHistory'
+});
+
+// User <-> FeatureToggle (creator)
+User.hasMany(FeatureToggle, {
+    foreignKey: 'createdBy',
+    as: 'createdFeatureToggles'
+});
+
+// User <-> RoleTemplate (creator)
+User.hasMany(RoleTemplate, {
+    foreignKey: 'createdBy',
+    as: 'createdRoleTemplates'
+});
+
+// User <-> MFASettings
+User.hasOne(MFASettings, {
+    foreignKey: 'userId',
+    as: 'mfaSettings'
+});
+
+// User <-> ImpersonationSession
+User.hasMany(ImpersonationSession, {
+    foreignKey: 'adminUserId',
+    as: 'impersonationSessions'
+});
+
 module.exports = {
     User,
     Group,
     GroupMember,
     Invitation,
     Subscription,
-    VpnConfig
+    VpnConfig,
+    AuditLog,
+    Device,
+    LoginHistory,
+    FeatureToggle,
+    RoleTemplate,
+    MFASettings,
+    ImpersonationSession
 };
 
 

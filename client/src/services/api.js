@@ -289,4 +289,175 @@ export const getErrorMessage = (error, defaultMessage = 'An error occurred') => 
   return defaultMessage;
 };
 
+// Audit Trail API functions
+export const auditAPI = {
+  getAuditLogs: async (params = {}) => {
+    const response = await api.get('/audit', { params });
+    return response.data;
+  },
+  exportAuditLogs: async (data) => {
+    const response = await api.post('/audit/export', data, {
+      responseType: 'blob'
+    });
+    return response.data;
+  }
+};
+
+// System Health API functions
+export const systemHealthAPI = {
+  getSystemHealth: async () => {
+    const response = await api.get('/system-health/health');
+    return response.data;
+  },
+  getAPIPerformance: async (timeRange = '24h') => {
+    const response = await api.get('/system-health/api-performance', { params: { timeRange } });
+    return response.data;
+  },
+  getServerResources: async (timeRange = '24h') => {
+    const response = await api.get('/system-health/server-resources', { params: { timeRange } });
+    return response.data;
+  },
+  getVPNUptime: async () => {
+    const response = await api.get('/system-health/vpn-uptime');
+    return response.data;
+  },
+  getFirewallSyncData: async (days = 7) => {
+    const response = await api.get('/system-health/firewall-sync', { params: { days } });
+    return response.data;
+  }
+};
+
+// Device API functions
+export const deviceAPI = {
+  getAllDevices: async (params = {}) => {
+    const response = await api.get('/devices/all', { params });
+    return response.data;
+  },
+  getUserDevices: async (userId) => {
+    const response = await api.get(`/devices/user/${userId}`);
+    return response.data;
+  },
+  registerDevice: async (deviceData) => {
+    const response = await api.post('/devices/register', deviceData);
+    return response.data;
+  },
+  updateDeviceStatus: async (deviceId, statusData) => {
+    const response = await api.put(`/devices/${deviceId}/status`, statusData);
+    return response.data;
+  }
+};
+
+// Login History API functions
+export const loginHistoryAPI = {
+  getLoginHistory: async (params = {}) => {
+    const response = await api.get('/login-history', { params });
+    return response.data;
+  },
+  getSecurityEvents: async (days = 7) => {
+    const response = await api.get('/login-history/security-events', { params: { days } });
+    return response.data;
+  },
+  toggleUserLock: async (userId, locked) => {
+    const response = await api.put(`/login-history/user/${userId}/lock`, { locked });
+    return response.data;
+  }
+};
+
+// Feature Toggle API functions
+export const featureToggleAPI = {
+  getFeatureToggles: async () => {
+    const response = await api.get('/feature-toggles');
+    return response.data;
+  },
+  checkFeatureAccess: async (featureName) => {
+    const response = await api.get(`/feature-toggles/check/${featureName}`);
+    return response.data;
+  },
+  setFeatureToggle: async (toggleData) => {
+    const response = await api.post('/feature-toggles', toggleData);
+    return response.data;
+  },
+  deleteFeatureToggle: async (id) => {
+    const response = await api.delete(`/feature-toggles/${id}`);
+    return response.data;
+  }
+};
+
+// Role Template API functions
+export const roleTemplateAPI = {
+  getRoleTemplates: async () => {
+    const response = await api.get('/role-templates');
+    return response.data;
+  },
+  getRoleTemplate: async (id) => {
+    const response = await api.get(`/role-templates/${id}`);
+    return response.data;
+  },
+  createRoleTemplate: async (templateData) => {
+    const response = await api.post('/role-templates', templateData);
+    return response.data;
+  },
+  updateRoleTemplate: async (id, templateData) => {
+    const response = await api.put(`/role-templates/${id}`, templateData);
+    return response.data;
+  },
+  deleteRoleTemplate: async (id) => {
+    const response = await api.delete(`/role-templates/${id}`);
+    return response.data;
+  }
+};
+
+// MFA API functions
+export const mfaAPI = {
+  getMFASettings: async (userId = null) => {
+    const url = userId ? `/mfa/${userId}` : '/mfa';
+    const response = await api.get(url);
+    return response.data;
+  },
+  setupMFA: async (method = 'authenticator_app') => {
+    const response = await api.post('/mfa/setup', { method });
+    return response.data;
+  },
+  verifyMFA: async (token) => {
+    const response = await api.post('/mfa/verify', { token });
+    return response.data;
+  },
+  disableMFA: async () => {
+    const response = await api.post('/mfa/disable');
+    return response.data;
+  }
+};
+
+// Impersonation API functions
+export const impersonationAPI = {
+  startImpersonation: async (targetUserId, reason = null) => {
+    const response = await api.post('/impersonation/start', { targetUserId, reason });
+    return response.data;
+  },
+  endImpersonation: async (sessionId) => {
+    const response = await api.post(`/impersonation/end/${sessionId}`);
+    return response.data;
+  },
+  getImpersonationSessions: async (activeOnly = false) => {
+    const response = await api.get('/impersonation/sessions', { params: { activeOnly } });
+    return response.data;
+  }
+};
+
+// Notification API functions
+export const notificationAPI = {
+  getNotifications: async (params = {}) => {
+    const response = await api.get('/notifications', { params });
+    return response.data;
+  },
+  markAsRead: async (notificationId) => {
+    const response = await api.put(`/notifications/${notificationId}/read`);
+    return response.data;
+  },
+  deleteNotification: async (notificationId) => {
+    const response = await api.delete(`/notifications/${notificationId}`);
+    return response.data;
+  }
+};
+
 export default api;

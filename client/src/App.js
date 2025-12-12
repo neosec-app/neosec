@@ -7,6 +7,16 @@ import './index.css';
 import ScanDashboard from './components/ScanDashboard';
 import ProfileManager from './components/ProfileManager';
 import FirewallRuleManagement from './components/FirewallRuleManagement';
+// Module 1 Additional Features
+import AdminAuditTrail from './components/AdminAuditTrail';
+import SystemHealthMetrics from './components/SystemHealthMetrics';
+import MFASettings from './components/MFASettings';
+import DeviceInventory from './components/DeviceInventory';
+import LoginHistory from './components/LoginHistory';
+import FeatureToggles from './components/FeatureToggles';
+import RoleTemplates from './components/RoleTemplates';
+import UserImpersonation from './components/UserImpersonation';
+import AdminNotifications from './components/AdminNotifications';
 import { SiAlwaysdata } from 'react-icons/si';
 import { GoAlertFill } from 'react-icons/go';
 import { MdModeEdit } from 'react-icons/md';
@@ -631,51 +641,241 @@ function App() {
 
 
                             {user.role === 'admin' && (
-                                <button
-                                    onMouseEnter={() => setNavHover('users')}
-                                    onMouseLeave={() => setNavHover(null)}
-                                    onClick={() => setCurrentView('users')}
-                                    style={{
-                                        width: '100%',
-                                        padding: '12px 15px',
-                                        marginBottom: '10px',
-                                        backgroundColor: currentView === 'users' || navHover === 'users' ? palette.accentSoft : 'transparent',
-                                        color: currentView === 'users' || navHover === 'users' ? palette.accent : palette.text,
-                                        border: currentView === 'users' || navHover === 'users' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                        borderRadius: '10px',
-                                        textAlign: 'left',
-                                        cursor: 'pointer',
-                                        fontSize: '14px',
-                                        transition: 'all 0.15s ease',
-                                        boxShadow: navHover === 'users' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                    }}
-                                >
-                                    User Management
-                                </button>
+                                <>
+                                    <button
+                                        onMouseEnter={() => setNavHover('users')}
+                                        onMouseLeave={() => setNavHover(null)}
+                                        onClick={() => setCurrentView('users')}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 15px',
+                                            marginBottom: '10px',
+                                            backgroundColor: currentView === 'users' || navHover === 'users' ? palette.accentSoft : 'transparent',
+                                            color: currentView === 'users' || navHover === 'users' ? palette.accent : palette.text,
+                                            border: currentView === 'users' || navHover === 'users' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                            borderRadius: '10px',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            transition: 'all 0.15s ease',
+                                            boxShadow: navHover === 'users' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                        }}
+                                    >
+                                        User Management
+                                    </button>
+                                    <button
+                                        onMouseEnter={() => setNavHover('scan')}
+                                        onMouseLeave={() => setNavHover(null)}
+                                        onClick={() => setCurrentView('scan')}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 15px',
+                                            marginBottom: '10px',
+                                            backgroundColor: currentView === 'scan' || navHover === 'scan' ? palette.accentSoft : 'transparent',
+                                            color: currentView === 'scan' || navHover === 'scan' ? palette.accent : palette.text,
+                                            border: currentView === 'scan' || navHover === 'scan' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                            borderRadius: '10px',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            transition: 'all 0.15s ease',
+                                            boxShadow: navHover === 'scan' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                        }}
+                                    >
+                                        URL Scanner
+                                    </button>
+                                    <button
+                                        onMouseEnter={() => setNavHover('audit')}
+                                        onMouseLeave={() => setNavHover(null)}
+                                        onClick={() => setCurrentView('audit')}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 15px',
+                                            marginBottom: '10px',
+                                            backgroundColor: currentView === 'audit' || navHover === 'audit' ? palette.accentSoft : 'transparent',
+                                            color: currentView === 'audit' || navHover === 'audit' ? palette.accent : palette.text,
+                                            border: currentView === 'audit' || navHover === 'audit' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                            borderRadius: '10px',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            transition: 'all 0.15s ease',
+                                            boxShadow: navHover === 'audit' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                        }}
+                                    >
+                                        Audit Trail
+                                    </button>
+                                    <button
+                                        onMouseEnter={() => setNavHover('system-health')}
+                                        onMouseLeave={() => setNavHover(null)}
+                                        onClick={() => setCurrentView('system-health')}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 15px',
+                                            marginBottom: '10px',
+                                            backgroundColor: currentView === 'system-health' || navHover === 'system-health' ? palette.accentSoft : 'transparent',
+                                            color: currentView === 'system-health' || navHover === 'system-health' ? palette.accent : palette.text,
+                                            border: currentView === 'system-health' || navHover === 'system-health' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                            borderRadius: '10px',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            transition: 'all 0.15s ease',
+                                            boxShadow: navHover === 'system-health' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                        }}
+                                    >
+                                        System Health
+                                    </button>
+                                    <button
+                                        onMouseEnter={() => setNavHover('devices')}
+                                        onMouseLeave={() => setNavHover(null)}
+                                        onClick={() => setCurrentView('devices')}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 15px',
+                                            marginBottom: '10px',
+                                            backgroundColor: currentView === 'devices' || navHover === 'devices' ? palette.accentSoft : 'transparent',
+                                            color: currentView === 'devices' || navHover === 'devices' ? palette.accent : palette.text,
+                                            border: currentView === 'devices' || navHover === 'devices' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                            borderRadius: '10px',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            transition: 'all 0.15s ease',
+                                            boxShadow: navHover === 'devices' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                        }}
+                                    >
+                                        Device Inventory
+                                    </button>
+                                    <button
+                                        onMouseEnter={() => setNavHover('mfa')}
+                                        onMouseLeave={() => setNavHover(null)}
+                                        onClick={() => setCurrentView('mfa')}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 15px',
+                                            marginBottom: '10px',
+                                            backgroundColor: currentView === 'mfa' || navHover === 'mfa' ? palette.accentSoft : 'transparent',
+                                            color: currentView === 'mfa' || navHover === 'mfa' ? palette.accent : palette.text,
+                                            border: currentView === 'mfa' || navHover === 'mfa' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                            borderRadius: '10px',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            transition: 'all 0.15s ease',
+                                            boxShadow: navHover === 'mfa' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                        }}
+                                    >
+                                        MFA Settings
+                                    </button>
+                                    <button
+                                        onMouseEnter={() => setNavHover('login-history')}
+                                        onMouseLeave={() => setNavHover(null)}
+                                        onClick={() => setCurrentView('login-history')}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 15px',
+                                            marginBottom: '10px',
+                                            backgroundColor: currentView === 'login-history' || navHover === 'login-history' ? palette.accentSoft : 'transparent',
+                                            color: currentView === 'login-history' || navHover === 'login-history' ? palette.accent : palette.text,
+                                            border: currentView === 'login-history' || navHover === 'login-history' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                            borderRadius: '10px',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            transition: 'all 0.15s ease',
+                                            boxShadow: navHover === 'login-history' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                        }}
+                                    >
+                                        Login History
+                                    </button>
+                                    <button
+                                        onMouseEnter={() => setNavHover('feature-toggles')}
+                                        onMouseLeave={() => setNavHover(null)}
+                                        onClick={() => setCurrentView('feature-toggles')}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 15px',
+                                            marginBottom: '10px',
+                                            backgroundColor: currentView === 'feature-toggles' || navHover === 'feature-toggles' ? palette.accentSoft : 'transparent',
+                                            color: currentView === 'feature-toggles' || navHover === 'feature-toggles' ? palette.accent : palette.text,
+                                            border: currentView === 'feature-toggles' || navHover === 'feature-toggles' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                            borderRadius: '10px',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            transition: 'all 0.15s ease',
+                                            boxShadow: navHover === 'feature-toggles' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                        }}
+                                    >
+                                        Feature Toggles
+                                    </button>
+                                    <button
+                                        onMouseEnter={() => setNavHover('role-templates')}
+                                        onMouseLeave={() => setNavHover(null)}
+                                        onClick={() => setCurrentView('role-templates')}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 15px',
+                                            marginBottom: '10px',
+                                            backgroundColor: currentView === 'role-templates' || navHover === 'role-templates' ? palette.accentSoft : 'transparent',
+                                            color: currentView === 'role-templates' || navHover === 'role-templates' ? palette.accent : palette.text,
+                                            border: currentView === 'role-templates' || navHover === 'role-templates' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                            borderRadius: '10px',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            transition: 'all 0.15s ease',
+                                            boxShadow: navHover === 'role-templates' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                        }}
+                                    >
+                                        Role Templates
+                                    </button>
+                                    <button
+                                        onMouseEnter={() => setNavHover('impersonation')}
+                                        onMouseLeave={() => setNavHover(null)}
+                                        onClick={() => setCurrentView('impersonation')}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 15px',
+                                            marginBottom: '10px',
+                                            backgroundColor: currentView === 'impersonation' || navHover === 'impersonation' ? palette.accentSoft : 'transparent',
+                                            color: currentView === 'impersonation' || navHover === 'impersonation' ? palette.accent : palette.text,
+                                            border: currentView === 'impersonation' || navHover === 'impersonation' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                            borderRadius: '10px',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            transition: 'all 0.15s ease',
+                                            boxShadow: navHover === 'impersonation' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                        }}
+                                    >
+                                        User Impersonation
+                                    </button>
+                                    <button
+                                        onMouseEnter={() => setNavHover('admin-notifications')}
+                                        onMouseLeave={() => setNavHover(null)}
+                                        onClick={() => setCurrentView('admin-notifications')}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 15px',
+                                            marginBottom: '10px',
+                                            backgroundColor: currentView === 'admin-notifications' || navHover === 'admin-notifications' ? palette.accentSoft : 'transparent',
+                                            color: currentView === 'admin-notifications' || navHover === 'admin-notifications' ? palette.accent : palette.text,
+                                            border: currentView === 'admin-notifications' || navHover === 'admin-notifications' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                            borderRadius: '10px',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            transition: 'all 0.15s ease',
+                                            boxShadow: navHover === 'admin-notifications' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                        }}
+                                    >
+                                        Admin Notifications
+                                    </button>
+                                </>
                             )}
                         </nav>
-                        <button
-                            onMouseEnter={() => setNavHover('scan')}
-                            onMouseLeave={() => setNavHover(null)}
-                            onClick={() => setCurrentView('scan')}
-                            style={{
-                                width: '100%',
-                                padding: '12px 15px',
-                                marginBottom: '10px',
-                                backgroundColor: currentView === 'scan' || navHover === 'scan' ? palette.accentSoft : 'transparent',
-                                color: currentView === 'scan' || navHover === 'scan' ? palette.accent : palette.text,
-                                border: currentView === 'scan' || navHover === 'scan' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                borderRadius: '10px',
-                                textAlign: 'left',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                transition: 'all 0.15s ease',
-                                boxShadow: navHover === 'scan' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                            }}
-                        >
-                            URL Scanner
-                        </button>
-
                         <button
                             onClick={handleLogout}
                             onMouseEnter={() => setLogoutHover(true)}
@@ -1231,6 +1431,43 @@ function App() {
 
 
                         {/* User Management View (Admin Only) */}
+                        {/* Module 1 Additional Features - Admin Only */}
+                        {currentView === 'audit' && user.role === 'admin' && (
+                            <AdminAuditTrail theme={theme} palette={palette} />
+                        )}
+
+                        {currentView === 'system-health' && user.role === 'admin' && (
+                            <SystemHealthMetrics theme={theme} palette={palette} />
+                        )}
+
+                        {currentView === 'mfa' && user.role === 'admin' && (
+                            <MFASettings theme={theme} palette={palette} />
+                        )}
+
+                        {currentView === 'devices' && user.role === 'admin' && (
+                            <DeviceInventory theme={theme} palette={palette} />
+                        )}
+
+                        {currentView === 'login-history' && user.role === 'admin' && (
+                            <LoginHistory theme={theme} palette={palette} />
+                        )}
+
+                        {currentView === 'feature-toggles' && user.role === 'admin' && (
+                            <FeatureToggles theme={theme} palette={palette} />
+                        )}
+
+                        {currentView === 'role-templates' && user.role === 'admin' && (
+                            <RoleTemplates theme={theme} palette={palette} />
+                        )}
+
+                        {currentView === 'impersonation' && user.role === 'admin' && (
+                            <UserImpersonation theme={theme} palette={palette} />
+                        )}
+
+                        {currentView === 'admin-notifications' && user.role === 'admin' && (
+                            <AdminNotifications theme={theme} palette={palette} />
+                        )}
+
                         {currentView === 'users' && user.role === 'admin' && (
                             <div>
                                 <div style={{

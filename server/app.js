@@ -16,6 +16,15 @@ const GroupMember = require('./models/GroupMember');
 const Invitation = require('./models/Invitation');
 const Subscription = require('./models/Subscription');
 
+// NEW: Add Module 1 additional feature models
+const AuditLog = require('./models/AuditLog');
+const Device = require('./models/Device');
+const LoginHistory = require('./models/LoginHistory');
+const FeatureToggle = require('./models/FeatureToggle');
+const RoleTemplate = require('./models/RoleTemplate');
+const MFASettings = require('./models/MFASettings');
+const ImpersonationSession = require('./models/ImpersonationSession');
+
 // NEW: Set up associations
 require('./models/associations');
 
@@ -33,7 +42,14 @@ const adminRoutes = require('./routes/adminRoutes');
 const hierarchyRoutes = require('./routes/hierarchyRoutes');
 const scanRoutes = require('./routes/scanRoutes');
 const firewallRoutes = require('./routes/firewallRoutes');
-
+const auditRoutes = require('./routes/auditRoutes');
+const systemHealthRoutes = require('./routes/systemHealthRoutes');
+const deviceRoutes = require('./routes/deviceRoutes');
+const loginHistoryRoutes = require('./routes/loginHistoryRoutes');
+const featureToggleRoutes = require('./routes/featureToggleRoutes');
+const roleTemplateRoutes = require('./routes/roleTemplateRoutes');
+const mfaRoutes = require('./routes/mfaRoutes');
+const impersonationRoutes = require('./routes/impersonationRoutes');
 
 // Initialize Express app
 const app = express();
@@ -94,6 +110,16 @@ app.use('/api/scan', scanRoutes);
 app.use('/api/firewall', firewallRoutes);
 const dataTransferRoutes = require('./routes/dataTransferRoutes');
 app.use('/api/data-transfer', dataTransferRoutes);
+
+// New Module 1 additional features routes
+app.use('/api/audit', auditRoutes);
+app.use('/api/system-health', systemHealthRoutes);
+app.use('/api/devices', deviceRoutes);
+app.use('/api/login-history', loginHistoryRoutes);
+app.use('/api/feature-toggles', featureToggleRoutes);
+app.use('/api/role-templates', roleTemplateRoutes);
+app.use('/api/mfa', mfaRoutes);
+app.use('/api/impersonation', impersonationRoutes);
 
 
 // Health check route with database status

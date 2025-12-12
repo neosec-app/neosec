@@ -1,12 +1,21 @@
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 
-// Get all notifications for current user
+// Get all notifications for current user (or all if admin)
 exports.getNotifications = async (req, res) => {
     try {
-        const { status, priority } = req.query;
+        const { status, priority, userId } = req.query;
 
-        const whereClause = { userId: req.user.id };
+        const whereClause = {};
+        
+        // Admins can view all notifications or filter by userId
+        if (req.user.role === 'admin' && userId) {
+            whereClause.userId = userId;
+        } else if (req.user.role !== 'admin') {
+            // Regular users only see their own notifications
+            whereClause.userId = req.user.id;
+        }
+        // If admin and no userId specified, show all notifications
 
         if (status) {
             whereClause.status = status;
@@ -18,6 +27,14 @@ exports.getNotifications = async (req, res) => {
 
         const notifications = await Notification.findAll({
             where: whereClause,
+            include: [
+                {
+                    model: require('../models/User'),
+                    as: 'user',
+                    attributes: ['id', 'email'],
+                    required: false
+                }
+            ],
             order: [
                 ['priority', 'DESC'], // Critical first
                 ['createdAt', 'DESC']

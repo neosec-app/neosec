@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const LoginHistory = require('../models/LoginHistory');
 const jwt = require('jsonwebtoken');
 
 // Generate JWT Token
@@ -166,7 +167,25 @@ const login = async (req, res) => {
       });
     }
 
+    // Log failed login attempt
+    const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    
     if (!user) {
+      // Log failed login attempt (user not found)
+      try {
+        await LoginHistory.create({
+          userId: null, // User not found
+          ipAddress,
+          userAgent,
+          success: false,
+          failureReason: 'User not found',
+          suspiciousActivity: true
+        });
+      } catch (logError) {
+        console.error('Error logging failed login:', logError);
+      }
+      
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
@@ -186,6 +205,32 @@ const login = async (req, res) => {
     }
 
     if (!isPasswordMatch) {
+      // Log failed login attempt (wrong password)
+      try {
+        // Check for suspicious activity (multiple failed attempts from same IP)
+        const { Op } = require('sequelize');
+        const recentFailures = await LoginHistory.count({
+          where: {
+            ipAddress,
+            success: false,
+            createdAt: {
+              [Op.gte]: new Date(Date.now() - 15 * 60 * 1000) // Last 15 minutes
+            }
+          }
+        });
+
+        await LoginHistory.create({
+          userId: user.id,
+          ipAddress,
+          userAgent,
+          success: false,
+          failureReason: 'Invalid password',
+          suspiciousActivity: recentFailures >= 3 // Mark as suspicious if 3+ failures in 15 min
+        });
+      } catch (logError) {
+        console.error('Error logging failed login:', logError);
+      }
+      
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
@@ -214,6 +259,20 @@ const login = async (req, res) => {
         success: false,
         message: 'Server error during token generation'
       });
+    }
+
+    // Log login history (ipAddress and userAgent already declared above)
+    try {
+      await LoginHistory.create({
+        userId: user.id,
+        ipAddress,
+        userAgent,
+        success: true,
+        suspiciousActivity: false
+      });
+    } catch (logError) {
+      console.error('Error logging login history:', logError);
+      // Don't fail login if logging fails
     }
 
     // IMPORTANT: return FULL user state

@@ -3,6 +3,7 @@ const User = require('../models/User');
 const VpnConfig = require('../models/VpnConfig');
 const Threat = require('../models/Threat');
 const bcrypt = require('bcryptjs');
+const { createAuditLog } = require('../middleware/auditLogger');
 
 // @desc    Get all users
 // @route   GET /api/admin/users
@@ -105,6 +106,21 @@ const updateUser = async (req, res) => {
 
     await user.save();
 
+    // Log the action
+    const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    await createAuditLog(
+      req.user.id,
+      'User Updated',
+      'User Management',
+      {
+        targetUserId: userId,
+        details: `Updated user: ${email ? `email=${email}` : ''} ${role ? `role=${role}` : ''} ${isApproved !== undefined ? `isApproved=${isApproved}` : ''}`,
+        ipAddress,
+        userAgent
+      }
+    );
+
     // Return user without password
     const userData = user.toJSON();
 
@@ -145,6 +161,21 @@ const deleteUser = async (req, res) => {
         message: 'User not found'
       });
     }
+
+    // Log the action before deletion
+    const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    await createAuditLog(
+      req.user.id,
+      'User Deleted',
+      'User Management',
+      {
+        targetUserId: userId,
+        details: `Deleted user account: ${user.email}`,
+        ipAddress,
+        userAgent
+      }
+    );
 
     await user.destroy();
 
