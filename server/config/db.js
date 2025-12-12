@@ -88,15 +88,91 @@ const connectDB = async () => {
             console.log('Database tables already exist.');
         }
 
-        // 5) Schema sync behavior
+        // 5) Check and add missing columns to users table
+        try {
+            const [columns] = await sequelize.query(`
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'users' AND table_schema = 'public';
+            `);
+            const columnNames = columns.map(col => col.column_name);
+            
+            // Check for missing columns and add them
+            const missingColumns = [];
+            if (!columnNames.includes('accountType')) missingColumns.push('accountType');
+            if (!columnNames.includes('subscriptionTier')) missingColumns.push('subscriptionTier');
+            if (!columnNames.includes('isPaid')) missingColumns.push('isPaid');
+            
+            if (missingColumns.length > 0) {
+                console.log(`Missing columns detected: ${missingColumns.join(', ')}. Adding them...`);
+                
+                // Create ENUM types if they don't exist
+                await sequelize.query(`
+                    DO $$ BEGIN
+                        CREATE TYPE account_type_enum AS ENUM ('user', 'leader', 'admin');
+                    EXCEPTION
+                        WHEN duplicate_object THEN null;
+                    END $$;
+                `);
+                
+                await sequelize.query(`
+                    DO $$ BEGIN
+                        CREATE TYPE subscription_tier_enum AS ENUM ('free', 'basic', 'pro', 'enterprise');
+                    EXCEPTION
+                        WHEN duplicate_object THEN null;
+                    END $$;
+                `);
+                
+                // Add missing columns
+                if (missingColumns.includes('accountType')) {
+                    await sequelize.query(`
+                        ALTER TABLE users 
+                        ADD COLUMN IF NOT EXISTS "accountType" account_type_enum DEFAULT 'user' NOT NULL;
+                    `);
+                }
+                
+                if (missingColumns.includes('subscriptionTier')) {
+                    await sequelize.query(`
+                        ALTER TABLE users 
+                        ADD COLUMN IF NOT EXISTS "subscriptionTier" subscription_tier_enum DEFAULT 'free' NOT NULL;
+                    `);
+                }
+                
+                if (missingColumns.includes('isPaid')) {
+                    await sequelize.query(`
+                        ALTER TABLE users 
+                        ADD COLUMN IF NOT EXISTS "isPaid" BOOLEAN DEFAULT false;
+                    `);
+                }
+                
+                // Update existing users with default values
+                await sequelize.query(`
+                    UPDATE users 
+                    SET 
+                        "accountType" = COALESCE("accountType", 'user'),
+                        "subscriptionTier" = COALESCE("subscriptionTier", 'free'),
+                        "isPaid" = COALESCE("isPaid", false)
+                    WHERE "accountType" IS NULL OR "subscriptionTier" IS NULL OR "isPaid" IS NULL;
+                `);
+                
+                console.log('✅ Missing columns added successfully.');
+            } else {
+                console.log('✅ All required columns exist in users table.');
+            }
+        } catch (colError) {
+            console.error('Error checking/adding columns:', colError.message);
+            // Don't fail the entire connection if column check fails
+        }
+
+        // 6) Schema sync behavior
         if (!isProd) {
             // Development: auto-update schema safely
             console.log('Syncing database schema (alter mode)...');
             await sequelize.sync({ alter: true });
             console.log('Database schema updated (new columns added if any).');
         } else {
-            // Production: never auto-alter tables
-            console.log('Production mode: No schema changes applied.');
+            // Production: columns are now handled above
+            console.log('Production mode: Schema check completed.');
         }
     } catch (err) {
         console.error('Database connection/sync error:', err.message);
