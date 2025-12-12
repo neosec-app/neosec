@@ -1,10 +1,8 @@
 import QtQuick
-//import QtQuick.Studio.Components 1.0
 import QtQuick.Controls
-//import QtQuick.Studio.DesignEffects
 
 
-Window {
+Page {
     property color primary: "#36e27b"
     property color background_light: "#f6f6f6"
     property color background_dark: "#121212"
@@ -15,12 +13,15 @@ Window {
     property color error_red: "#d32f2f"
 
     id: mainWindow
-    width: 1080
-    height: 720
 
     visible: true
-    color: background_dark
     title: "NeoSec"
+    height: 720
+    width: 1080
+
+    background: Rectangle {
+	    color: background_dark
+    }
 
     Row {
         id: loginHeader
@@ -38,6 +39,8 @@ Window {
             anchors.verticalCenter: parent.verticalCenter
             source: "images/logo.svg"
             fillMode: Image.PreserveAspectFit
+            sourceSize.width: width
+            sourceSize.height: height
         }
 
         Text {
@@ -151,19 +154,27 @@ Window {
             Button {
                 id: loginButton
                 width: parent.width
-                text: qsTr("Login")
+                text: loginButton.enabled ? qsTr("Login") : qsTr("Logging in...")
                 font.weight: 650
                 font.pixelSize: 20
                 height: 50
                 anchors.top: loginPasswordField.bottom
                 anchors.topMargin: 35
+                enabled: false
                 HoverHandler {
-                    cursorShape: parent.hovered ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    cursorShape: parent.hovered ?
+                    (!parent.enabled ? Qt.ForbiddenCursor : Qt.PointingHandCursor) : Qt.ArrowCursor
                 }
 
                 background: Rectangle {
-                    color: primary
+                    color: loginButton.enabled ? primary : background_dark
                     radius: 50
+                }
+                onClicked: {
+                    if (loginButton.enabled) {
+                        loginButton.enabled = false
+                        backend.authenticate(loginUsernameField.text, loginPasswordField.text)
+                    }
                 }
             }
 
@@ -221,8 +232,26 @@ Window {
                 property color linkHoverColor: Qt.lighter(text_light, 1.2)
             }
 
+            Label {
+                id: errorLabel
+                color: error_red
+                anchors.top: signupButton.bottom
+                anchors.topMargin: 20
+                font.pointSize: 10
+                font.bold: true
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+
         }
+    }
 
-
+    Connections {
+        target: backend
+        function onLoginFailed(message) {
+            errorLabel.text = message
+        }
+        function onAuthenticationFinished() {
+            loginButton.enabled = true
+        }
     }
 }
