@@ -84,6 +84,12 @@ const UserImpersonation = ({ theme = 'dark', palette = null }) => {
     <div style={{ padding: '24px', backgroundColor: colors.bgMain, minHeight: '100vh', color: colors.text }}>
       <h1 style={{ marginBottom: '24px', fontSize: '28px', fontWeight: 700 }}>User Impersonation</h1>
       
+      {loading && (
+        <div style={{ padding: '20px', textAlign: 'center', color: colors.textMuted }}>
+          Loading users...
+        </div>
+      )}
+
       {error && (
         <div style={{
           padding: '12px',

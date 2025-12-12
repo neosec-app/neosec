@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { notificationAPI, getErrorMessage } from '../services/api';
-import { FiBell, FiCheckCircle, FiXCircle, FiAlertTriangle } from 'react-icons/fi';
+import { FiBell, FiAlertTriangle } from 'react-icons/fi';
 
 const AdminNotifications = ({ theme = 'dark', palette = null }) => {
   const darkPalette = {

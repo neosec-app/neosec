@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { deviceAPI, getErrorMessage } from '../services/api';
 import { FiSmartphone, FiMonitor, FiServer, FiWifi, FiWifiOff, FiCheckCircle, FiXCircle } from 'react-icons/fi';
 
@@ -17,11 +17,7 @@ const DeviceInventory = ({ theme = 'dark', palette = null, userId = null }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    fetchDevices();
-  }, [userId]);
-
-  const fetchDevices = async () => {
+  const fetchDevices = useCallback(async () => {
     try {
       setLoading(true);
       const response = userId 
@@ -35,7 +31,11 @@ const DeviceInventory = ({ theme = 'dark', palette = null, userId = null }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    fetchDevices();
+  }, [fetchDevices]);
 
   const getDeviceIcon = (osType) => {
     switch (osType) {
