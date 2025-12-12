@@ -194,7 +194,7 @@ function App() {
 
                         {/* Hierarchy buttons */}
                         <SidebarButton
-                            label="👑 Subscription"
+                            label=" Subscription"
                             view="subscription"
                             currentView={currentView}
                             setCurrentView={setCurrentView}
@@ -202,7 +202,7 @@ function App() {
 
                         {user.accountType === 'leader' && (
                             <SidebarButton
-                                label="👥 My Groups"
+                                label=" My Groups"
                                 view="groups"
                                 currentView={currentView}
                                 setCurrentView={setCurrentView}
@@ -210,14 +210,14 @@ function App() {
                         )}
 
                         <SidebarButton
-                            label="📬 Invitations"
+                            label=" Invitations"
                             view="invitations"
                             currentView={currentView}
                             setCurrentView={setCurrentView}
                         />
 
                         <SidebarButton
-                            label="🎫 My Memberships"
+                            label="My Memberships"
                             view="memberships"
                             currentView={currentView}
                             setCurrentView={setCurrentView}
