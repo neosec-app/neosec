@@ -21,7 +21,7 @@ function extractStats(data) {
 exports.scanUrl = async (req, res) => {
   try {
     const { url } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     if (!url) {
       return res.status(400).json({ message: "URL is required" });
@@ -58,7 +58,7 @@ exports.scanUrl = async (req, res) => {
 exports.getScanStatus = async (req, res) => {
   try {
     const { scanId } = req.params;
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     const record = await ScanHistory.findOne({ where: { userId, scanId } });
     if (!record) return res.status(404).json({ message: "Not found" });
@@ -102,6 +102,6 @@ exports.getScanStatus = async (req, res) => {
 
 
 exports.getScanHistory = async (req, res) => {
-  const scans = await ScanHistory.findAll({ where: { userId: req.user.userId } });
+  const scans = await ScanHistory.findAll({ where: { userId: req.user.id } });
   res.json(scans);
 };

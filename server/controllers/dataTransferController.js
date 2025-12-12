@@ -6,7 +6,7 @@ const VpnConfig = require('../models/VpnConfig');
 // @access  Private
 const updateDataTransfer = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user.id;
     const { bytesSent, bytesReceived } = req.body;
 
     // Find active VPN config for this user
@@ -68,7 +68,7 @@ const updateDataTransfer = async (req, res) => {
 // @access  Private
 const getDataTransferStats = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     const { sequelize } = require('../config/db');
     const stats = await DataTransfer.findAll({

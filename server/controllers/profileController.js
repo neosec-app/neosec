@@ -21,7 +21,7 @@ const createLog = async (profileId, userId, action, changes, req, description) =
 const getProfiles = async (req, res) => {
   try {
     const profiles = await Profile.findAll({
-      where: { userId: req.user.userId },
+      where: { userId: req.user.id },
       order: [['createdAt', 'DESC']],
       include: [{
         model: ProfileLog,
@@ -51,7 +51,7 @@ const getProfile = async (req, res) => {
     const profile = await Profile.findOne({
       where: {
         id: req.params.id,
-        userId: req.user.userId
+        userId: req.user.id
       },
       include: [{
         model: ProfileLog,
@@ -85,14 +85,14 @@ const createProfile = async (req, res) => {
   try {
     const profileData = {
       ...req.body,
-      userId: req.user.userId
+      userId: req.user.id
     };
 
     const profile = await Profile.create(profileData);
 
     await createLog(
       profile.id,
-      req.user.userId,
+      req.user.id,
       'CREATED',
       { profileData },
       req,
@@ -119,7 +119,7 @@ const updateProfile = async (req, res) => {
     const profile = await Profile.findOne({
       where: {
         id: req.params.id,
-        userId: req.user.userId
+        userId: req.user.id
       }
     });
 
@@ -136,7 +136,7 @@ const updateProfile = async (req, res) => {
 
     await createLog(
       profile.id,
-      req.user.userId,
+      req.user.id,
       'UPDATED',
       { before: oldValues, after: profile.toJSON() },
       req,
@@ -163,7 +163,7 @@ const deleteProfile = async (req, res) => {
     const profile = await Profile.findOne({
       where: {
         id: req.params.id,
-        userId: req.user.userId
+        userId: req.user.id
       }
     });
 
@@ -178,7 +178,7 @@ const deleteProfile = async (req, res) => {
 
     await createLog(
       profile.id,
-      req.user.userId,
+      req.user.id,
       'DELETED',
       { deletedProfile: profile.toJSON() },
       req,
@@ -204,7 +204,7 @@ const deleteProfile = async (req, res) => {
 const activateProfile = async (req, res) => {
   try {
     const allProfiles = await Profile.findAll({
-      where: { userId: req.user.userId }
+      where: { userId: req.user.id }
     });
 
     for (const prof of allProfiles) {
@@ -212,7 +212,7 @@ const activateProfile = async (req, res) => {
         await prof.update({ isActive: false });
         await createLog(
           prof.id,
-          req.user.userId,
+          req.user.id,
           'DEACTIVATED',
           {},
           req,
@@ -224,7 +224,7 @@ const activateProfile = async (req, res) => {
     const profile = await Profile.findOne({
       where: {
         id: req.params.id,
-        userId: req.user.userId
+        userId: req.user.id
       }
     });
 
@@ -243,7 +243,7 @@ const activateProfile = async (req, res) => {
 
     await createLog(
       profile.id,
-      req.user.userId,
+      req.user.id,
       'ACTIVATED',
       { activationCount: profile.activationCount },
       req,
@@ -270,7 +270,7 @@ const getProfileLogs = async (req, res) => {
     const profile = await Profile.findOne({
       where: {
         id: req.params.id,
-        userId: req.user.userId
+        userId: req.user.id
       }
     });
 
@@ -305,7 +305,7 @@ const getProfileLogs = async (req, res) => {
 const getAllLogs = async (req, res) => {
   try {
     const logs = await ProfileLog.findAll({
-      where: { userId: req.user.userId },
+      where: { userId: req.user.id },
       order: [['createdAt', 'DESC']],
       limit: parseInt(req.query.limit) || 100,
       include: [{
@@ -334,7 +334,7 @@ const deactivateProfile = async (req, res) => {
     const profile = await Profile.findOne({
       where: {
         id: req.params.id,
-        userId: req.user.userId
+        userId: req.user.id
       }
     });
 
@@ -357,7 +357,7 @@ const deactivateProfile = async (req, res) => {
     });
     await createLog(
       profile.id,
-      req.user.userId,
+      req.user.id,
       'DEACTIVATED',
       {},
       req,

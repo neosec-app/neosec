@@ -22,14 +22,14 @@ const getRules = async (req, res) => {
     let rules;
     try {
       rules = await FirewallRule.findAll({
-        where: { userId: req.user.userId },
+        where: { userId: req.user.id },
         order: [['order', 'ASC'], ['createdAt', 'ASC']]
       });
     } catch (orderError) {
       // If order column doesn't exist, just order by createdAt
       console.log('Order column not found, using createdAt for ordering');
       rules = await FirewallRule.findAll({
-        where: { userId: req.user.userId },
+        where: { userId: req.user.id },
         order: [['createdAt', 'ASC']]
       });
     }
@@ -65,7 +65,7 @@ const createRule = async (req, res) => {
 
     // Get max order for this user to set default
     const maxOrder = await FirewallRule.max('order', {
-      where: { userId: req.user.userId }
+      where: { userId: req.user.id }
     }) || 0;
 
     const rule = await FirewallRule.create({
@@ -79,7 +79,7 @@ const createRule = async (req, res) => {
       description: description || null,
       enabled: enabled !== undefined ? enabled : true,
       order: order !== undefined ? order : maxOrder + 1,
-      userId: req.user.userId
+      userId: req.user.id
     });
 
     res.status(201).json({
@@ -102,7 +102,7 @@ const updateRule = async (req, res) => {
     const { action, direction, protocol, sourceIP, destinationIP, sourcePort, destinationPort, description, enabled, order } = req.body;
 
     const rule = await FirewallRule.findOne({
-      where: { id, userId: req.user.userId }
+      where: { id, userId: req.user.id }
     });
 
     if (!rule) {
@@ -157,7 +157,7 @@ const deleteRule = async (req, res) => {
     const { id } = req.params;
 
     const rule = await FirewallRule.findOne({
-      where: { id, userId: req.user.userId }
+      where: { id, userId: req.user.id }
     });
 
     if (!rule) {
