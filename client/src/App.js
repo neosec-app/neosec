@@ -1,15 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
-import { authAPI, dashboardAPI, adminAPI, firewallAPI, vpnAPI } from './services/api';
+import { authAPI, dashboardAPI, adminAPI, firewallAPI, vpnAPI, getErrorMessage } from './services/api';
 import './index.css';
-import ProfileManager from './components/ProfileManager';
+
 import ScanDashboard from './components/ScanDashboard';
+import ProfileManager from './components/ProfileManager';
 import { SiAlwaysdata } from 'react-icons/si';
 import { GoAlertFill } from 'react-icons/go';
 import { MdModeEdit } from 'react-icons/md';
 import { SlReload } from 'react-icons/sl';
 import { RiDeleteBin6Line } from 'react-icons/ri';
+
+// Hierarchy Components
+import Subscription from './components/Hierarchy/Subscription';
+import GroupManagement from './components/Hierarchy/GroupManagement';
+import Invitations from './components/Hierarchy/Invitations';
+import Memberships from './components/Hierarchy/Memberships';
 
 function App() {
     // Theme
@@ -107,8 +114,14 @@ function App() {
     const [currentView, setCurrentView] = useState(initialView); // dashboard, vpn, firewall, profiles
     const [dashboardData, setDashboardData] = useState(null);
     const [dashboardLoading, setDashboardLoading] = useState(true);
+    const [dashboardError, setDashboardError] = useState(null);
+
+    // Admin state
     const [users, setUsers] = useState([]);
+    // eslint-disable-next-line no-unused-vars
+    const [adminStats, setAdminStats] = useState(null);
     const [usersLoading, setUsersLoading] = useState(false);
+
     const [editingUser, setEditingUser] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
     const [editModalAnimating, setEditModalAnimating] = useState(false);
@@ -163,18 +176,24 @@ function App() {
     };
     const [firewallForm, setFirewallForm] = useState(initialFirewallForm);
 
+    const [adminError, setAdminError] = useState(null);
+
     // Helper to fetch admin data (users + stats)
     const loadAdminData = useCallback(
         async (withLoading = true) => {
             if (!(user && user.role === 'admin' && currentView === 'users')) return;
             try {
                 if (withLoading) setUsersLoading(true);
+                setAdminError(null);
                 const usersResponse = await adminAPI.getAllUsers();
                 if (usersResponse.success) {
                     setUsers(usersResponse.data || []);
+                } else {
+                    setAdminError(usersResponse.message || 'Failed to load users');
                 }
             } catch (error) {
                 console.error('Admin data fetch error:', error);
+                setAdminError(getErrorMessage(error, 'Failed to load users'));
             } finally {
                 if (withLoading) setUsersLoading(false);
             }
@@ -182,16 +201,15 @@ function App() {
         [user, currentView]
     );
 
+    // ---------------- AUTH CHECK ----------------
     useEffect(() => {
         const checkAuth = async () => {
             if (authAPI.isAuthenticated()) {
                 try {
                     const currentUser = authAPI.getCurrentUser();
-                    if (currentUser) {
-                        setUser(currentUser);
-                    }
-                } catch (error) {
-                    console.error('Auth check error:', error);
+                    if (currentUser) setUser(currentUser);
+                } catch (err) {
+                    console.error('Auth check error:', err);
                     authAPI.logout();
                 }
             }
@@ -212,28 +230,35 @@ function App() {
         }
     }, [currentView, user]);
 
-    // Fetch dashboard data when user is logged in
-    useEffect(() => {
-        const fetchDashboardData = async () => {
-            if (user && currentView === 'dashboard') {
-                try {
-                    setDashboardLoading(true);
-                    const response = await dashboardAPI.getDashboard();
-                    if (response.success) {
-                        setDashboardData(response.data);
-                    }
-                } catch (error) {
-                    console.error('Dashboard fetch error:', error);
-                } finally {
-                    setDashboardLoading(false);
+// Fetch dashboard data when user is logged in
+useEffect(() => {
+    const fetchDashboard = async () => {
+        if (user && currentView === 'dashboard') {
+            try {
+                setDashboardLoading(true);
+                setDashboardError(null);
+
+                const response = await dashboardAPI.getDashboard();
+
+                if (response.success) {
+                    setDashboardData(response.data);
+                } else {
+                    setDashboardError(response.message || 'Failed to load dashboard data');
                 }
+
+            } catch (error) {
+                console.error('Dashboard fetch error:', error);
+                setDashboardError(getErrorMessage(error, 'Failed to load dashboard data'));
+            } finally {
+                setDashboardLoading(false);
             }
-        };
+        }
+    };
+    fetchDashboard();
+}, [user, currentView]);
 
-        fetchDashboardData();
-    }, [user, currentView]);
 
-    // Fetch users and stats when admin views user management
+    // -------- ADMIN DATA FETCH (USERS + STATS) --
     useEffect(() => {
         loadAdminData();
     }, [loadAdminData]);
@@ -253,7 +278,7 @@ function App() {
                     }
                 } catch (error) {
                     console.error('Firewall fetch error:', error);
-                    setFirewallError(error.response?.data?.message || 'Failed to load firewall rules');
+                    setFirewallError(getErrorMessage(error, 'Failed to load firewall rules'));
                 } finally {
                     setFirewallLoading(false);
                 }
@@ -281,13 +306,13 @@ function App() {
 
     const handleSaveUser = async () => {
         try {
-            const response = await adminAPI.updateUser(editingUser.id, {
+            const res = await adminAPI.updateUser(editingUser.id, {
                 email: editingUser.email,
                 role: editingUser.role,
                 isApproved: editingUser.isApproved
             });
-            if (response.success) {
-                setUsers(users.map(u => u.id === editingUser.id ? response.data : u));
+            if (res.success) {
+                setUsers(users.map(u => u.id === editingUser.id ? res.data : u));
                 closeEditModal();
                 // Refresh stats (e.g., pending approvals) without full page refresh
                 await loadAdminData(false);
@@ -301,14 +326,12 @@ function App() {
         }
     };
 
-    const handleDeleteUser = async (userId) => {
-        if (!window.confirm('Are you sure you want to delete this user?')) {
-            return;
-        }
+    const handleDeleteUser = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this user?')) return;
         try {
-            const response = await adminAPI.deleteUser(userId);
+            const response = await adminAPI.deleteUser(id);
             if (response.success) {
-                setUsers(users.filter(u => u.id !== userId));
+                setUsers(users.filter(u => u.id !== id));
                 // Refresh stats after delete
                 await loadAdminData(false);
                 showToast('User deleted', 'success');
@@ -573,7 +596,6 @@ function App() {
 
     const handleLoginSuccess = (userData) => {
         setUser(userData);
-        showToast('Login successful', 'success');
     };
 
     const handleLogout = () => {
@@ -583,6 +605,7 @@ function App() {
         showToast('Logged out', 'info');
     };
 
+    // ---------------- LOADING -------------------
     if (loading) {
         return (
             <div style={{
@@ -599,9 +622,10 @@ function App() {
         );
     }
 
-    // If user is logged in, show dashboard
+    // --------------- AUTHENTICATED UI -----------
     if (user) {
         return (
+
             <>
                 <div style={{
                     minHeight: '100vh',
@@ -862,6 +886,23 @@ function App() {
                                 Security Profiles
                             </button>
 
+                            <nav className="flex-1 space-y-2 text-sm">
+
+
+                                {/* HIERARCHY */}
+                                <SidebarButton label="Subscription" view="subscription" currentView={currentView} setCurrentView={setCurrentView} />
+
+                                {user.accountType === "leader" && (
+                                    <SidebarButton label="My Groups" view="groups" currentView={currentView} setCurrentView={setCurrentView} />
+                                )}
+
+                                <SidebarButton label="Invitations" view="invitations" currentView={currentView} setCurrentView={setCurrentView} />
+                                <SidebarButton label="My Memberships" view="memberships" currentView={currentView} setCurrentView={setCurrentView} />
+                            </nav>
+
+
+
+
                             {user.role === 'admin' && (
                                 <button
                                     onMouseEnter={() => setNavHover('users')}
@@ -936,6 +977,22 @@ function App() {
                         </button>
                     </div>
 
+                    {/* HIERARCHY RENDER */}
+                    {currentView === "subscription" && (
+                        <Subscription
+                            user={user}
+                            onUpgradeSuccess={(updatedUser) => {
+                                setUser(updatedUser);
+                                localStorage.setItem("user", JSON.stringify(updatedUser));
+                            }}
+                        />
+                    )}
+
+                    {currentView === "groups" && user.accountType === "leader" && <GroupManagement user={user} />}
+                    {currentView === "invitations" && <Invitations />}
+                    {currentView === "memberships" && <Memberships />}
+
+
                     {/* Main Content */}
                     <div style={{
                         flex: 1,
@@ -971,6 +1028,22 @@ function App() {
                                         <strong style={{ color: palette.warning }}>⚠️ Account Pending Approval</strong>
                                         <p style={{ margin: '8px 0 0 0', color: palette.textMuted }}>
                                             Your account is awaiting admin approval. Some features may be restricted.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Dashboard Error Message */}
+                                {dashboardError && !dashboardLoading && (
+                                    <div style={{
+                                        ...cardBase,
+                                        padding: '16px',
+                                        marginBottom: '24px',
+                                        backgroundColor: palette.danger + '20',
+                                        border: `1px solid ${palette.danger}`,
+                                    }}>
+                                        <strong style={{ color: palette.danger }}>Error loading dashboard:</strong>
+                                        <p style={{ margin: '8px 0 0 0', color: palette.danger }}>
+                                            {dashboardError}
                                         </p>
                                     </div>
                                 )}
@@ -1647,7 +1720,7 @@ function App() {
 
                         {/* Scanner */}
                         {currentView === 'scan' && (
-                        <ScanDashboard theme={theme} palette={palette} />
+                            <ScanDashboard theme={theme} palette={palette} />
                         )}
 
 
@@ -1896,6 +1969,18 @@ function App() {
 
                                     {usersLoading ? (
                                         <div style={{ color: palette.textMuted, textAlign: 'center', padding: '40px' }}>Loading users...</div>
+                                    ) : adminError ? (
+                                        <div style={{
+                                            padding: '20px',
+                                            backgroundColor: palette.danger + '20',
+                                            border: `1px solid ${palette.danger}`,
+                                            borderRadius: '10px',
+                                            color: palette.danger,
+                                            textAlign: 'center',
+                                            margin: '20px 0'
+                                        }}>
+                                            <strong>Error loading users:</strong> {adminError}
+                                        </div>
                                     ) : (() => {
                                         // Filter users based on search query, role, and status
                                         const filteredUsers = users.filter(u => {
@@ -2507,7 +2592,6 @@ function App() {
                         <h1>NeoSec</h1>
                         <p>Welcome! Please login or register to continue.</p>
                     </div>
-
                     <div className="auth-tabs">
                         <button
                             className={`tab-button ${activeTab === 'login' ? 'active' : ''}`}
@@ -2565,5 +2649,285 @@ function App() {
         </>
     );
 }
+
+function SidebarButton({ label, view, currentView, setCurrentView }) {
+    const active = currentView === view;
+    return (
+        <button
+            onClick={() => setCurrentView(view)}
+            className={`w-full text-left px-4 py-3 rounded-lg text-sm transition border 
+        ${active
+                    ? 'bg-[#1E402C] border-primary text-primary'
+                    : 'bg-transparent border-transparent text-white hover:bg-[#222222]'}`}
+        >
+            {label}
+        </button>
+    );
+}
+
+// eslint-disable-next-line no-unused-vars
+function EmptyPanel({ title, buttonLabel }) {
+    return (
+        <section>
+            <div className="flex items-center justify-between mb-6">
+                <h1 className="text-3xl font-semibold">{title}</h1>
+                <button className="btn-primary">{buttonLabel}</button>
+            </div>
+            <div className="card text-center text-[#B3B3B3]">
+                <p>No data available yet.</p>
+            </div>
+        </section>
+    );
+}
+
+// eslint-disable-next-line no-unused-vars
+function DashboardPanel({ user, dashboardData, dashboardLoading }) {
+    return (
+        <section>
+            <h1 className="text-3xl font-semibold mb-1">Welcome to NeoSec</h1>
+            <p className="text-sm text-[#B3B3B3] mb-6">VPN &amp; Firewall Manager Dashboard</p>
+
+            {!user.isApproved && (
+                <div className="card border border-amber-500 bg-[#282828] mb-6">
+                    <p className="text-amber-400 font-semibold flex items-center gap-2">
+                        ⚠️ Account Pending Approval
+                    </p>
+                    <p className="text-sm text-[#ddd] mt-2">
+                        Your account is awaiting admin approval. Some features may be restricted.
+                    </p>
+                </div>
+            )}
+
+            <div className="grid gap-5 mb-6 md:grid-cols-3">
+                <div className="card">
+                    <p className="card-title">VPN Status</p>
+                    {dashboardLoading ? (
+                        <p className="small-text">Loading...</p>
+                    ) : (
+                        <>
+                            <p
+                                className={`card-value ${dashboardData?.vpnStatus?.connected ? 'text-primary' : 'text-amber-400'
+                                    }`}
+                            >
+                                {dashboardData?.vpnStatus?.connected ? 'Connected' : 'Disconnected'}
+                            </p>
+                            <p className="small-text mt-2">
+                                {dashboardData?.vpnStatus?.server
+                                    ? `Server: ${dashboardData.vpnStatus.server}`
+                                    : 'No active connection'}
+                            </p>
+                        </>
+                    )}
+                </div>
+
+                <div className="card">
+                    <p className="card-title">Threats Blocked</p>
+                    {dashboardLoading ? (
+                        <p className="small-text">Loading...</p>
+                    ) : (
+                        <>
+                            <p className="card-value">{dashboardData?.threatsBlocked?.last24Hours || 0}</p>
+                            <p className="small-text mt-2">
+                                Last 24 hours (Total: {dashboardData?.threatsBlocked?.total || 0})
+                            </p>
+                        </>
+                    )}
+                </div>
+
+                <div className="card">
+                    <p className="card-title">Active Rules</p>
+                    <p className="card-value">12</p>
+                    <p className="small-text mt-2">Firewall rules active</p>
+                </div>
+            </div>
+
+            <div className="card">
+                <h2 className="text-xl font-semibold mb-4">Account Information</h2>
+                <div className="space-y-2 text-sm">
+                    <p><span className="text-[#B3B3B3]">Email: </span>{user.email}</p>
+                    <p>
+                        <span className="text-[#B3B3B3]">Role: </span>
+                        <span className={user.role === 'admin' ? 'text-primary font-semibold' : ''}>
+                            {user.role}
+                        </span>
+                    </p>
+                    <p>
+                        <span className="text-[#B3B3B3]">Status: </span>
+                        <span className={user.isApproved ? 'text-primary' : 'text-amber-400'}>
+                            {user.isApproved ? '✅ Approved' : '⏳ Pending'}
+                        </span>
+                    </p>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+// eslint-disable-next-line no-unused-vars
+function UserManagementPanel({
+    users,
+    usersLoading,
+    adminStats,
+    editingUser,
+    setEditingUser,
+    showEditModal,
+    setShowEditModal,
+    handleEditUser,
+    handleSaveUser,
+    handleDeleteUser,
+    user
+}) {
+    return (
+        <section>
+            <div className="flex items-center justify-between mb-6">
+                <h1 className="text-3xl font-semibold">User Management</h1>
+            </div>
+
+            {adminStats && (
+                <div className="grid gap-4 mb-6 md:grid-cols-4">
+                    <div className="card">
+                        <p className="card-title">Total Users</p>
+                        <p className="card-value">{adminStats.users?.total || 0}</p>
+                    </div>
+                    <div className="card">
+                        <p className="card-title">Pending Approvals</p>
+                        <p className="card-value text-amber-400">{adminStats.users?.pendingApprovals || 0}</p>
+                    </div>
+                    <div className="card">
+                        <p className="card-title">Total Threats Blocked</p>
+                        <p className="card-value">{adminStats.threats?.totalBlocked || 0}</p>
+                    </div>
+                    <div className="card">
+                        <p className="card-title">Application Health</p>
+                        <p className="card-value">{adminStats.applicationHealth?.status || 'Unknown'}</p>
+                    </div>
+                </div>
+            )}
+
+            <div className="card">
+                <h2 className="text-lg font-semibold mb-4">All Users</h2>
+
+                {usersLoading ? (
+                    <p className="text-center text-[#B3B3B3] py-6">Loading users...</p>
+                ) : users.length === 0 ? (
+                    <p className="text-center text-[#B3B3B3] py-6">No users found.</p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-[#282828] text-[#B3B3B3]">
+                                    <th className="px-3 py-2 text-left">Email</th>
+                                    <th className="px-3 py-2 text-left">Role</th>
+                                    <th className="px-3 py-2 text-left">Status</th>
+                                    <th className="px-3 py-2 text-left">Created</th>
+                                    <th className="px-3 py-2 text-left">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {users.map((u) => (
+                                    <tr key={u.id} className="border-b border-[#282828]">
+                                        <td className="px-3 py-2">{u.email}</td>
+                                        <td className="px-3 py-2">{u.role}</td>
+                                        <td className="px-3 py-2">
+                                            {u.isApproved ? '✅ Approved' : '⏳ Pending'}
+                                        </td>
+                                        <td className="px-3 py-2 text-[#B3B3B3]">
+                                            {new Date(u.createdAt).toLocaleDateString()}
+                                        </td>
+                                        <td className="px-3 py-2 space-x-2">
+                                            <button
+                                                onClick={() => handleEditUser(u)}
+                                                className="btn-primary !py-1 !px-3 text-xs"
+                                            >
+                                                Edit
+                                            </button>
+                                            {u.id !== user.id && (
+                                                <button
+                                                    onClick={() => handleDeleteUser(u.id)}
+                                                    className="btn-danger !py-1 !px-3 text-xs"
+                                                >
+                                                    Delete
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+
+            {showEditModal && editingUser && (
+                <EditUserModal
+                    editingUser={editingUser}
+                    setEditingUser={setEditingUser}
+                    setShowEditModal={setShowEditModal}
+                    handleSaveUser={handleSaveUser}
+                    currentUser={user}
+                />
+            )}
+        </section>
+    );
+}
+
+function EditUserModal({ editingUser, setEditingUser, setShowEditModal, handleSaveUser, currentUser }) {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+            <div className="card w-full max-w-lg">
+                <h2 className="text-xl font-semibold mb-4">Edit User</h2>
+
+                <div className="space-y-4 text-sm">
+                    <div>
+                        <label className="block text-[#B3B3B3] mb-1">Email</label>
+                        <input
+                            type="email"
+                            value={editingUser.email}
+                            onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                            className="w-full px-3 py-2 bg-[#121212] border border-[#282828] rounded-lg text-sm"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-[#B3B3B3] mb-1">Role</label>
+                        <select
+                            value={editingUser.role}
+                            onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
+                            disabled={editingUser.id === currentUser.id}
+                            className="w-full px-3 py-2 bg-[#121212] border border-[#282828] rounded-lg text-sm"
+                        >
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <input
+                            id="approved"
+                            type="checkbox"
+                            checked={editingUser.isApproved}
+                            onChange={(e) => setEditingUser({ ...editingUser, isApproved: e.target.checked })}
+                            className="w-4 h-4 accent-primary"
+                        />
+                        <label htmlFor="approved" className="text-[#B3B3B3]">Approved</label>
+                    </div>
+                </div>
+
+                <div className="mt-6 flex justify-end gap-3 text-sm">
+                    <button
+                        onClick={() => { setShowEditModal(false); setEditingUser(null); }}
+                        className="btn-secondary"
+                    >
+                        Cancel
+                    </button>
+                    <button onClick={handleSaveUser} className="btn-primary">
+                        Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 
 export default App;

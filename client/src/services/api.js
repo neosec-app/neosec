@@ -12,12 +12,12 @@ const getApiUrl = () => {
     }
     return url;
   }
-  
+
   if (process.env.NODE_ENV === 'production') {
     // Default production URL - update this with your actual Render backend URL
     return 'https://neosec.onrender.com/api';
   }
-  
+
   return 'http://localhost:5000/api';
 };
 
@@ -150,13 +150,13 @@ export const scanAPI = {
   // Submit a URL for scanning
   scanUrl: async (url) => {
     const response = await api.post('/scan/url', { url });
-    return response.data; 
+    return response.data;
   },
 
   // Get scan status
   getStatus: async (scanId) => {
     const response = await api.get(`/scan/status/${scanId}`);
-    return response.data; 
+    return response.data;
   },
 
   getHistory: async () => {
@@ -199,6 +199,94 @@ export const vpnAPI = {
     const response = await api.post(`/vpn/${configId}/toggle`);
     return response.data;
   }
+};
+
+// Profile API functions
+export const profilesAPI = {
+  // Get all profiles
+  getProfiles: async () => {
+    const response = await api.get('/profiles');
+    return response.data;
+  },
+
+  // Get all profile logs
+  getLogs: async () => {
+    const response = await api.get('/profiles/logs/all');
+    return response.data;
+  },
+
+  // Create a new profile
+  createProfile: async (profileData) => {
+    const response = await api.post('/profiles', profileData);
+    return response.data;
+  },
+
+  // Update a profile
+  updateProfile: async (profileId, profileData) => {
+    const response = await api.put(`/profiles/${profileId}`, profileData);
+    return response.data;
+  },
+
+  // Delete a profile
+  deleteProfile: async (profileId) => {
+    const response = await api.delete(`/profiles/${profileId}`);
+    return response.data;
+  },
+
+  // Activate a profile
+  activateProfile: async (profileId) => {
+    const response = await api.put(`/profiles/${profileId}/activate`, {});
+    return response.data;
+  },
+
+  // Deactivate a profile
+  deactivateProfile: async (profileId) => {
+    const response = await api.put(`/profiles/${profileId}/deactivate`, {});
+    return response.data;
+  }
+};
+
+// Helper function to check if error is a connection error
+export const isConnectionError = (error) => {
+  if (!error) return false;
+
+  // Check for network errors
+  if (error.code === 'ERR_NETWORK' || error.code === 'ECONNREFUSED') {
+    return true;
+  }
+
+  // Check for connection refused in message
+  if (error.message && (
+    error.message.includes('ERR_CONNECTION_REFUSED') ||
+    error.message.includes('Network Error') ||
+    error.message.includes('Failed to fetch')
+  )) {
+    return true;
+  }
+
+  // Check axios specific errors
+  if (error.response === undefined && error.request) {
+    return true;
+  }
+
+  return false;
+};
+
+// Helper function to get user-friendly error message
+export const getErrorMessage = (error, defaultMessage = 'An error occurred') => {
+  if (isConnectionError(error)) {
+    return 'Cannot connect to server. Please make sure the backend server is running on port 5000.';
+  }
+
+  if (error.response?.data?.message) {
+    return error.response.data.message;
+  }
+
+  if (error.message) {
+    return error.message;
+  }
+
+  return defaultMessage;
 };
 
 export default api;

@@ -1,4 +1,4 @@
-const { User } = require('../models');
+const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
 // Generate JWT Token
@@ -8,50 +8,56 @@ const generateToken = (userId) => {
   });
 };
 
+// @desc    Register a new user
+// @route   POST /api/auth/register
+// @access  Public
 const register = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const existingUser = await User.findOne({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'User already exists with this email'
-      });
+    try {
+        const { email, password } = req.body;
+
+
+        const existingUser = await User.findOne({ where: { email } });
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                message: 'User already exists with this email'
+            });
+        }
+
+        // First user becomes admin
+        const userCount = await User.count();
+        const isFirstUser = userCount === 0;
+
+        const user = await User.create({
+            email,
+            password,
+            isApproved: true,
+            role: isFirstUser ? 'admin' : 'user',
+            accountType: isFirstUser ? 'admin' : 'user',
+            subscriptionTier: 'free',
+            isPaid: false
+        });
+
+        res.status(201).json({
+            success: true,
+            message: isFirstUser
+                ? 'Registration successful. Admin account created.'
+                : 'Registration successful. Please login.'
+        });
+    } catch (error) {
+        console.error('Register error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error during registration'
+        });
     }
-
-    // Check if this is the first user (make them admin automatically)
-    const userCount = await User.count();
-    const isFirstUser = userCount === 0;
-
-    // Create user
-    const user = await User.create({
-      email,
-      password,
-      isApproved: true,
-      role: isFirstUser ? 'admin' : 'user'  // First user = admin, others = user
-    });
-
-    // Return success message
-    res.status(201).json({
-      success: true,
-      message: isFirstUser 
-        ? 'Registration successful! You are the first user and have been granted admin privileges.'
-        : 'Registration successful! Please wait for admin approval.'
-    });
-  } catch (error) {
-    console.error('Registration error:', error);
-    console.error('Error stack:', error.stack);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during registration',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error. Please check server logs.'
-    });
-  }
 };
 
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
+/**
+ * @desc    Login user
+ * @route   POST /api/auth/login
+ * @access  Public
+ */
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -91,36 +97,48 @@ const login = async (req, res) => {
     );
 
 
-    // Return user data and token
-    res.status(200).json({
-      success: true,
-      message: 'Login successful',
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        isApproved: user.isApproved
-      }
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during login',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
+        // IMPORTANT: return FULL user state
+        res.status(200).json({
+            success: true,
+            message: 'Login successful',
+            token,
+            user: {
+                id: user.id,
+                email: user.email,
+                role: user.role,
+                accountType: user.accountType,
+                subscriptionTier: user.subscriptionTier,
+                isPaid: user.isPaid,
+                isApproved: user.isApproved
+            }
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error during login'
+        });
+    }
 };
 
 // @desc    Get current user
 // @route   GET /api/auth/me
 // @access  Private
 const getMe = async (req, res) => {
-  try {
-    const user = await User.findByPk(req.user.userId, {
-      attributes: { exclude: ['password'] }
-    });
+    try {
+        // req.user is already populated by protect middleware
+        const user = await User.findByPk(req.user.id, {
+            attributes: [
+                'id',
+                'email',
+                'role',
+                'accountType',
+                'subscriptionTier',
+                'isPaid',
+                'isApproved',
+                'createdAt'
+            ]
+        });
 
     if (!user) {
       return res.status(404).json({
@@ -148,4 +166,5 @@ module.exports = {
   login,
   getMe
 };
+
 
