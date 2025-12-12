@@ -1,4 +1,78 @@
-/* ProfileManager.css - Dark Theme */
+body[data-theme='light'] .profile-manager {
+  color: #0b172a;
+}
+
+/* Main cards / sections */
+body[data-theme='light'] .logs-section,
+body[data-theme='light'] .profile-form-container,
+body[data-theme='light'] .profile-card {
+  background-color: #ffffff;
+  border-color: #d9e2ec;
+}
+
+body[data-theme='light'] .form-section {
+  background-color: #eef3f8;
+  border-color: #d9e2ec;
+}
+
+/* Inputs */
+body[data-theme='light'] .form-input,
+body[data-theme='light'] .form-textarea,
+body[data-theme='light'] .form-select {
+  background-color: #ffffff;
+  border-color: #d9e2ec;
+  color: #0b172a;
+}
+
+/* Muted text */
+body[data-theme='light'] .profile-description,
+body[data-theme='light'] .log-email,
+body[data-theme='light'] .log-description,
+body[data-theme='light'] .log-label,
+body[data-theme='light'] .field-hint,
+body[data-theme='light'] .profile-meta {
+  color: #5b6b7a;
+}
+
+/* Log cards */
+body[data-theme='light'] .log-card {
+  background-color: #f6f8fb;
+  border-color: #d9e2ec;
+}
+
+/* Buttons */
+body[data-theme='light'] .btn-logs {
+  background-color: #ffffff;
+  color: #0b172a;
+  border: 1px solid #d9e2ec;
+}
+
+body[data-theme='light'] .btn-logs:hover {
+  background-color: #eef3f8;
+}
+
+body[data-theme='light'] .btn-create,
+body[data-theme='light'] .btn-submit,
+body[data-theme='light'] .btn-activate {
+  background-color: #1fa45a;
+  color: #ffffff;
+}
+
+body[data-theme='light'] .btn-cancel {
+  background-color: #ffffff;
+  color: #0b172a;
+  border: 1px solid #d9e2ec;
+}
+
+/* Active profile / badges */
+body[data-theme='light'] .profile-card.active-profile {
+  border-color: #1fa45a;
+}
+
+body[data-theme='light'] .badge-active {
+  background-color: #1fa45a;
+  color: #ffffff;
+}
 
 /* Container */
 .profile-manager {
