@@ -15,15 +15,39 @@ const register = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Check if User model is available
+    if (!User) {
+      console.error('User model is not available');
+      return res.status(500).json({
+        success: false,
+        message: 'Server configuration error - models not loaded'
+      });
+    }
+
+    // Test database connection first
+    const { sequelize } = require('../config/db');
+    try {
+      await sequelize.authenticate();
+    } catch (connError) {
+      console.error('Database connection error in register:', connError.message);
+      return res.status(503).json({
+        success: false,
+        message: 'Database connection unavailable. Please try again later.'
+      });
+    }
+
     // Find existing user
     let existingUser;
     try {
       existingUser = await User.findOne({ where: { email } });
     } catch (dbError) {
       console.error('Database error checking existing user:', dbError);
+      console.error('Database error details:', dbError.message);
+      console.error('Database error stack:', dbError.stack);
       return res.status(500).json({
         success: false,
-        message: 'Database error. Please try again later.'
+        message: 'Database error. Please try again later.',
+        error: process.env.NODE_ENV === 'development' ? dbError.message : undefined
       });
     }
 
@@ -106,15 +130,39 @@ const login = async (req, res) => {
       });
     }
 
+    // Check if User model is available
+    if (!User) {
+      console.error('User model is not available');
+      return res.status(500).json({
+        success: false,
+        message: 'Server configuration error - models not loaded'
+      });
+    }
+
+    // Test database connection first
+    const { sequelize } = require('../config/db');
+    try {
+      await sequelize.authenticate();
+    } catch (connError) {
+      console.error('Database connection error in login:', connError.message);
+      return res.status(503).json({
+        success: false,
+        message: 'Database connection unavailable. Please try again later.'
+      });
+    }
+
     // Find user by email
     let user;
     try {
       user = await User.findOne({ where: { email } });
     } catch (dbError) {
       console.error('Database error finding user:', dbError);
+      console.error('Database error details:', dbError.message);
+      console.error('Database error stack:', dbError.stack);
       return res.status(500).json({
         success: false,
-        message: 'Database error. Please try again later.'
+        message: 'Database error. Please try again later.',
+        error: process.env.NODE_ENV === 'development' ? dbError.message : undefined
       });
     }
 

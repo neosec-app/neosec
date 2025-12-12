@@ -96,13 +96,36 @@ const dataTransferRoutes = require('./routes/dataTransferRoutes');
 app.use('/api/data-transfer', dataTransferRoutes);
 
 
-// Health check route
-app.get('/api/health', (req, res) => {
-    res.status(200).json({
-        success: true,
-        message: 'Server is running',
-        timestamp: new Date().toISOString()
-    });
+// Health check route with database status
+app.get('/api/health', async (req, res) => {
+    const { sequelize } = require('./config/db');
+    try {
+        await sequelize.authenticate();
+        res.status(200).json({
+            success: true,
+            message: 'Server is running',
+            database: 'connected',
+            timestamp: new Date().toISOString(),
+            env: {
+                hasJWTSecret: !!process.env.JWT_SECRET,
+                hasDatabaseUrl: !!process.env.DATABASE_URL,
+                nodeEnv: process.env.NODE_ENV || 'development'
+            }
+        });
+    } catch (error) {
+        res.status(503).json({
+            success: false,
+            message: 'Server is running but database is not connected',
+            database: 'disconnected',
+            error: error.message,
+            timestamp: new Date().toISOString(),
+            env: {
+                hasJWTSecret: !!process.env.JWT_SECRET,
+                hasDatabaseUrl: !!process.env.DATABASE_URL,
+                nodeEnv: process.env.NODE_ENV || 'development'
+            }
+        });
+    }
 });
 
 // Root route
