@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { profilesAPI, getErrorMessage } from '../services/api';
+
+import api from '../services/api';
 
 // Same idea as App.js / ScanDashboard
 const darkPalette = {
@@ -116,6 +117,13 @@ const makeStyles = (c) => ({
     fontSize: 14,
     color: c.text,
   },
+  checkboxLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,              
+    fontSize: 14,
+    color: c.text,
+  },
   fieldHint: {
     display: 'block',
     marginTop: 4,
@@ -131,11 +139,11 @@ const makeStyles = (c) => ({
   profileCardActive: (isActive) =>
     isActive
       ? {
-        backgroundColor: c.bgCard,
-        border: `1px solid ${c.accent}`,
-        borderRadius: 12,
-        padding: 20,
-      }
+          backgroundColor: c.bgCard,
+          border: `1px solid ${c.accent}`,
+          borderRadius: 12,
+          padding: 20,
+        }
       : undefined,
   profileDescription: {
     color: c.textMuted,
@@ -153,15 +161,13 @@ const makeStyles = (c) => ({
   },
 });
 
-const ProfileManager = ({ theme = 'light', palette = null }) => {
+const ProfileManager = ({ theme = 'dark', palette }) => {
   const colors = palette || (theme === 'light' ? lightPalette : darkPalette);
   const styles = makeStyles(colors);
 
   const [profiles, setProfiles] = useState([]);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [logsError, setLogsError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [editingProfile, setEditingProfile] = useState(null);
@@ -205,35 +211,21 @@ const ProfileManager = ({ theme = 'light', palette = null }) => {
 
   const fetchProfiles = async () => {
     try {
-      setError(null);
-      const response = await profilesAPI.getProfiles();
-      if (response.success) {
-        setProfiles(response.profiles || []);
-      } else {
-        setError(response.message || 'Failed to load profiles');
-      }
+      const response = await api.get('/profiles');
+      setProfiles(response.data.profiles);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching profiles:', error);
-      const errorMessage = getErrorMessage(error, 'Failed to load profiles');
-      setError(errorMessage);
       setLoading(false);
     }
   };
 
   const fetchLogs = async () => {
     try {
-      setLogsError(null);
-      const response = await profilesAPI.getLogs();
-      if (response.success) {
-        setLogs(response.logs || []);
-      } else {
-        setLogsError(response.message || 'Failed to load logs');
-      }
+      const response = await api.get('/profiles/logs/all');
+      setLogs(response.data.logs);
     } catch (error) {
       console.error('Error fetching logs:', error);
-      const errorMessage = getErrorMessage(error, 'Failed to load logs');
-      setLogsError(errorMessage);
     }
   };
 
@@ -260,36 +252,6 @@ const ProfileManager = ({ theme = 'light', palette = null }) => {
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      profileType: 'Custom',
-      vpnEnabled: false,
-      vpnServer: '',
-      vpnProtocol: 'OpenVPN',
-      vpnPort: '',
-      vpnUsername: '',
-      firewallEnabled: true,
-      defaultFirewallAction: 'DENY',
-      firewallRules: '',
-      dnsEnabled: false,
-      primaryDns: '',
-      secondaryDns: '',
-      allowedIps: '',
-      blockedIps: '',
-      allowedPorts: '',
-      blockedPorts: '',
-      isScheduled: false,
-      scheduleType: 'NONE',
-      scheduleStartTime: '',
-      scheduleEndTime: '',
-      scheduleDays: [],
-      scheduleCondition: '',
-      autoActivate: false,
-    });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -303,57 +265,48 @@ const ProfileManager = ({ theme = 'light', palette = null }) => {
 
         firewallRules: formData.firewallRules
           ? formData.firewallRules
-            .split(',')
-            .map((r) => r.trim())
-            .filter((r) => r !== '')
+              .split(',')
+              .map((r) => r.trim())
+              .filter((r) => r !== '')
           : [],
 
         allowedIps: formData.allowedIps
           ? formData.allowedIps
-            .split(',')
-            .map((ip) => ip.trim())
-            .filter((ip) => ip !== '')
+              .split(',')
+              .map((ip) => ip.trim())
+              .filter((ip) => ip !== '')
           : [],
 
         blockedIps: formData.blockedIps
           ? formData.blockedIps
-            .split(',')
-            .map((ip) => ip.trim())
-            .filter((ip) => ip !== '')
+              .split(',')
+              .map((ip) => ip.trim())
+              .filter((ip) => ip !== '')
           : [],
 
         allowedPorts: formData.allowedPorts
           ? formData.allowedPorts
-            .split(',')
-            .map((p) => p.trim())
-            .filter((p) => p !== '' && !isNaN(p))
-            .map(Number)
+              .split(',')
+              .map((p) => p.trim())
+              .filter((p) => p !== '' && !isNaN(p))
+              .map(Number)
           : [],
 
         blockedPorts: formData.blockedPorts
           ? formData.blockedPorts
-            .split(',')
-            .map((p) => p.trim())
-            .filter((p) => p !== '' && !isNaN(p))
-            .map(Number)
+              .split(',')
+              .map((p) => p.trim())
+              .filter((p) => p !== '' && !isNaN(p))
+              .map(Number)
           : [],
       };
 
-      let response;
       if (editingProfile) {
-        response = await profilesAPI.updateProfile(editingProfile.id, submitData);
-        if (response.success) {
-          alert('Profile updated successfully!');
-        } else {
-          throw new Error(response.message || 'Failed to update profile');
-        }
+        await api.put(`/profiles/${editingProfile.id}`, submitData);
+        alert('Profile updated successfully!');
       } else {
-        response = await profilesAPI.createProfile(submitData);
-        if (response.success) {
-          alert('Profile created successfully!');
-        } else {
-          throw new Error(response.message || 'Failed to create profile');
-        }
+        await api.post(`/profiles`, submitData);
+        alert('Profile created successfully!');
       }
 
       setShowForm(false);
@@ -363,8 +316,10 @@ const ProfileManager = ({ theme = 'light', palette = null }) => {
       fetchLogs();
     } catch (error) {
       console.error('Error saving profile:', error);
-      const errorMessage = getErrorMessage(error, 'Failed to save profile');
-      alert(errorMessage);
+      alert(
+        'Error saving profile: ' +
+          (error.response?.data?.message || error.message)
+      );
     }
   };
 
@@ -419,18 +374,13 @@ const ProfileManager = ({ theme = 'light', palette = null }) => {
   const handleDeactivate = async (id) => {
     if (window.confirm('Are you sure you want to deactivate this profile?')) {
       try {
-        const response = await profilesAPI.deactivateProfile(id);
-        if (response.success) {
-          alert('Profile deactivated successfully!');
-          fetchProfiles();
-          fetchLogs();
-        } else {
-          throw new Error(response.message || 'Failed to deactivate profile');
-        }
+        await api.put(`/profiles/${id}/deactivate`, {});
+        alert('Profile deactivated successfully!');
+        fetchProfiles();
+        fetchLogs();
       } catch (error) {
         console.error('Error deactivating profile:', error);
-        const errorMessage = getErrorMessage(error, 'Failed to deactivate profile');
-        alert(errorMessage);
+        alert('Error deactivating profile');
       }
     }
   };
@@ -438,37 +388,57 @@ const ProfileManager = ({ theme = 'light', palette = null }) => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this profile?')) {
       try {
-        const response = await profilesAPI.deleteProfile(id);
-        if (response.success) {
-          alert('Profile deleted successfully!');
-          fetchProfiles();
-          fetchLogs();
-        } else {
-          throw new Error(response.message || 'Failed to delete profile');
-        }
+        await api.delete(`/profiles/${id}`);
+        alert('Profile deleted successfully!');
+        fetchProfiles();
+        fetchLogs();
       } catch (error) {
         console.error('Error deleting profile:', error);
-        const errorMessage = getErrorMessage(error, 'Failed to delete profile');
-        alert(errorMessage);
+        alert('Error deleting profile');
       }
     }
   };
 
   const handleActivate = async (id) => {
     try {
-      const response = await profilesAPI.activateProfile(id);
-      if (response.success) {
-        alert('Profile activated successfully!');
-        fetchProfiles();
-        fetchLogs();
-      } else {
-        throw new Error(response.message || 'Failed to activate profile');
-      }
+      await api.put(`/profiles/${id}/activate`, {});
+      alert('Profile activated successfully!');
+      fetchProfiles();
+      fetchLogs();
     } catch (error) {
       console.error('Error activating profile:', error);
-      const errorMessage = getErrorMessage(error, 'Failed to activate profile');
-      alert(errorMessage);
+      alert('Error activating profile');
     }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      description: '',
+      profileType: 'Custom',
+      vpnEnabled: false,
+      vpnServer: '',
+      vpnProtocol: 'OpenVPN',
+      vpnPort: '',
+      vpnUsername: '',
+      firewallEnabled: true,
+      defaultFirewallAction: 'DENY',
+      firewallRules: '',
+      dnsEnabled: false,
+      primaryDns: '',
+      secondaryDns: '',
+      allowedIps: '',
+      blockedIps: '',
+      allowedPorts: '',
+      blockedPorts: '',
+      isScheduled: false,
+      scheduleType: 'NONE',
+      scheduleStartTime: '',
+      scheduleEndTime: '',
+      scheduleDays: [],
+      scheduleCondition: '',
+      autoActivate: false,
+    });
   };
 
   const handleCancel = () => {
@@ -509,101 +479,171 @@ const ProfileManager = ({ theme = 'light', palette = null }) => {
   return (
     <div className="profile-manager" style={styles.container}>
       {/* Header */}
-      <div className="pm-header">
-        <h2 style={styles.headerTitle}>Security Profile Management</h2>
-        <div className="header-actions">
-          <button onClick={() => setShowLogs(!showLogs)} className="btn btn-logs">
-            {showLogs ? "Hide Logs" : "View Activity Logs"}
-          </button>
-          <button onClick={() => setShowForm(true)} className="btn btn-create">
-            Create New Profile
-          </button>
+        <div
+          className="pm-header"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 24,
+            gap: 16,
+            flexWrap: 'wrap',
+          }}
+        >
+          <h2 style={styles.headerTitle}>Security Profile Management</h2>
+
+          <div
+            className="header-actions"
+            style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}
+          >
+            <button
+              onClick={() => setShowLogs(!showLogs)}
+              style={{
+                padding: '10px 18px',
+                borderRadius: 999,
+                border: `1px solid ${colors.border}`,
+                backgroundColor: showLogs ? colors.accentSoft : colors.bgCard,
+                color: colors.text,
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              {showLogs ? 'Hide Logs' : 'View Activity Logs'}
+            </button>
+
+            <button
+              onClick={() => setShowForm(true)}
+              style={{
+                padding: '10px 20px',
+                borderRadius: 999,
+                border: 'none',
+                backgroundColor: colors.accent,
+                color: theme === 'dark' ? '#121212' : '#ffffff',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.12)',
+              }}
+            >
+              Create New Profile
+            </button>
+          </div>
         </div>
-      </div>
+
 
       {/* Activity Logs Section */}
       {showLogs && (
-        <div className="logs-section" style={styles.logsSection}>
-          <h3 style={{ marginTop: 0, marginBottom: 16, color: colors.text }}>
-            Activity Logs
-          </h3>
-
-          {logsError ? (
+  <div className="logs-section" style={styles.logsSection}>
+    <h3 style={{ marginTop: 0, marginBottom: 16, color: colors.text }}>
+      Activity Logs
+    </h3>
+    {logs.length === 0 ? (
+      <p className="no-logs" style={styles.logsEmpty}>
+        No activity logs yet.
+      </p>
+    ) : (
+      <div
+        className="logs-container"
+        style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+      >
+        {logs.map((log) => (
+          <div key={log.id} className="log-card" style={styles.logCard}>
             <div
+              className="log-card-header"
               style={{
-                padding: 16,
-                backgroundColor: colors.danger + "20",
-                border: `1px solid ${colors.danger}`,
-                borderRadius: 8,
-                color: colors.danger,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 6,
               }}
             >
-              <strong>Error loading logs:</strong> {logsError}
+              <span className="log-date" style={styles.logDate}>
+                {formatDate(log.createdAt)}
+              </span>
+
+              {/* 👇 change only this span */}
+              <span
+                className={`action-badge ${getActionBadgeClass(log.action)}`}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  backgroundColor:
+                    log.action === 'DEACTIVATED'
+                      ? 'rgba(249,115,22,0.12)' // orange bg
+                      : colors.accentSoft,        // green-ish for others
+                  color:
+                    log.action === 'DEACTIVATED'
+                      ? '#f97316'                // orange text
+                      : colors.accent,           // green text for others
+                }}
+              >
+                {log.action}
+              </span>
             </div>
-          ) : logs.length === 0 ? (
-            <p className="no-logs" style={styles.logsEmpty}>
-              No activity logs yet.
-            </p>
-          ) : (
-            <div className="logs-container">
-              {logs.map((log) => (
-                <div key={log.id} className="log-card" style={styles.logCard}>
-                  <div className="log-card-header">
-                    <span className="log-date" style={styles.logDate}>
-                      {formatDate(log.createdAt)}
-                    </span>
 
-                    <span className={`action-badge ${getActionBadgeClass(log.action)}`}>
-                      {log.action}
-                    </span>
-                  </div>
+            <div className="log-card-body">
+              <p>
+                <span className="log-label">Profile:</span>{' '}
+                <span
+                  className={`log-profile ${
+                    !log.profile?.name ? 'deleted' : ''
+                  }`}
+                  style={{
+                    color: log.profile?.name ? colors.accent : colors.danger,
+                    fontWeight: 600,
+                    textDecoration: log.profile?.name ? 'underline' : 'none',
+                  }}
+                >
+                  {log.profile?.name ||
+                    log.description?.match(/"([^"]+)"/)?.[1] ||
+                    'Deleted'}
+                </span>
+              </p>
 
-                  <div className="log-card-body">
-                    <p>
-                      <span className="log-label">Profile:</span>{" "}
-                      <span
-                        className={`log-profile ${!log.profile?.name ? "deleted" : ""
-                          }`}
-                      >
-                        {log.profile?.name ||
-                          log.description?.match(/"([^"]+)"/)?.[1] ||
-                          "Deleted"}
-                      </span>
-                    </p>
+              <p>
+                <span className="log-label">User:</span>{' '}
+                <span className="log-email">{log.userEmail}</span>
+              </p>
 
-                    <p>
-                      <span className="log-label">User:</span>{" "}
-                      <span className="log-email">{log.userEmail}</span>
-                    </p>
-
-                    {log.description && (
-                      <p className="log-description" style={styles.logDescription}>
-                        {log.description}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
+              {log.description && (
+                <p
+                  className="log-description"
+                  style={styles.logDescription}
+                >
+                  {log.description}
+                </p>
+              )}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+)}
+
 
       {/* Profile Form */}
       {showForm && (
-        <div className="profile-form-container" style={styles.profileFormContainer}>
+        <div
+          className="profile-form-container"
+          style={styles.profileFormContainer}
+        >
           <h3
             style={{
               marginTop: 0,
               marginBottom: 16,
               color: colors.text,
               fontSize: 24,
-              fontWeight: "bold",
+              fontWeight: 'bold',
             }}
           >
-            {editingProfile ? "Edit Profile" : "Create New Profile"}
+            {editingProfile ? 'Edit Profile' : 'Create New Profile'}
           </h3>
-
           <form onSubmit={handleSubmit} className="profile-form">
             {/* Basic Information */}
             <div className="form-section" style={styles.formSection}>
@@ -659,7 +699,10 @@ const ProfileManager = ({ theme = 'light', palette = null }) => {
                 VPN Settings
               </h4>
 
-              <label className="checkbox-label">
+              <label
+                className="checkbox-label"
+                style={styles.checkboxLabel}
+              >
                 <input
                   type="checkbox"
                   name="vpnEnabled"
@@ -668,6 +711,7 @@ const ProfileManager = ({ theme = 'light', palette = null }) => {
                 />
                 <span>Enable VPN</span>
               </label>
+
 
               {formData.vpnEnabled && (
                 <div className="nested-fields">
@@ -741,8 +785,10 @@ const ProfileManager = ({ theme = 'light', palette = null }) => {
               >
                 Firewall Settings
               </h4>
-
-              <label className="checkbox-label">
+              <label
+                className="checkbox-label"
+                style={styles.checkboxLabel}
+              >
                 <input
                   type="checkbox"
                   name="firewallEnabled"
@@ -751,6 +797,7 @@ const ProfileManager = ({ theme = 'light', palette = null }) => {
                 />
                 <span>Enable Firewall</span>
               </label>
+
 
               {formData.firewallEnabled && (
                 <div className="nested-fields">
@@ -763,8 +810,12 @@ const ProfileManager = ({ theme = 'light', palette = null }) => {
                       className="form-select"
                       style={styles.select}
                     >
-                      <option value="ALLOW">Allow All (Blacklist Mode)</option>
-                      <option value="DENY">Deny All (Whitelist Mode)</option>
+                      <option value="ALLOW">
+                        Allow All (Blacklist Mode)
+                      </option>
+                      <option value="DENY">
+                        Deny All (Whitelist Mode)
+                      </option>
                     </select>
                   </div>
 
@@ -865,7 +916,10 @@ const ProfileManager = ({ theme = 'light', palette = null }) => {
                 Scheduling
               </h4>
 
-              <label className="checkbox-label">
+              <label
+                className="checkbox-label"
+                style={styles.checkboxLabel}
+              >
                 <input
                   type="checkbox"
                   name="isScheduled"
@@ -874,6 +928,7 @@ const ProfileManager = ({ theme = 'light', palette = null }) => {
                 />
                 <span>Enable Scheduling</span>
               </label>
+
 
               {formData.isScheduled && (
                 <div className="nested-fields">
@@ -893,78 +948,81 @@ const ProfileManager = ({ theme = 'light', palette = null }) => {
                     </select>
                   </div>
 
-                  {(formData.scheduleType === "TIME" ||
-                    formData.scheduleType === "BOTH") && (
-                      <>
-                        <div className="form-group">
-                          <label>Start Time</label>
-                          <input
-                            type="time"
-                            name="scheduleStartTime"
-                            value={formData.scheduleStartTime}
-                            onChange={handleInputChange}
-                            className="form-input"
-                            style={styles.formInput}
-                          />
-                        </div>
-
-                        <div className="form-group">
-                          <label>End Time</label>
-                          <input
-                            type="time"
-                            name="scheduleEndTime"
-                            value={formData.scheduleEndTime}
-                            onChange={handleInputChange}
-                            className="form-input"
-                            style={styles.formInput}
-                          />
-                        </div>
-
-                        <div className="form-group">
-                          <label>Active Days</label>
-                          <div className="days-selector">
-                            {[
-                              "Monday",
-                              "Tuesday",
-                              "Wednesday",
-                              "Thursday",
-                              "Friday",
-                              "Saturday",
-                              "Sunday",
-                            ].map((day) => (
-                              <label key={day} className="day-checkbox">
-                                <input
-                                  type="checkbox"
-                                  checked={formData.scheduleDays.includes(day)}
-                                  onChange={() => handleDayToggle(day)}
-                                />
-                                <span>{day}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      </>
-                    )}
-
-                  {(formData.scheduleType === "CONDITION" ||
-                    formData.scheduleType === "BOTH") && (
+                  {(formData.scheduleType === 'TIME' ||
+                    formData.scheduleType === 'BOTH') && (
+                    <>
                       <div className="form-group">
-                        <label>Activation Condition</label>
+                        <label>Start Time</label>
                         <input
-                          type="text"
-                          name="scheduleCondition"
-                          placeholder="e.g., WiFi network name, IP range"
-                          value={formData.scheduleCondition}
+                          type="time"
+                          name="scheduleStartTime"
+                          value={formData.scheduleStartTime}
                           onChange={handleInputChange}
                           className="form-input"
                           style={styles.formInput}
                         />
-                        <small className="field-hint" style={styles.fieldHint}>
-                          Example: "Public WiFi", "192.168.1.x",
-                          "Outside office hours"
-                        </small>
                       </div>
-                    )}
+
+                      <div className="form-group">
+                        <label>End Time</label>
+                        <input
+                          type="time"
+                          name="scheduleEndTime"
+                          value={formData.scheduleEndTime}
+                          onChange={handleInputChange}
+                          className="form-input"
+                          style={styles.formInput}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Active Days</label>
+                        <div className="days-selector">
+                          {[
+                            'Monday',
+                            'Tuesday',
+                            'Wednesday',
+                            'Thursday',
+                            'Friday',
+                            'Saturday',
+                            'Sunday',
+                          ].map((day) => (
+                            <label key={day} className="day-checkbox">
+                              <input
+                                type="checkbox"
+                                checked={formData.scheduleDays.includes(day)}
+                                onChange={() => handleDayToggle(day)}
+                              />
+                              <span>{day}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {(formData.scheduleType === 'CONDITION' ||
+                    formData.scheduleType === 'BOTH') && (
+                    <div className="form-group">
+                      <label>Activation Condition</label>
+                      <input
+                        type="text"
+                        name="scheduleCondition"
+                        placeholder="e.g., WiFi network name, IP range"
+                        value={formData.scheduleCondition}
+                        onChange={handleInputChange}
+                        className="form-input"
+                        style={styles.formInput}
+                      />
+                      <small
+                        className="field-hint"
+                        style={styles.fieldHint}
+                      >
+                        Example: "Public WiFi", "192.168.1.x",
+                        "Outside office hours"
+                      </small>
+                    </div>
+                  )}
 
                   <label className="checkbox-label">
                     <input
@@ -980,190 +1038,342 @@ const ProfileManager = ({ theme = 'light', palette = null }) => {
             </div>
 
             {/* Form Actions */}
-            <div className="form-actions">
-              <button type="submit" className="btn btn-submit">
-                {editingProfile ? "Update Profile" : "Create Profile"}
+            <div
+              className="form-actions"
+              style={{
+                marginTop: 20,
+                display: 'flex',
+                gap: 12,
+                justifyContent: 'flex-end',
+              }}
+            >
+              <button
+                type="submit"
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: 8,
+                  border: 'none',
+                  backgroundColor: colors.accent,
+                  color: theme === 'dark' ? '#121212' : '#ffffff',
+                  fontWeight: 600,
+                  fontSize: 14,
+                  cursor: 'pointer',
+                }}
+              >
+                {editingProfile ? 'Update Profile' : 'Create Profile'}
               </button>
+
               <button
                 type="button"
                 onClick={handleCancel}
-                className="btn btn-cancel"
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: 8,
+                  border: `1px solid ${colors.border}`,
+                  backgroundColor: colors.bgCard,
+                  color: colors.text,
+                  fontSize: 14,
+                  cursor: 'pointer',
+                }}
               >
                 Cancel
               </button>
             </div>
+
           </form>
         </div>
       )}
 
       {/* Profiles List */}
-      <div className="profiles-section">
-        <h3
+<div className="profiles-section">
+  <h3
+    style={{
+      marginBottom: 16,
+      color: colors.text,
+      fontSize: 20,
+      fontWeight: 600,
+    }}
+  >
+    Your Profiles ({profiles.length})
+  </h3>
+  {profiles.length === 0 ? (
+    <div className="empty-state">
+      <p style={{ color: colors.textMuted }}>
+        No profiles yet. Create your first security profile!
+      </p>
+    </div>
+  ) : (
+    <div
+      className="profiles-grid"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 16,
+      }}
+    >
+      {profiles.map((profile) => (
+        <div
+          key={profile.id}
+          className={`profile-card ${
+            profile.isActive ? 'active-profile' : ''
+          }`}
           style={{
-            marginBottom: 16,
-            color: colors.text,
-            fontSize: 20,
-            fontWeight: 600,
+            backgroundColor: colors.bgCard,
+            borderRadius: 12,
+            border: `1px solid ${
+              profile.isActive ? colors.accent : colors.border
+            }`,
+            padding: 20,
           }}
         >
-          Your Profiles ({profiles.length})
-        </h3>
-
-        {error ? (
           <div
+            className="profile-content"
             style={{
-              padding: 16,
-              backgroundColor: colors.danger + "20",
-              border: `1px solid ${colors.danger}`,
-              borderRadius: 8,
-              color: colors.danger,
-              marginBottom: 16,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              gap: 16,
             }}
           >
-            <strong>Error loading profiles:</strong> {error}
-          </div>
-        ) : profiles.length === 0 ? (
-          <div className="empty-state">
-            <p style={{ color: colors.textMuted }}>
-              No profiles yet. Create your first security profile!
-            </p>
-          </div>
-        ) : (
-          <div className="profiles-grid">
-            {profiles.map((profile) => {
-              return (
-                <div
-                  key={profile.id}
-                  className={`profile-card ${profile.isActive ? "active-profile" : ""
-                    }`}
-                  style={
-                    styles.profileCardActive(profile.isActive) ||
-                    styles.profileCard
-                  }
+            {/* LEFT: info */}
+            <div
+              className="profile-info"
+              style={{ flex: 1, minWidth: 0 }}
+            >
+              <div
+                className="profile-title"
+                style={{
+                  marginBottom: 10,
+                }}
+              >
+                {/* Name on its own line */}
+                <h4
+                  style={{
+                    margin: 0,
+                    color: colors.text,
+                    fontSize: 18,
+                    fontWeight: 600,
+                  }}
                 >
-                  <div className="profile-content">
-                    <div className="profile-info">
-                      <div className="profile-title">
-                        <h4
-                          style={{
-                            margin: 0,
-                            color: colors.text,
-                            fontSize: 18,
-                            fontWeight: 600,
-                          }}
-                        >
-                          {profile.name}
-                        </h4>
+                  {profile.name}
+                </h4>
 
-                        <div className="profile-badges">
-                          {profile.isActive && (
-                            <span className="badge badge-active">● ACTIVE</span>
-                          )}
-                          <span className="badge badge-type">
-                            {profile.profileType}
-                          </span>
-                        </div>
-                      </div>
-
-                      {profile.description && (
-                        <p
-                          className="profile-description"
-                          style={styles.profileDescription}
-                        >
-                          {profile.description}
-                        </p>
-                      )}
-
-                      {/* Settings Summary */}
-                      <div className="settings-summary">
-                        <div className="setting-item">
-                          <strong>VPN:</strong>
-                          {profile.vpnEnabled ? (
-                            <span style={styles.statusEnabled}>
-                              ✓ Enabled ({profile.vpnProtocol})
-                            </span>
-                          ) : (
-                            <span style={styles.statusDisabled}>✗ Disabled</span>
-                          )}
-                        </div>
-
-                        <div className="setting-item">
-                          <strong>Firewall:</strong>
-                          {profile.firewallEnabled ? (
-                            <span style={styles.statusEnabled}>
-                              ✓ Enabled ({profile.defaultFirewallAction})
-                            </span>
-                          ) : (
-                            <span style={styles.statusDisabled}>✗ Disabled</span>
-                          )}
-                        </div>
-
-                        <div className="setting-item">
-                          <strong>Scheduling:</strong>
-                          {profile.isScheduled ? (
-                            <span style={styles.statusEnabled}>
-                              ✓ {profile.scheduleType}
-                            </span>
-                          ) : (
-                            <span style={styles.statusDisabled}>✗ None</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Additional Info */}
-                      <div className="profile-meta" style={styles.profileMeta}>
-                        <p>Created: {formatDate(profile.createdAt)}</p>
-
-                        {profile.lastActivatedAt && (
-                          <p>
-                            Last Activated:{" "}
-                            {formatDate(profile.lastActivatedAt)} (
-                            {profile.activationCount} times)
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="profile-actions">
-                        {!profile.isActive ? (
-                          <button
-                            onClick={() => handleActivate(profile.id)}
-                            className="btn btn-activate"
-                          >
-                            Activate
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleDeactivate(profile.id)}
-                            className="btn btn-deactivate"
-                          >
-                            Deactivate
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => handleEdit(profile)}
-                          className="btn btn-edit"
-                        >
-                          Edit
-                        </button>
-
-                        <button
-                          onClick={() => handleDelete(profile.id)}
-                          className="btn btn-delete"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                {/* Badges on a separate, smaller row */}
+                <div
+                  className="profile-badges"
+                  style={{
+                    display: 'flex',
+                    gap: 6,
+                    flexWrap: 'wrap',
+                    marginTop: 4,
+                  }}
+                >
+                  {profile.isActive && (
+                    <span
+                      className="badge badge-active"
+                      style={{
+                        padding: '3px 8px',
+                        borderRadius: 999,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        backgroundColor: colors.accent,
+                        color: theme === 'dark' ? '#121212' : '#ffffff',
+                      }}
+                    >
+                      ● ACTIVE
+                    </span>
+                  )}
+                  <span
+                    className="badge badge-type"
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: 999,
+                      fontSize: 11,
+                      backgroundColor: colors.accentSoft,
+                      color: colors.accent,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {profile.profileType}
+                  </span>
                 </div>
-              );
-            })}
+              </div>
+
+
+              {profile.description && (
+                <p
+                  style={{
+                    color: colors.textMuted,
+                    marginBottom: 12,
+                  }}
+                >
+                  {profile.description}
+                </p>
+              )}
+
+              {/* Settings Summary */}
+              <div className="settings-summary">
+                <div className="setting-item">
+                  <strong>VPN:</strong>{' '}
+                  {profile.vpnEnabled ? (
+                    <span
+                      style={{ color: colors.accent, fontWeight: 500 }}
+                    >
+                      ✓ Enabled ({profile.vpnProtocol})
+                    </span>
+                  ) : (
+                    <span
+                      style={{ color: colors.danger, fontWeight: 500 }}
+                    >
+                      ✗ Disabled
+                    </span>
+                  )}
+                </div>
+
+                <div className="setting-item">
+                  <strong>Firewall:</strong>{' '}
+                  {profile.firewallEnabled ? (
+                    <span
+                      style={{ color: colors.accent, fontWeight: 500 }}
+                    >
+                      ✓ Enabled ({profile.defaultFirewallAction})
+                    </span>
+                  ) : (
+                    <span
+                      style={{ color: colors.danger, fontWeight: 500 }}
+                    >
+                      ✗ Disabled
+                    </span>
+                  )}
+                </div>
+
+                <div className="setting-item">
+                  <strong>Scheduling:</strong>{' '}
+                  {profile.isScheduled ? (
+                    <span
+                      style={{ color: colors.accent, fontWeight: 500 }}
+                    >
+                      ✓ {profile.scheduleType}
+                    </span>
+                  ) : (
+                    <span
+                      style={{ color: colors.danger, fontWeight: 500 }}
+                    >
+                      ✗ None
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Meta */}
+              <div
+                className="profile-meta"
+                style={{
+                  fontSize: 12,
+                  color: colors.textMuted,
+                  marginTop: 12,
+                }}
+              >
+                <p>Created: {formatDate(profile.createdAt)}</p>
+                {profile.lastActivatedAt && (
+                  <p>
+                    Last Activated:{' '}
+                    {formatDate(profile.lastActivatedAt)} (
+                    {profile.activationCount} times)
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* RIGHT: actions (top-right) */}
+            <div
+              className="profile-actions"
+              style={{
+                display: 'flex',
+                flexDirection: 'row',
+                gap: 8,
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                minWidth: 260,
+              }}
+            >
+              {/* Activate / Deactivate – transparent, outlined */}
+              {!profile.isActive ? (
+                <button
+                  onClick={() => handleActivate(profile.id)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 999,
+                    border: `1px solid ${colors.accent}`,
+                    backgroundColor: 'transparent',
+                    color: colors.accent,
+                    fontWeight: 600,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Activate
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleDeactivate(profile.id)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 999,
+                    border: '1px solid #f97316',
+                    backgroundColor: 'transparent',
+                    color: '#f97316',
+                    fontWeight: 600,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Deactivate
+                </button>
+              )}
+
+              {/* Edit – subtle neutral outline */}
+              <button
+                onClick={() => handleEdit(profile)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 999,
+                  border: `1px solid ${colors.border}`,
+                  backgroundColor: 'transparent',
+                  color: colors.text,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                Edit
+              </button>
+
+              {/* Delete – transparent red outline */}
+              <button
+                onClick={() => handleDelete(profile.id)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 999,
+                  border: '1px solid #dc2626',
+                  backgroundColor: 'transparent',
+                  color: '#fca5a5',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                Delete
+              </button>
+            </div>
+
           </div>
-        )}
-      </div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+
     </div>
   );
 };
+
 export default ProfileManager;
