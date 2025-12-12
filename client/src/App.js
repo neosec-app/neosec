@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
-import { authAPI, dashboardAPI, adminAPI, firewallAPI, vpnAPI, getErrorMessage } from './services/api';
+import { authAPI, dashboardAPI, adminAPI, vpnAPI, getErrorMessage } from './services/api';
 import './index.css';
 
 import ScanDashboard from './components/ScanDashboard';
@@ -131,8 +131,6 @@ function App() {
     const [userStatusFilter, setUserStatusFilter] = useState('all');
     const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
     const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
-    const [firewallRules, setFirewallRules] = useState([]);
-
     // Close dropdowns when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -148,34 +146,9 @@ function App() {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isMobile, sidebarOpen]);
-    const [firewallLoading, setFirewallLoading] = useState(false);
-    // eslint-disable-next-line no-unused-vars
-    const [firewallError, setFirewallError] = useState('');
-    const [editingRuleId, setEditingRuleId] = useState(null);
-    const [confirmDeleteRuleId, setConfirmDeleteRuleId] = useState(null);
     const [navHover, setNavHover] = useState(null);
     const [logoutHover, setLogoutHover] = useState(false);
-    const [actionButtonHover, setActionButtonHover] = useState(null); // Track hovered action button: 'reset-{id}', 'edit-{id}', 'delete-{id}', etc.
-    // eslint-disable-next-line no-unused-vars
-    const [showFirewallModal, setShowFirewallModal] = useState(false);
-    // eslint-disable-next-line no-unused-vars
-    const [firewallModalAnimating, setFirewallModalAnimating] = useState(false);
-    const initialFirewallForm = {
-        action: 'allow',
-        direction: 'inbound',
-        protocol: 'tcp',
-        sourceIPType: 'any', // 'any', 'specific', 'range'
-        sourceIP: '',
-        destinationIPType: 'any',
-        destinationIP: '',
-        sourcePortType: 'any', // 'any', 'specific', 'range'
-        sourcePort: '',
-        destinationPortType: 'any',
-        destinationPort: '',
-        description: '',
-        enabled: true
-    };
-    const [firewallForm, setFirewallForm] = useState(initialFirewallForm);
+    const [actionButtonHover, setActionButtonHover] = useState(null); // Track hovered action button for user management
 
     const [adminError, setAdminError] = useState(null);
 
@@ -264,30 +237,6 @@ function App() {
         loadAdminData();
     }, [loadAdminData]);
 
-    // Fetch firewall rules when viewing firewall
-    useEffect(() => {
-        const fetchFirewallRules = async () => {
-            if (user && currentView === 'firewall') {
-                try {
-                    setFirewallLoading(true);
-                    setFirewallError('');
-                    const response = await firewallAPI.getRules();
-                    if (response.success) {
-                        setFirewallRules(response.data || []);
-                    } else {
-                        setFirewallError(response.message || 'Failed to load firewall rules');
-                    }
-                } catch (error) {
-                    console.error('Firewall fetch error:', error);
-                    setFirewallError(getErrorMessage(error, 'Failed to load firewall rules'));
-                } finally {
-                    setFirewallLoading(false);
-                }
-            }
-        };
-
-        fetchFirewallRules();
-    }, [user, currentView]);
 
     const handleEditUser = (userToEdit) => {
         setEditingUser({ ...userToEdit });
@@ -370,230 +319,7 @@ function App() {
         }
     };
 
-    // Firewall handlers
-    const clearFirewallForm = () => {
-        setFirewallForm(initialFirewallForm);
-        setEditingRuleId(null);
-    };
 
-    const resetFirewallForm = () => {
-        closeFirewallModal();
-    };
-
-    const closeFirewallModal = () => {
-        // Animate out before closing
-        setFirewallModalAnimating(false);
-        setTimeout(() => {
-            clearFirewallForm();
-            setShowFirewallModal(false);
-        }, 200);
-    };
-
-    const openFirewallModal = () => {
-        clearFirewallForm();
-        setShowFirewallModal(true);
-        setFirewallModalAnimating(false);
-        // Trigger animation after mount
-        setTimeout(() => setFirewallModalAnimating(true), 10);
-    };
-
-    const openFirewallModalForEdit = () => {
-        setShowFirewallModal(true);
-        setFirewallModalAnimating(false);
-        setTimeout(() => setFirewallModalAnimating(true), 10);
-    };
-
-    // eslint-disable-next-line no-unused-vars
-    const handleFirewallChange = (e) => {
-        const { name, value, type, checked } = e.target;
-        setFirewallForm((prev) => ({
-            ...prev,
-            [name]: type === 'checkbox' ? checked : value
-        }));
-    };
-
-    // eslint-disable-next-line no-unused-vars
-    const handleSaveRule = async (e) => {
-        e.preventDefault();
-        setFirewallError('');
-        setFirewallLoading(true);
-        try {
-            const payload = {
-                action: firewallForm.action,
-                direction: firewallForm.direction,
-                protocol: firewallForm.protocol,
-                sourceIP: firewallForm.sourceIPType === 'any' ? null : (firewallForm.sourceIP || null),
-                destinationIP: firewallForm.destinationIPType === 'any' ? null : (firewallForm.destinationIP || null),
-                sourcePort: firewallForm.sourcePortType === 'any' ? null : (firewallForm.sourcePort || null),
-                destinationPort: firewallForm.destinationPortType === 'any' ? null : (firewallForm.destinationPort || null),
-                description: firewallForm.description || null,
-                enabled: firewallForm.enabled
-            };
-
-            let response;
-            if (editingRuleId) {
-                response = await firewallAPI.updateRule(editingRuleId, payload);
-                if (response.success) {
-                    setFirewallRules((prev) =>
-                        prev.map((rule) => (rule.id === editingRuleId ? response.data : rule))
-                    );
-                    showToast('Firewall rule updated', 'success');
-                }
-            } else {
-                response = await firewallAPI.createRule(payload);
-                if (response.success) {
-                    setFirewallRules((prev) => [response.data, ...prev]);
-                    showToast('Firewall rule added', 'success');
-                }
-            }
-
-            if (!response?.success) {
-                setFirewallError(response?.message || 'Failed to save firewall rule');
-                showToast(response?.message || 'Failed to save firewall rule', 'error');
-                return;
-            }
-
-            resetFirewallForm();
-        } catch (error) {
-            console.error('Save firewall rule error:', error);
-            const msg = error.response?.data?.message || 'Failed to save firewall rule';
-            setFirewallError(msg);
-            showToast(msg, 'error');
-        } finally {
-            setFirewallLoading(false);
-        }
-    };
-
-    const handleEditRule = (rule) => {
-        setEditingRuleId(rule.id);
-        setFirewallForm({
-            action: rule.action,
-            direction: rule.direction,
-            protocol: (rule.protocol === 'tcp' || rule.protocol === 'udp') ? rule.protocol : 'tcp',
-            sourceIPType: rule.sourceIP ? (rule.sourceIP.includes('/') ? 'range' : 'specific') : 'any',
-            sourceIP: rule.sourceIP || '',
-            destinationIPType: rule.destinationIP ? (rule.destinationIP.includes('/') ? 'range' : 'specific') : 'any',
-            destinationIP: rule.destinationIP || '',
-            sourcePortType: rule.sourcePort ? (rule.sourcePort.includes('-') ? 'range' : 'specific') : 'any',
-            sourcePort: rule.sourcePort || '',
-            destinationPortType: rule.destinationPort ? (rule.destinationPort.includes('-') ? 'range' : 'specific') : 'any',
-            destinationPort: rule.destinationPort || '',
-            description: rule.description || '',
-            enabled: rule.enabled !== undefined ? rule.enabled : true
-        });
-        openFirewallModalForEdit();
-    };
-
-    const handleDeleteRule = (id) => {
-        setConfirmDeleteRuleId(id);
-    };
-
-    const confirmDeleteRule = async () => {
-        if (!confirmDeleteRuleId) return;
-        setFirewallError('');
-        try {
-            const response = await firewallAPI.deleteRule(confirmDeleteRuleId);
-            if (response.success) {
-                setFirewallRules((prev) => prev.filter((rule) => rule.id !== confirmDeleteRuleId));
-                showToast('Firewall rule deleted', 'success');
-            } else {
-                setFirewallError(response.message || 'Failed to delete firewall rule');
-                showToast(response.message || 'Failed to delete firewall rule', 'error');
-            }
-        } catch (error) {
-            console.error('Delete firewall rule error:', error);
-            const msg = error.response?.data?.message || 'Failed to delete firewall rule';
-            setFirewallError(msg);
-            showToast(msg, 'error');
-        } finally {
-            setConfirmDeleteRuleId(null);
-        }
-    };
-
-    // Move rule up (decrease order)
-    const handleMoveRuleUp = async (ruleId, currentIndex) => {
-        if (currentIndex === 0) return;
-        try {
-            setFirewallLoading(true);
-            const currentRule = firewallRules[currentIndex];
-            const previousRule = firewallRules[currentIndex - 1];
-
-            // Get current orders or use index as fallback
-            const currentOrder = currentRule.order !== undefined ? currentRule.order : currentIndex;
-            const previousOrder = previousRule.order !== undefined ? previousRule.order : currentIndex - 1;
-
-            // Swap orders - current rule gets previous order, previous rule gets current order
-            await Promise.all([
-                firewallAPI.updateRule(currentRule.id, { order: previousOrder }),
-                firewallAPI.updateRule(previousRule.id, { order: currentOrder })
-            ]);
-
-            // Refresh rules list
-            const response = await firewallAPI.getRules();
-            if (response.success) {
-                setFirewallRules(response.data || []);
-                showToast('Rule moved up', 'success');
-            }
-        } catch (error) {
-            console.error('Move rule up error:', error);
-            const msg = error.response?.data?.message || 'Failed to move rule';
-            showToast(msg, 'error');
-        } finally {
-            setFirewallLoading(false);
-        }
-    };
-
-    // Move rule down (increase order)
-    const handleMoveRuleDown = async (ruleId, currentIndex) => {
-        if (currentIndex === firewallRules.length - 1) return;
-        try {
-            setFirewallLoading(true);
-            const currentRule = firewallRules[currentIndex];
-            const nextRule = firewallRules[currentIndex + 1];
-
-            // Get current orders or use index as fallback
-            const currentOrder = currentRule.order !== undefined ? currentRule.order : currentIndex;
-            const nextOrder = nextRule.order !== undefined ? nextRule.order : currentIndex + 1;
-
-            // Swap orders - current rule gets next order, next rule gets current order
-            await Promise.all([
-                firewallAPI.updateRule(currentRule.id, { order: nextOrder }),
-                firewallAPI.updateRule(nextRule.id, { order: currentOrder })
-            ]);
-
-            // Refresh rules list
-            const response = await firewallAPI.getRules();
-            if (response.success) {
-                setFirewallRules(response.data || []);
-                showToast('Rule moved down', 'success');
-            }
-        } catch (error) {
-            console.error('Move rule down error:', error);
-            const msg = error.response?.data?.message || 'Failed to move rule';
-            showToast(msg, 'error');
-        } finally {
-            setFirewallLoading(false);
-        }
-    };
-
-    // Reset/Refresh rule (reload from server)
-    const handleResetRule = async (ruleId) => {
-        try {
-            const response = await firewallAPI.getRules();
-            if (response.success) {
-                const updatedRule = response.data.find(r => r.id === ruleId);
-                if (updatedRule) {
-                    setFirewallRules((prev) =>
-                        prev.map((rule) => rule.id === ruleId ? updatedRule : rule)
-                    );
-                    showToast('Rule refreshed', 'success');
-                }
-            }
-        } catch (error) {
-            console.error('Reset rule error:', error);
-            showToast('Failed to refresh rule', 'error');
-        }
-    };
 
     const handleLoginSuccess = (userData) => {
         setUser(userData);
@@ -2277,63 +2003,6 @@ function App() {
                     </div>
                 </div>
 
-                {/* Confirm delete dialog for firewall */}
-                {confirmDeleteRuleId && (
-                    <div style={{
-                        position: 'fixed',
-                        inset: 0,
-                        backgroundColor: 'rgba(0,0,0,0.6)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 1000
-                    }}>
-                        <div style={{
-                            backgroundColor: palette.bgCard,
-                            color: palette.text,
-                            padding: '24px',
-                            borderRadius: '10px',
-                            border: `1px solid ${palette.border}`,
-                            width: '90%',
-                            maxWidth: '420px',
-                            boxShadow: '0 10px 40px rgba(0,0,0,0.35)'
-                        }}>
-                            <h3 style={{ marginTop: 0, marginBottom: '12px' }}>Delete Firewall Rule</h3>
-                            <p style={{ marginTop: 0, marginBottom: '20px', color: palette.textMuted }}>
-                                Are you sure you want to delete this rule? This action cannot be undone.
-                            </p>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                                <button
-                                    onClick={() => setConfirmDeleteRuleId(null)}
-                                    style={{
-                                        padding: '10px 16px',
-                                        backgroundColor: palette.bgPanel,
-                                        color: palette.text,
-                                        border: `1px solid ${palette.border}`,
-                                        borderRadius: '8px',
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={confirmDeleteRule}
-                                    style={{
-                                        padding: '10px 16px',
-                                        backgroundColor: palette.danger,
-                                        color: '#fff',
-                                        border: 'none',
-                                        borderRadius: '8px',
-                                        cursor: 'pointer',
-                                        fontWeight: 600
-                                    }}
-                                >
-                                    Delete
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
 
                 {/* Toasts */}
                 <div style={{
