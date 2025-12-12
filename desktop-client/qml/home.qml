@@ -88,6 +88,9 @@ Page {
                 width: parent.width
                 onClicked: {
                     page.currentSelection = "dashboardBtn"
+                    if (contentStack.currentItem !== dashboardView) {
+                        contentStack.push(dashboardView, StackView.Immediate)
+                    }
                 }
                 contentItem: Row {
                     spacing: 10
@@ -121,6 +124,9 @@ Page {
                 width: parent.width
                 onClicked: {
                     page.currentSelection = "vpnBtn"
+                    if (contentStack.currentItem !== vpnView) {
+                        contentStack.push(vpnView, StackView.Immediate)
+                    }
                 }
                 contentItem: Row {
                     spacing: 10
@@ -154,6 +160,9 @@ Page {
                 width: parent.width
                 onClicked: {
                     page.currentSelection = "firewallBtn"
+                    if (contentStack.currentItem !== firewallView) {
+                        contentStack.push(firewallView, StackView.Immediate)
+                    }
                 }
                 contentItem: Row {
                     spacing: 10
@@ -207,5 +216,32 @@ Page {
             }
         }
 
+    }
+
+    StackView {
+        id: contentStack
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: leftBar.right
+        anchors.right: parent.right
+        clip: true
+        initialItem: dashboardView
+
+        Component {
+                id: dashboardView
+                // Loads the QML file named DashboardView.qml
+                Loader { source: "dashboard.qml" }
+            }
+
+            Component {
+                id: vpnView
+                // Loads the QML file named VpnView.qml
+                Loader { source: "vpn.qml" }
+            }
+
+            Component {
+                id: firewallView
+                Loader { source: "firewall.qml" }
+            }
     }
 }
