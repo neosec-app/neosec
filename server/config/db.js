@@ -73,6 +73,12 @@ const connectDB = async () => {
             'threats',
             'firewall_rules',
             'data_transfers',
+            'groups',
+            'invitations',
+            'group_members',
+            'subscriptions',
+            'profiles',
+            'profile_logs',
         ];
 
         const missingTables = await getMissingTables(tablesToCheck);
@@ -82,8 +88,24 @@ const connectDB = async () => {
             console.log(
                 `Missing tables detected (${missingTables.join(', ')}). Creating database tables...`
             );
-            await sequelize.sync({ force: false });
+            // Sync will create missing tables and update schema
+            await sequelize.sync({ force: false, alter: false });
             console.log('Database tables created successfully.');
+            
+            // Verify all tables now exist
+            const stillMissing = await getMissingTables(tablesToCheck);
+            if (stillMissing.length > 0) {
+                console.warn(`Warning: Some tables still missing after sync: ${stillMissing.join(', ')}`);
+                // Try sync with alter mode as fallback
+                console.log('Attempting to create remaining tables with alter mode...');
+                await sequelize.sync({ force: false, alter: true });
+                const finalCheck = await getMissingTables(tablesToCheck);
+                if (finalCheck.length > 0) {
+                    console.error(`Error: Could not create tables: ${finalCheck.join(', ')}`);
+                } else {
+                    console.log('All tables created successfully.');
+                }
+            }
         } else {
             console.log('Database tables already exist.');
         }
