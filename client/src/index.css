@@ -1,304 +1,325 @@
+/* =========================================
+   🚀 TAILWIND INITIALIZATION
+   ========================================= */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================
+   🌈 GLOBAL RESET & BODY
+   ========================================= */
 * {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  min-height: 100vh;
-  color: #333;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
+    /* Only applies to LOGIN pages, not dashboard */
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    color: #333;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
-}
+/* =========================================
+   🔐 LOGIN / REGISTER UI
+   ========================================= */
 
 .app-container {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
 }
 
 /* Auth Container */
 .auth-container {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-  width: 100%;
-  max-width: 450px;
-  padding: 0;
-  overflow: hidden;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 450px;
+    overflow: hidden;
 }
 
 .auth-header {
-  text-align: center;
-  padding: 30px 30px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+    text-align: center;
+    padding: 30px 30px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
 }
 
 .auth-header h1 {
-  font-size: 2.5rem;
-  margin-bottom: 10px;
-  font-weight: 700;
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+    font-weight: 700;
 }
 
 .auth-header p {
-  font-size: 1rem;
-  opacity: 0.9;
+    font-size: 1rem;
+    opacity: 0.9;
 }
 
 .auth-tabs {
-  display: flex;
-  border-bottom: 2px solid #f0f0f0;
+    display: flex;
+    border-bottom: 2px solid #f0f0f0;
 }
 
 .tab-button {
-  flex: 1;
-  padding: 15px;
-  background: none;
-  border: none;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  color: #666;
-  transition: all 0.3s ease;
-  border-bottom: 3px solid transparent;
+    flex: 1;
+    padding: 15px;
+    background: none;
+    border: none;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: #666;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
 }
 
 .tab-button:hover {
-  background: #f8f8f8;
-  color: #333;
+    background: #f8f8f8;
+    color: #333;
 }
 
 .tab-button.active {
-  color: #667eea;
-  border-bottom-color: #667eea;
+    color: #667eea;
+    border-bottom-color: #667eea;
 }
 
 .auth-content {
-  padding: 30px;
+    padding: 30px;
 }
 
 /* Auth Form */
 .auth-form-container {
-  width: 100%;
+    width: 100%;
 }
 
 .auth-form-container h2 {
-  margin-bottom: 25px;
-  color: #333;
-  font-size: 1.8rem;
+    margin-bottom: 25px;
+    color: #333;
+    font-size: 1.8rem;
 }
 
 .auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
 }
 
 .form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .form-group label {
-  font-weight: 600;
-  color: #555;
-  font-size: 0.95rem;
+    font-weight: 600;
+    color: #555;
+    font-size: 0.95rem;
 }
 
 .form-group input {
-  padding: 12px 15px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 1rem;
-  transition: all 0.3s ease;
-  outline: none;
+    padding: 12px 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    outline: none;
 }
 
 .form-group input:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 /* Buttons */
 .btn {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  outline: none;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
 }
 
+/* LOGIN PAGE Primary Button */
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
 }
 
 .btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .btn-secondary {
-  background: #6c757d;
-  color: white;
+    background: #6c757d;
+    color: white;
 }
 
 .btn-secondary:hover {
-  background: #5a6268;
+    background: #5a6268;
 }
 
 /* Messages */
 .error-message {
-  padding: 12px 15px;
-  background: #fee;
-  border: 1px solid #fcc;
-  border-radius: 8px;
-  color: #c33;
-  font-size: 0.95rem;
-  margin-bottom: 10px;
+    padding: 12px 15px;
+    background: #fee;
+    border: 1px solid #fcc;
+    border-radius: 8px;
+    color: #c33;
+    font-size: 0.95rem;
+    margin-bottom: 10px;
 }
 
 .success-message {
-  padding: 12px 15px;
-  background: #efe;
-  border: 1px solid #cfc;
-  border-radius: 8px;
-  color: #3c3;
-  font-size: 0.95rem;
-  margin-bottom: 10px;
+    padding: 12px 15px;
+    background: #efe;
+    border: 1px solid #cfc;
+    border-radius: 8px;
+    color: #3c3;
+    font-size: 0.95rem;
+    margin-bottom: 10px;
 }
 
 .info-message {
-  padding: 15px;
-  background: #e7f3ff;
-  border: 1px solid #b3d9ff;
-  border-radius: 8px;
-  color: #0066cc;
-  margin-top: 20px;
+    padding: 15px;
+    background: #e7f3ff;
+    border: 1px solid #b3d9ff;
+    border-radius: 8px;
+    color: #0066cc;
+    margin-top: 20px;
 }
 
-/* Auth Switch */
+/* Switch Link */
 .auth-switch {
-  text-align: center;
-  margin-top: 20px;
-  color: #666;
-  font-size: 0.95rem;
+    text-align: center;
+    margin-top: 20px;
+    color: #666;
+    font-size: 0.95rem;
 }
 
 .link-button {
-  background: none;
-  border: none;
-  color: #667eea;
-  cursor: pointer;
-  font-weight: 600;
-  text-decoration: underline;
-  font-size: inherit;
-  padding: 0;
+    background: none;
+    border: none;
+    color: #667eea;
+    cursor: pointer;
+    font-weight: 600;
+    text-decoration: underline;
+    padding: 0;
 }
 
 .link-button:hover {
-  color: #764ba2;
+    color: #764ba2;
 }
 
-/* Dashboard */
+/* =========================================
+   📊 DASHBOARD — OLD STYLES (kept for fallback)
+   ========================================= */
 .dashboard {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-  width: 100%;
-  max-width: 600px;
-  overflow: hidden;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 600px;
 }
 
 .dashboard-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 30px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.dashboard-header h1 {
-  font-size: 2rem;
-  font-weight: 700;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 30px;
 }
 
 .dashboard-content {
-  padding: 30px;
+    padding: 30px;
 }
 
 .user-info {
-  background: #f8f9fa;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 20px;
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
 }
 
-.user-info h2 {
-  margin-bottom: 15px;
-  color: #333;
-  font-size: 1.5rem;
-}
-
-.user-info p {
-  margin-bottom: 10px;
-  font-size: 1rem;
-  color: #555;
-}
-
-.user-info strong {
-  color: #333;
-  margin-right: 10px;
-}
-
-/* Loading */
+/* =========================================
+   ⏳ LOADING
+   ========================================= */
 .loading {
-  text-align: center;
-  color: white;
-  font-size: 1.2rem;
-  font-weight: 600;
-}
-
-/* Responsive */
-@media (max-width: 480px) {
-  .auth-container {
-    max-width: 100%;
-  }
-
-  .auth-header h1 {
-    font-size: 2rem;
-  }
-
-  .dashboard-header {
-    flex-direction: column;
-    gap: 15px;
     text-align: center;
-  }
-
-  .dashboard-header h1 {
-    font-size: 1.5rem;
-  }
+    color: white;
+    font-size: 1.2rem;
+    font-weight: 600;
 }
 
+/* =========================================
+   📱 RESPONSIVE LOGIN PAGE
+   ========================================= */
+@media (max-width: 480px) {
+    .auth-container {
+        max-width: 100%;
+    }
+
+    .auth-header h1 {
+        font-size: 2rem;
+    }
+}
+
+/* =========================================
+   ✨ CUSTOM UTILITIES FOR TAILWIND UI
+   ========================================= */
+
+/* Generic dark card */
+.card {
+    @apply bg-[#181818] border border-[#282828] rounded-xl p-6;
+}
+
+/* Small label text */
+.card-title {
+    @apply text-sm text-[#B3B3B3] mb-1;
+}
+
+/* Highlight statistics text */
+.card-value {
+    @apply text-2xl font-semibold text-primary;
+}
+
+/* Subtle text */
+.small-text {
+    @apply text-xs text-[#B3B3B3];
+}
+
+/* Tailwind-powered buttons */
+.btn-primary {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg
+    bg-primary text-[#121212] text-sm font-semibold
+    hover:bg-[#2fd06f] transition;
+}
+
+.btn-secondary {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg
+    bg-[#282828] text-white border border-[#444]
+    hover:bg-[#333] transition;
+}
+
+.btn-danger {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg
+    bg-[#D32F2F] text-white text-sm font-semibold
+    hover:bg-red-700 transition;
+}
