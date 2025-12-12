@@ -403,7 +403,7 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
         alert(errorMessage);
       }
     }
-  };
+  }
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this profile?')) {
@@ -1027,15 +1027,18 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
         >
           Your Profiles ({profiles.length})
         </h3>
+
         {error ? (
-          <div style={{
-            padding: 16,
-            backgroundColor: colors.danger + '20',
-            border: `1px solid ${colors.danger}`,
-            borderRadius: 8,
-            color: colors.danger,
-            marginBottom: 16
-          }}>
+          <div
+            style={{
+              padding: 16,
+              backgroundColor: colors.danger + "20",
+              border: `1px solid ${colors.danger}`,
+              borderRadius: 8,
+              color: colors.danger,
+              marginBottom: 16,
+            }}
+          >
             <strong>Error loading profiles:</strong> {error}
           </div>
         ) : profiles.length === 0 ? (
@@ -1046,138 +1049,134 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
           </div>
         ) : (
           <div className="profiles-grid">
-            {profiles.map((profile) => (
-              <div
-                key={profile.id}
-                className={`profile-card ${profile.isActive ? 'active-profile' : ''
-                  }`}
-                style={
-                  styles.profileCardActive(profile.isActive) ||
-                  styles.profileCard
-                }
-              >
-                <div className="profile-content">
-                  <div className="profile-info">
-                    <div className="profile-title">
-                      <h4
-                        style={{
-                          margin: 0,
-                          color: colors.text,
-                          fontSize: 18,
-                          fontWeight: 600,
-                        }}
-                      >
-                        {profile.name}
-                      </h4>
-                      <div className="profile-badges">
-                        {profile.isActive && (
-                          <span className="badge badge-active">
-                            ● ACTIVE
-                          </span>
-                        )}
-                        <span className="badge badge-type">
-                          {profile.profileType}
-                        </span>
-                      </div>
-                    </div>
+            {profiles.map((profile) => {
+              return (
+                <div
+                  key={profile.id}
+                  className={`profile-card ${profile.isActive ? "active-profile" : ""
+                    }`}
+                  style={
+                    styles.profileCardActive(profile.isActive) || styles.profileCard
+                  }
+                >
+                  <div className="profile-content">
+                    <div className="profile-info">
+                      <div className="profile-title">
+                        <h4
+                          style={{
+                            margin: 0,
+                            color: colors.text,
+                            fontSize: 18,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {profile.name}
+                        </h4>
 
-                    {profile.description && (
-                      <p
-                        className="profile-description"
-                        style={styles.profileDescription}
-                      >
-                        {profile.description}
-                      </p>
-                    )}
-
-                    {/* Settings Summary */}
-                    <div className="settings-summary">
-                      <div className="setting-item">
-                        <strong>VPN:</strong>
-                        {profile.vpnEnabled ? (
-                          <span style={styles.statusEnabled}>
-                            ✓ Enabled ({profile.vpnProtocol})
+                        <div className="profile-badges">
+                          {profile.isActive && (
+                            <span className="badge badge-active">● ACTIVE</span>
+                          )}
+                          <span className="badge badge-type">
+                            {profile.profileType}
                           </span>
-                        ) : (
-                          <span style={styles.statusDisabled}>
-                            ✗ Disabled
-                          </span>
-                        )}
+                        </div>
                       </div>
 
-                      <div className="setting-item">
-                        <strong>Firewall:</strong>
-                        {profile.firewallEnabled ? (
-                          <span style={styles.statusEnabled}>
-                            ✓ Enabled ({profile.defaultFirewallAction})
-                          </span>
-                        ) : (
-                          <span style={styles.statusDisabled}>
-                            ✗ Disabled
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="setting-item">
-                        <strong>Scheduling:</strong>
-                        {profile.isScheduled ? (
-                          <span style={styles.statusEnabled}>
-                            ✓ {profile.scheduleType}
-                          </span>
-                        ) : (
-                          <span style={styles.statusDisabled}>
-                            ✗ None
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Additional Info */}
-                    <div className="profile-meta" style={styles.profileMeta}>
-                      <p>Created: {formatDate(profile.createdAt)}</p>
-                      {profile.lastActivatedAt && (
-                        <p>
-                          Last Activated:{' '}
-                          {formatDate(profile.lastActivatedAt)} (
-                          {profile.activationCount} times)
+                      {profile.description && (
+                        <p
+                          className="profile-description"
+                          style={styles.profileDescription}
+                        >
+                          {profile.description}
                         </p>
                       )}
+
+                      {/* Settings Summary */}
+                      <div className="settings-summary">
+                        <div className="setting-item">
+                          <strong>VPN:</strong>
+                          {profile.vpnEnabled ? (
+                            <span style={styles.statusEnabled}>
+                              ✓ Enabled ({profile.vpnProtocol})
+                            </span>
+                          ) : (
+                            <span style={styles.statusDisabled}>✗ Disabled</span>
+                          )}
+                        </div>
+
+                        <div className="setting-item">
+                          <strong>Firewall:</strong>
+                          {profile.firewallEnabled ? (
+                            <span style={styles.statusEnabled}>
+                              ✓ Enabled ({profile.defaultFirewallAction})
+                            </span>
+                          ) : (
+                            <span style={styles.statusDisabled}>✗ Disabled</span>
+                          )}
+                        </div>
+
+                        <div className="setting-item">
+                          <strong>Scheduling:</strong>
+                          {profile.isScheduled ? (
+                            <span style={styles.statusEnabled}>
+                              ✓ {profile.scheduleType}
+                            </span>
+                          ) : (
+                            <span style={styles.statusDisabled}>✗ None</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Additional Info */}
+                      <div className="profile-meta" style={styles.profileMeta}>
+                        <p>Created: {formatDate(profile.createdAt)}</p>
+
+                        {profile.lastActivatedAt && (
+                          <p>
+                            Last Activated: {formatDate(profile.lastActivatedAt)} (
+                            {profile.activationCount} times)
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="profile-actions">
+                        {!profile.isActive ? (
+                          <button
+                            onClick={() => handleActivate(profile.id)}
+                            className="btn btn-activate"
+                          >
+                            Activate
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleDeactivate(profile.id)}
+                            className="btn btn-deactivate"
+                          >
+                            Deactivate
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => handleEdit(profile)}
+                          className="btn btn-edit"
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          onClick={() => handleDelete(profile.id)}
+                          className="btn btn-delete"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
-
-                  {/* Action Buttons */}
-                  <div className="profile-actions">
-                    {!profile.isActive ? (
-                      <button
-                        onClick={() => handleActivate(profile.id)}
-                        className="btn btn-activate"
-                      >
-                        Activate
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleDeactivate(profile.id)}
-                        className="btn btn-deactivate"
-                      >
-                        Deactivate
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleEdit(profile)}
-                      className="btn btn-edit"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(profile.id)}
-                      className="btn btn-delete"
-                    >
-                      Delete
-                    </button>
-                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

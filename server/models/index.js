@@ -1,44 +1,44 @@
+// server/models/index.js
+
 const User = require('./User');
 const Profile = require('./Profile');
 const ProfileLog = require('./ProfileLog');
 const ScanHistory = require('./scanhistory');
 
-User.hasMany(Profile, {
-  foreignKey: 'userId',
-  as: 'profiles',
-  onDelete: 'CASCADE'
-});
+const Subscription = require('./Subscription');
+const Notification = require('./Notification');
 
-Profile.belongsTo(User, {
-  foreignKey: 'userId',
-  as: 'user'
-});
+const Group = require('./Group');
+const GroupMember = require('./GroupMember');
+const Invitation = require('./Invitation');
 
-User.hasMany(ProfileLog, {
-  foreignKey: 'userId',
-  as: 'profileLogs',
-  onDelete: 'CASCADE'
-});
+const VpnConfig = require('./VpnConfig'); // only if you actually have this file
 
-ProfileLog.belongsTo(User, {
-  foreignKey: 'userId',
-  as: 'user'
-});
+// load associations AFTER models exist
+require('./associations');
 
-Profile.hasMany(ProfileLog, {
-  foreignKey: 'profileId',
-  as: 'logs',
-  onDelete: 'CASCADE'
-});
+// your profile associations (these were in your old index.js)
+User.hasMany(Profile, { foreignKey: 'userId', as: 'profiles', onDelete: 'CASCADE' });
+Profile.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
-ProfileLog.belongsTo(Profile, {
-  foreignKey: 'profileId',
-  as: 'profile'
-});
+User.hasMany(ProfileLog, { foreignKey: 'userId', as: 'profileLogs', onDelete: 'CASCADE' });
+ProfileLog.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+Profile.hasMany(ProfileLog, { foreignKey: 'profileId', as: 'logs', onDelete: 'CASCADE' });
+ProfileLog.belongsTo(Profile, { foreignKey: 'profileId', as: 'profile' });
 
 module.exports = {
-  User,
-  Profile,
-  ProfileLog,
-  ScanHistory
+    User,
+    Profile,
+    ProfileLog,
+    ScanHistory,
+
+    Subscription,
+    Notification,
+
+    Group,
+    GroupMember,
+    Invitation,
+
+    VpnConfig,
 };
