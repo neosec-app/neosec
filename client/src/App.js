@@ -886,7 +886,6 @@ function App() {
                                 </button>
                             )}
                         </nav>
-
                         <button
                             onMouseEnter={() => setNavHover('scan')}
                             onMouseLeave={() => setNavHover(null)}
@@ -1648,9 +1647,8 @@ function App() {
 
                         {/* Scanner */}
                         {currentView === 'scan' && (
-                            <ScanDashboard theme={theme} palette={palette} />
+                        <ScanDashboard theme={theme} palette={palette} />
                         )}
-
 
 
                         {/* User Management View (Admin Only) */}

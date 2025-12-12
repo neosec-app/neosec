@@ -524,19 +524,15 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
                     <p>
                       <span className="log-label">Profile:</span>{' '}
                       <span
-                        className={`log-profile ${!log.profile?.name ? 'deleted' : ''}`}
-                        style={{
-                          color: log.profile?.name ? colors.accent : colors.danger,
-                          fontWeight: 600,
-                          textDecoration: log.profile?.name ? 'underline' : 'none',
-                        }}
+                        className={`log-profile ${
+                          !log.profile?.name ? 'deleted' : ''
+                        }`}
                       >
                         {log.profile?.name ||
                           log.description?.match(/"([^"]+)"/)?.[1] ||
                           'Deleted'}
                       </span>
                     </p>
-
                     <p>
                       <span className="log-label">User:</span>{' '}
                       <span className="log-email">{log.userEmail}</span>
