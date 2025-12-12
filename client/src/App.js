@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
-import { authAPI, dashboardAPI, adminAPI, firewallAPI, vpnAPI } from './services/api';
+import { authAPI, dashboardAPI, adminAPI, firewallAPI, vpnAPI, getErrorMessage } from './services/api';
 import './index.css';
 import ProfileManager from './components/ProfileManager';
 import ScanDashboard from './components/ScanDashboard';
@@ -107,6 +107,7 @@ function App() {
     const [currentView, setCurrentView] = useState(initialView); // dashboard, vpn, firewall, profiles
     const [dashboardData, setDashboardData] = useState(null);
     const [dashboardLoading, setDashboardLoading] = useState(true);
+    const [dashboardError, setDashboardError] = useState(null);
     const [users, setUsers] = useState([]);
     const [usersLoading, setUsersLoading] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
@@ -163,18 +164,24 @@ function App() {
     };
     const [firewallForm, setFirewallForm] = useState(initialFirewallForm);
 
+    const [adminError, setAdminError] = useState(null);
+
     // Helper to fetch admin data (users + stats)
     const loadAdminData = useCallback(
         async (withLoading = true) => {
             if (!(user && user.role === 'admin' && currentView === 'users')) return;
             try {
                 if (withLoading) setUsersLoading(true);
+                setAdminError(null);
                 const usersResponse = await adminAPI.getAllUsers();
                 if (usersResponse.success) {
                     setUsers(usersResponse.data || []);
+                } else {
+                    setAdminError(usersResponse.message || 'Failed to load users');
                 }
             } catch (error) {
                 console.error('Admin data fetch error:', error);
+                setAdminError(getErrorMessage(error, 'Failed to load users'));
             } finally {
                 if (withLoading) setUsersLoading(false);
             }
@@ -218,12 +225,16 @@ function App() {
             if (user && currentView === 'dashboard') {
                 try {
                     setDashboardLoading(true);
+                    setDashboardError(null);
                     const response = await dashboardAPI.getDashboard();
                     if (response.success) {
                         setDashboardData(response.data);
+                    } else {
+                        setDashboardError(response.message || 'Failed to load dashboard data');
                     }
                 } catch (error) {
                     console.error('Dashboard fetch error:', error);
+                    setDashboardError(getErrorMessage(error, 'Failed to load dashboard data'));
                 } finally {
                     setDashboardLoading(false);
                 }
@@ -253,7 +264,7 @@ function App() {
                     }
                 } catch (error) {
                     console.error('Firewall fetch error:', error);
-                    setFirewallError(error.response?.data?.message || 'Failed to load firewall rules');
+                    setFirewallError(getErrorMessage(error, 'Failed to load firewall rules'));
                 } finally {
                     setFirewallLoading(false);
                 }
@@ -975,6 +986,22 @@ function App() {
                                     </div>
                                 )}
 
+                                {/* Dashboard Error Message */}
+                                {dashboardError && !dashboardLoading && (
+                                    <div style={{
+                                        ...cardBase,
+                                        padding: '16px',
+                                        marginBottom: '24px',
+                                        backgroundColor: palette.danger + '20',
+                                        border: `1px solid ${palette.danger}`,
+                                    }}>
+                                        <strong style={{ color: palette.danger }}>Error loading dashboard:</strong>
+                                        <p style={{ margin: '8px 0 0 0', color: palette.danger }}>
+                                            {dashboardError}
+                                        </p>
+                                    </div>
+                                )}
+
                                 {/* Dashboard Grid - 3 columns on desktop, 1 on mobile */}
                                 <div style={{
                                     display: 'grid',
@@ -1647,7 +1674,7 @@ function App() {
 
                         {/* Scanner */}
                         {currentView === 'scan' && (
-                        <ScanDashboard theme={theme} palette={palette} />
+                            <ScanDashboard theme={theme} palette={palette} />
                         )}
 
 
@@ -1896,6 +1923,18 @@ function App() {
 
                                     {usersLoading ? (
                                         <div style={{ color: palette.textMuted, textAlign: 'center', padding: '40px' }}>Loading users...</div>
+                                    ) : adminError ? (
+                                        <div style={{
+                                            padding: '20px',
+                                            backgroundColor: palette.danger + '20',
+                                            border: `1px solid ${palette.danger}`,
+                                            borderRadius: '10px',
+                                            color: palette.danger,
+                                            textAlign: 'center',
+                                            margin: '20px 0'
+                                        }}>
+                                            <strong>Error loading users:</strong> {adminError}
+                                        </div>
                                     ) : (() => {
                                         // Filter users based on search query, role, and status
                                         const filteredUsers = users.filter(u => {
