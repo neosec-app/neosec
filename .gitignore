@@ -41,3 +41,11 @@ logs/
 
 # Custom folders
 ig/
+
+#QT Project files
+*.qmlproject
+*.qtds
+*.qrc
+
+#client auth credentials
+**auth.json
