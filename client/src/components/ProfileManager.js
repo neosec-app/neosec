@@ -153,7 +153,7 @@ const makeStyles = (c) => ({
   },
 });
 
-const ProfileManager = ({ theme = 'dark', palette }) => {
+const ProfileManager = ({ theme = 'light', palette = null }) => {
   const colors = palette || (theme === 'light' ? lightPalette : darkPalette);
   const styles = makeStyles(colors);
 
@@ -777,610 +777,28 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
   }
 
   return (
-    <div className="profile-manager" style={styles.container}>
-      {/* Header */}
-      <div className="pm-header">
-        <h2 style={styles.headerTitle}>Security Profile Management</h2>
-        <div className="header-actions">
-          <button
-            onClick={() => setShowLogs(!showLogs)}
-            className="btn btn-logs"
-          >
-            {showLogs ? 'Hide Logs' : 'View Activity Logs'}
-          </button>
-          <button
-            onClick={() => setShowForm(true)}
-            className="btn btn-create"
-          >
-            Create New Profile
-          </button>
-        </div>
+  <div className="profile-manager" style={styles.container}>
+    {/* Header */}
+    <div className="pm-header">
+      <h2 style={styles.headerTitle}>Security Profile Management</h2>
+      <div className="header-actions">
+        <button onClick={() => setShowLogs(!showLogs)} className="btn btn-logs">
+          {showLogs ? "Hide Logs" : "View Activity Logs"}
+        </button>
+        <button onClick={() => setShowForm(true)} className="btn btn-create">
+          Create New Profile
+        </button>
       </div>
+    </div>
 
-      {/* Activity Logs Section */}
-      {showLogs && (
-        <div className="logs-section" style={styles.logsSection}>
-          <h3 style={{ marginTop: 0, marginBottom: 16, color: colors.text }}>
-            Activity Logs
-          </h3>
-          {logsError ? (
-            <div style={{
-              padding: 16,
-              backgroundColor: colors.danger + '20',
-              border: `1px solid ${colors.danger}`,
-              borderRadius: 8,
-              color: colors.danger
-            }}>
-              <strong>Error loading logs:</strong> {logsError}
-            </div>
-          ) : logs.length === 0 ? (
-            <p className="no-logs" style={styles.logsEmpty}>
-              No activity logs yet.
-            </p>
-          ) : (
-            <div className="logs-container">
-              {logs.map((log) => (
-                <div
-                  key={log.id}
-                  className="log-card"
-                  style={styles.logCard}
-                >
-                  <div className="log-card-header">
-                    <span className="log-date" style={styles.logDate}>
-                      {formatDate(log.createdAt)}
-                    </span>
-                    <span
-                      className={`action-badge ${getActionBadgeClass(
-                        log.action
-                      )}`}
-                    >
-                      {log.action}
-                    </span>
-                  </div>
-                  <div className="log-card-body">
-                    <p>
-                      <span className="log-label">Profile:</span>{' '}
-                      <span
-                        className={`log-profile ${!log.profile?.name ? 'deleted' : ''
-                          }`}
-                      >
-                        {log.profile?.name ||
-                          log.description?.match(/"([^"]+)"/)?.[1] ||
-                          'Deleted'}
-                      </span>
-                    </p>
-                    <p>
-                      <span className="log-label">User:</span>{' '}
-                      <span className="log-email">{log.userEmail}</span>
-                    </p>
-                    {log.description && (
-                      <p
-                        className="log-description"
-                        style={styles.logDescription}
-                      >
-                        {log.description}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Profile Form */}
-      {showForm && (
-        <div
-          className="profile-form-container"
-          style={styles.profileFormContainer}
-        >
-          <h3
-            style={{
-              marginTop: 0,
-              marginBottom: 16,
-              color: colors.text,
-              fontSize: 24,
-              fontWeight: 'bold',
-            }}
-          >
-            {editingProfile ? 'Edit Profile' : 'Create New Profile'}
-          </h3>
-          <form onSubmit={handleSubmit} className="profile-form">
-            {/* Basic Information */}
-            <div className="form-section" style={styles.formSection}>
-              <h4
-                style={{
-                  marginTop: 0,
-                  marginBottom: 16,
-                  color: colors.accent,
-                  fontSize: 18,
-                  fontWeight: 600,
-                }}
-              >
-                Basic Information
-              </h4>
-
-              <div className="form-group">
-                <label>Profile Name *</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  required
-                  className="form-input"
-                  style={styles.formInput}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Description</label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  rows="3"
-                  className="form-textarea"
-                  style={styles.textArea}
-                />
-              </div>
-            </div>
-
-            {/* VPN Settings */}
-            <div className="form-section" style={styles.formSection}>
-              <h4
-                style={{
-                  marginTop: 0,
-                  marginBottom: 16,
-                  color: colors.accent,
-                  fontSize: 18,
-                  fontWeight: 600,
-                }}
-              >
-                VPN Settings
-              </h4>
-
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  name="vpnEnabled"
-                  checked={formData.vpnEnabled}
-                  onChange={handleInputChange}
-                />
-                <span>Enable VPN</span>
-              </label>
-
-              {formData.vpnEnabled && (
-                <div className="nested-fields">
-                  <div className="form-group">
-                    <label>VPN Server Address</label>
-                    <input
-                      type="text"
-                      name="vpnServer"
-                      placeholder="vpn.example.com"
-                      value={formData.vpnServer}
-                      onChange={handleInputChange}
-                      className="form-input"
-                      style={styles.formInput}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Protocol</label>
-                    <select
-                      name="vpnProtocol"
-                      value={formData.vpnProtocol}
-                      onChange={handleInputChange}
-                      className="form-select"
-                      style={styles.select}
-                    >
-                      <option value="OpenVPN">OpenVPN</option>
-                      <option value="WireGuard">WireGuard</option>
-                      <option value="IKEv2">IKEv2</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Port</label>
-                    <input
-                      type="number"
-                      name="vpnPort"
-                      placeholder="1194"
-                      value={formData.vpnPort}
-                      onChange={handleInputChange}
-                      className="form-input"
-                      style={styles.formInput}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Username</label>
-                    <input
-                      type="text"
-                      name="vpnUsername"
-                      placeholder="username"
-                      value={formData.vpnUsername}
-                      onChange={handleInputChange}
-                      className="form-input"
-                      style={styles.formInput}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Firewall Settings */}
-            <div className="form-section" style={styles.formSection}>
-              <h4
-                style={{
-                  marginTop: 0,
-                  marginBottom: 16,
-                  color: colors.accent,
-                  fontSize: 18,
-                  fontWeight: 600,
-                }}
-              >
-                Firewall Settings
-              </h4>
-
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  name="firewallEnabled"
-                  checked={formData.firewallEnabled}
-                  onChange={handleInputChange}
-                />
-                <span>Enable Firewall</span>
-              </label>
-
-              {formData.firewallEnabled && (
-                <div className="nested-fields">
-                  <div className="form-group">
-                    <label>Default Action</label>
-                    <select
-                      name="defaultFirewallAction"
-                      value={formData.defaultFirewallAction}
-                      onChange={handleInputChange}
-                      className="form-select"
-                      style={styles.select}
-                    >
-                      <option value="ALLOW">
-                        Allow All (Blacklist Mode)
-                      </option>
-                      <option value="DENY">
-                        Deny All (Whitelist Mode)
-                      </option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Custom Rules (comma-separated)</label>
-                    <input
-                      type="text"
-                      name="firewallRules"
-                      placeholder="rule1, rule2, rule3"
-                      value={formData.firewallRules}
-                      onChange={handleInputChange}
-                      className="form-input"
-                      style={styles.formInput}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Access Control */}
-            <div className="form-section" style={styles.formSection}>
-              <h4
-                style={{
-                  marginTop: 0,
-                  marginBottom: 16,
-                  color: colors.accent,
-                  fontSize: 18,
-                  fontWeight: 600,
-                }}
-              >
-                Access Control
-              </h4>
-
-              <div className="form-group">
-                <label>Allowed IPs (comma-separated)</label>
-                <input
-                  type="text"
-                  name="allowedIps"
-                  placeholder="192.168.1.1, 10.0.0.1"
-                  value={formData.allowedIps}
-                  onChange={handleInputChange}
-                  className="form-input"
-                  style={styles.formInput}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Blocked IPs (comma-separated)</label>
-                <input
-                  type="text"
-                  name="blockedIps"
-                  placeholder="192.168.1.100, 10.0.0.50"
-                  value={formData.blockedIps}
-                  onChange={handleInputChange}
-                  className="form-input"
-                  style={styles.formInput}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Allowed Ports (comma-separated)</label>
-                <input
-                  type="text"
-                  name="allowedPorts"
-                  placeholder="80, 443, 8080"
-                  value={formData.allowedPorts}
-                  onChange={handleInputChange}
-                  className="form-input"
-                  style={styles.formInput}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Blocked Ports (comma-separated)</label>
-                <input
-                  type="text"
-                  name="blockedPorts"
-                  placeholder="21, 23, 25"
-                  value={formData.blockedPorts}
-                  onChange={handleInputChange}
-                  className="form-input"
-                  style={styles.formInput}
-                />
-              </div>
-            </div>
-
-            {/* Scheduling */}
-            <div className="form-section" style={styles.formSection}>
-              <h4
-                style={{
-                  marginTop: 0,
-                  marginBottom: 16,
-                  color: colors.accent,
-                  fontSize: 18,
-                  fontWeight: 600,
-                }}
-              >
-                Scheduling
-              </h4>
-
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  name="isScheduled"
-                  checked={formData.isScheduled}
-                  onChange={handleInputChange}
-                />
-                <span>Enable Scheduling</span>
-              </label>
-
-              {formData.isScheduled && (
-                <div className="nested-fields">
-                  <div className="form-group">
-                    <label>Schedule Type</label>
-                    <select
-                      name="scheduleType"
-                      value={formData.scheduleType}
-                      onChange={handleInputChange}
-                      className="form-select"
-                      style={styles.select}
-                    >
-                      <option value="NONE">None</option>
-                      <option value="TIME">Time-Based</option>
-                      <option value="CONDITION">Condition-Based</option>
-                      <option value="BOTH">Both</option>
-                    </select>
-                  </div>
-
-                  {(formData.scheduleType === 'TIME' ||
-                    formData.scheduleType === 'BOTH') && (
-                      <>
-                        <div className="form-group">
-                          <label>Start Time</label>
-                          <input
-                            type="time"
-                            name="scheduleStartTime"
-                            value={formData.scheduleStartTime}
-                            onChange={handleInputChange}
-                            className="form-input"
-                            style={styles.formInput}
-                          />
-                        </div>
-
-                        <div className="form-group">
-                          <label>End Time</label>
-                          <input
-                            type="time"
-                            name="scheduleEndTime"
-                            value={formData.scheduleEndTime}
-                            onChange={handleInputChange}
-                            className="form-input"
-                            style={styles.formInput}
-                          />
-                        </div>
-
-                        <div className="form-group">
-                          <label>Active Days</label>
-                          <div className="days-selector">
-                            {[
-                              'Monday',
-                              'Tuesday',
-                              'Wednesday',
-                              'Thursday',
-                              'Friday',
-                              'Saturday',
-                              'Sunday',
-                            ].map((day) => (
-                              <label key={day} className="day-checkbox">
-                                <input
-                                  type="checkbox"
-                                  checked={formData.scheduleDays.includes(day)}
-                                  onChange={() => handleDayToggle(day)}
-                                />
-                                <span>{day}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      </>
-                    )}
-
-                  {(formData.scheduleType === 'CONDITION' ||
-                    formData.scheduleType === 'BOTH') && (
-                      <div className="form-group">
-                        <label>Activation Condition</label>
-                        <input
-                          type="text"
-                          name="scheduleCondition"
-                          placeholder="e.g., WiFi network name, IP range"
-                          value={formData.scheduleCondition}
-                          onChange={handleInputChange}
-                          className="form-input"
-                          style={styles.formInput}
-                        />
-                        <small
-                          className="field-hint"
-                          style={styles.fieldHint}
-                        >
-                          Example: "Public WiFi", "192.168.1.x",
-                          "Outside office hours"
-                        </small>
-                      </div>
-
-                      <div className="form-group">
-                        <label>Active Days</label>
-                        <div className="days-selector">
-                          {[
-                            'Monday',
-                            'Tuesday',
-                            'Wednesday',
-                            'Thursday',
-                            'Friday',
-                            'Saturday',
-                            'Sunday',
-                          ].map((day) => (
-                            <label key={day} className="day-checkbox">
-                              <input
-                                type="checkbox"
-                                checked={formData.scheduleDays.includes(day)}
-                                onChange={() => handleDayToggle(day)}
-                              />
-                              <span>{day}</span>
-                            </label>
-
-                            {formData.firewallEnabled && (
-                                <div className="nested-fields">
-                                    <div className="form-group">
-                                        <label>Default Action</label>
-                                        <select
-                                            name="defaultFirewallAction"
-                                            value={formData.defaultFirewallAction}
-                                            onChange={handleInputChange}
-                                            className="form-select"
-                                            style={styles.select}
-                                        >
-                                            <option value="ALLOW">
-                                                Allow All (Blacklist Mode)
-                                            </option>
-                                            <option value="DENY">
-                                                Deny All (Whitelist Mode)
-                                            </option>
-                                        </select>
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label>Custom Rules (comma-separated)</label>
-                                        <input
-                                            type="text"
-                                            name="firewallRules"
-                                            placeholder="rule1, rule2, rule3"
-                                            value={formData.firewallRules}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                            style={styles.formInput}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {(formData.scheduleType === 'CONDITION' ||
-                    formData.scheduleType === 'BOTH') && (
-                    <div className="form-group">
-                      <label>Activation Condition</label>
-                      <input
-                        type="text"
-                        name="scheduleCondition"
-                        placeholder="e.g., WiFi network name, IP range"
-                        value={formData.scheduleCondition}
-                        onChange={handleInputChange}
-                        className="form-input"
-                        style={styles.formInput}
-                      />
-                      <small
-                        className="field-hint"
-                        style={styles.fieldHint}
-                      >
-                        Example: "Public WiFi", "192.168.1.x",
-                        "Outside office hours"
-                      </small>
-                    </div>
-                  )}
-
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      name="autoActivate"
-                      checked={formData.autoActivate}
-                      onChange={handleInputChange}
-                    />
-                    <span>Auto-activate when conditions are met</span>
-                  </label>
-                </div>
-              )}
-            </div>
-
-            {/* Form Actions */}
-            <div className="form-actions">
-              <button type="submit" className="btn btn-submit">
-                {editingProfile ? 'Update Profile' : 'Create Profile'}
-              </button>
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="btn btn-cancel"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Profiles List */}
-      <div className="profiles-section">
-        <h3
-          style={{
-            marginBottom: 16,
-            color: colors.text,
-            fontSize: 20,
-            fontWeight: 600,
-          }}
-        >
-          Your Profiles ({profiles.length})
+    {/* Activity Logs Section */}
+    {showLogs && (
+      <div className="logs-section" style={styles.logsSection}>
+        <h3 style={{ marginTop: 0, marginBottom: 16, color: colors.text }}>
+          Activity Logs
         </h3>
 
-        {error ? (
+        {logsError ? (
           <div
             style={{
               padding: 16,
@@ -1388,152 +806,637 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
               border: `1px solid ${colors.danger}`,
               borderRadius: 8,
               color: colors.danger,
-              marginBottom: 16,
             }}
           >
-            <strong>Error loading profiles:</strong> {error}
+            <strong>Error loading logs:</strong> {logsError}
           </div>
-        ) : profiles.length === 0 ? (
-          <div className="empty-state">
-            <p style={{ color: colors.textMuted }}>
-              No profiles yet. Create your first security profile!
-            </p>
-          </div>
+        ) : logs.length === 0 ? (
+          <p className="no-logs" style={styles.logsEmpty}>
+            No activity logs yet.
+          </p>
         ) : (
-          <div className="profiles-grid">
-            {profiles.map((profile) => {
-              return (
-                <div
-                  key={profile.id}
-                  className={`profile-card ${profile.isActive ? "active-profile" : ""
-                    }`}
-                  style={
-                    styles.profileCardActive(profile.isActive) || styles.profileCard
-                  }
-                >
-                  <div className="profile-content">
-                    <div className="profile-info">
-                      <div className="profile-title">
-                        <h4
-                          style={{
-                            margin: 0,
-                            color: colors.text,
-                            fontSize: 18,
-                            fontWeight: 600,
-                          }}
-                        >
-                          {profile.name}
-                        </h4>
+          <div className="logs-container">
+            {logs.map((log) => (
+              <div key={log.id} className="log-card" style={styles.logCard}>
+                <div className="log-card-header">
+                  <span className="log-date" style={styles.logDate}>
+                    {formatDate(log.createdAt)}
+                  </span>
 
-                        <div className="profile-badges">
-                          {profile.isActive && (
-                            <span className="badge badge-active">● ACTIVE</span>
-                          )}
-                          <span className="badge badge-type">
-                            {profile.profileType}
-                          </span>
-                        </div>
-                      </div>
-
-                      {profile.description && (
-                        <p
-                          className="profile-description"
-                          style={styles.profileDescription}
-                        >
-                          {profile.description}
-                        </p>
-                      )}
-
-                      {/* Settings Summary */}
-                      <div className="settings-summary">
-                        <div className="setting-item">
-                          <strong>VPN:</strong>
-                          {profile.vpnEnabled ? (
-                            <span style={styles.statusEnabled}>
-                              ✓ Enabled ({profile.vpnProtocol})
-                            </span>
-                          ) : (
-                            <span style={styles.statusDisabled}>✗ Disabled</span>
-                          )}
-                        </div>
-
-                        <div className="setting-item">
-                          <strong>Firewall:</strong>
-                          {profile.firewallEnabled ? (
-                            <span style={styles.statusEnabled}>
-                              ✓ Enabled ({profile.defaultFirewallAction})
-                            </span>
-                          ) : (
-                            <span style={styles.statusDisabled}>✗ Disabled</span>
-                          )}
-                        </div>
-
-                        <div className="setting-item">
-                          <strong>Scheduling:</strong>
-                          {profile.isScheduled ? (
-                            <span style={styles.statusEnabled}>
-                              ✓ {profile.scheduleType}
-                            </span>
-                          ) : (
-                            <span style={styles.statusDisabled}>✗ None</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Additional Info */}
-                      <div className="profile-meta" style={styles.profileMeta}>
-                        <p>Created: {formatDate(profile.createdAt)}</p>
-
-                        {profile.lastActivatedAt && (
-                          <p>
-                            Last Activated: {formatDate(profile.lastActivatedAt)} (
-                            {profile.activationCount} times)
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="profile-actions">
-                        {!profile.isActive ? (
-                          <button
-                            onClick={() => handleActivate(profile.id)}
-                            className="btn btn-activate"
-                          >
-                            Activate
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleDeactivate(profile.id)}
-                            className="btn btn-deactivate"
-                          >
-                            Deactivate
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => handleEdit(profile)}
-                          className="btn btn-edit"
-                        >
-                          Edit
-                        </button>
-
-                        <button
-                          onClick={() => handleDelete(profile.id)}
-                          className="btn btn-delete"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <span className={`action-badge ${getActionBadgeClass(log.action)}`}>
+                    {log.action}
+                  </span>
                 </div>
-              );
-            })}
+
+                <div className="log-card-body">
+                  <p>
+                    <span className="log-label">Profile:</span>{" "}
+                    <span
+                      className={`log-profile ${
+                        !log.profile?.name ? "deleted" : ""
+                      }`}
+                    >
+                      {log.profile?.name ||
+                        log.description?.match(/"([^"]+)"/)?.[1] ||
+                        "Deleted"}
+                    </span>
+                  </p>
+
+                  <p>
+                    <span className="log-label">User:</span>{" "}
+                    <span className="log-email">{log.userEmail}</span>
+                  </p>
+
+                  {log.description && (
+                    <p className="log-description" style={styles.logDescription}>
+                      {log.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
+    )}
+
+    {/* Profile Form */}
+    {showForm && (
+      <div className="profile-form-container" style={styles.profileFormContainer}>
+        <h3
+          style={{
+            marginTop: 0,
+            marginBottom: 16,
+            color: colors.text,
+            fontSize: 24,
+            fontWeight: "bold",
+          }}
+        >
+          {editingProfile ? "Edit Profile" : "Create New Profile"}
+        </h3>
+
+        <form onSubmit={handleSubmit} className="profile-form">
+          {/* Basic Information */}
+          <div className="form-section" style={styles.formSection}>
+            <h4
+              style={{
+                marginTop: 0,
+                marginBottom: 16,
+                color: colors.accent,
+                fontSize: 18,
+                fontWeight: 600,
+              }}
+            >
+              Basic Information
+            </h4>
+
+            <div className="form-group">
+              <label>Profile Name *</label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                required
+                className="form-input"
+                style={styles.formInput}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Description</label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                rows="3"
+                className="form-textarea"
+                style={styles.textArea}
+              />
+            </div>
+          </div>
+
+          {/* VPN Settings */}
+          <div className="form-section" style={styles.formSection}>
+            <h4
+              style={{
+                marginTop: 0,
+                marginBottom: 16,
+                color: colors.accent,
+                fontSize: 18,
+                fontWeight: 600,
+              }}
+            >
+              VPN Settings
+            </h4>
+
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                name="vpnEnabled"
+                checked={formData.vpnEnabled}
+                onChange={handleInputChange}
+              />
+              <span>Enable VPN</span>
+            </label>
+
+            {formData.vpnEnabled && (
+              <div className="nested-fields">
+                <div className="form-group">
+                  <label>VPN Server Address</label>
+                  <input
+                    type="text"
+                    name="vpnServer"
+                    placeholder="vpn.example.com"
+                    value={formData.vpnServer}
+                    onChange={handleInputChange}
+                    className="form-input"
+                    style={styles.formInput}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Protocol</label>
+                  <select
+                    name="vpnProtocol"
+                    value={formData.vpnProtocol}
+                    onChange={handleInputChange}
+                    className="form-select"
+                    style={styles.select}
+                  >
+                    <option value="OpenVPN">OpenVPN</option>
+                    <option value="WireGuard">WireGuard</option>
+                    <option value="IKEv2">IKEv2</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Port</label>
+                  <input
+                    type="number"
+                    name="vpnPort"
+                    placeholder="1194"
+                    value={formData.vpnPort}
+                    onChange={handleInputChange}
+                    className="form-input"
+                    style={styles.formInput}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Username</label>
+                  <input
+                    type="text"
+                    name="vpnUsername"
+                    placeholder="username"
+                    value={formData.vpnUsername}
+                    onChange={handleInputChange}
+                    className="form-input"
+                    style={styles.formInput}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Firewall Settings */}
+          <div className="form-section" style={styles.formSection}>
+            <h4
+              style={{
+                marginTop: 0,
+                marginBottom: 16,
+                color: colors.accent,
+                fontSize: 18,
+                fontWeight: 600,
+              }}
+            >
+              Firewall Settings
+            </h4>
+
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                name="firewallEnabled"
+                checked={formData.firewallEnabled}
+                onChange={handleInputChange}
+              />
+              <span>Enable Firewall</span>
+            </label>
+
+            {formData.firewallEnabled && (
+              <div className="nested-fields">
+                <div className="form-group">
+                  <label>Default Action</label>
+                  <select
+                    name="defaultFirewallAction"
+                    value={formData.defaultFirewallAction}
+                    onChange={handleInputChange}
+                    className="form-select"
+                    style={styles.select}
+                  >
+                    <option value="ALLOW">Allow All (Blacklist Mode)</option>
+                    <option value="DENY">Deny All (Whitelist Mode)</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Custom Rules (comma-separated)</label>
+                  <input
+                    type="text"
+                    name="firewallRules"
+                    placeholder="rule1, rule2, rule3"
+                    value={formData.firewallRules}
+                    onChange={handleInputChange}
+                    className="form-input"
+                    style={styles.formInput}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Access Control */}
+          <div className="form-section" style={styles.formSection}>
+            <h4
+              style={{
+                marginTop: 0,
+                marginBottom: 16,
+                color: colors.accent,
+                fontSize: 18,
+                fontWeight: 600,
+              }}
+            >
+              Access Control
+            </h4>
+
+            <div className="form-group">
+              <label>Allowed IPs (comma-separated)</label>
+              <input
+                type="text"
+                name="allowedIps"
+                placeholder="192.168.1.1, 10.0.0.1"
+                value={formData.allowedIps}
+                onChange={handleInputChange}
+                className="form-input"
+                style={styles.formInput}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Blocked IPs (comma-separated)</label>
+              <input
+                type="text"
+                name="blockedIps"
+                placeholder="192.168.1.100, 10.0.0.50"
+                value={formData.blockedIps}
+                onChange={handleInputChange}
+                className="form-input"
+                style={styles.formInput}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Allowed Ports (comma-separated)</label>
+              <input
+                type="text"
+                name="allowedPorts"
+                placeholder="80, 443, 8080"
+                value={formData.allowedPorts}
+                onChange={handleInputChange}
+                className="form-input"
+                style={styles.formInput}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Blocked Ports (comma-separated)</label>
+              <input
+                type="text"
+                name="blockedPorts"
+                placeholder="21, 23, 25"
+                value={formData.blockedPorts}
+                onChange={handleInputChange}
+                className="form-input"
+                style={styles.formInput}
+              />
+            </div>
+          </div>
+
+          {/* Scheduling */}
+          <div className="form-section" style={styles.formSection}>
+            <h4
+              style={{
+                marginTop: 0,
+                marginBottom: 16,
+                color: colors.accent,
+                fontSize: 18,
+                fontWeight: 600,
+              }}
+            >
+              Scheduling
+            </h4>
+
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                name="isScheduled"
+                checked={formData.isScheduled}
+                onChange={handleInputChange}
+              />
+              <span>Enable Scheduling</span>
+            </label>
+
+            {formData.isScheduled && (
+              <div className="nested-fields">
+                <div className="form-group">
+                  <label>Schedule Type</label>
+                  <select
+                    name="scheduleType"
+                    value={formData.scheduleType}
+                    onChange={handleInputChange}
+                    className="form-select"
+                    style={styles.select}
+                  >
+                    <option value="NONE">None</option>
+                    <option value="TIME">Time-Based</option>
+                    <option value="CONDITION">Condition-Based</option>
+                    <option value="BOTH">Both</option>
+                  </select>
+                </div>
+
+                {(formData.scheduleType === "TIME" ||
+                  formData.scheduleType === "BOTH") && (
+                  <>
+                    <div className="form-group">
+                      <label>Start Time</label>
+                      <input
+                        type="time"
+                        name="scheduleStartTime"
+                        value={formData.scheduleStartTime}
+                        onChange={handleInputChange}
+                        className="form-input"
+                        style={styles.formInput}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>End Time</label>
+                      <input
+                        type="time"
+                        name="scheduleEndTime"
+                        value={formData.scheduleEndTime}
+                        onChange={handleInputChange}
+                        className="form-input"
+                        style={styles.formInput}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Active Days</label>
+                      <div className="days-selector">
+                        {[
+                          "Monday",
+                          "Tuesday",
+                          "Wednesday",
+                          "Thursday",
+                          "Friday",
+                          "Saturday",
+                          "Sunday",
+                        ].map((day) => (
+                          <label key={day} className="day-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={formData.scheduleDays.includes(day)}
+                              onChange={() => handleDayToggle(day)}
+                            />
+                            <span>{day}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {(formData.scheduleType === "CONDITION" ||
+                  formData.scheduleType === "BOTH") && (
+                  <div className="form-group">
+                    <label>Activation Condition</label>
+                    <input
+                      type="text"
+                      name="scheduleCondition"
+                      placeholder="e.g., WiFi network name, IP range"
+                      value={formData.scheduleCondition}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      style={styles.formInput}
+                    />
+                    <small className="field-hint" style={styles.fieldHint}>
+                      Example: "Public WiFi", "192.168.1.x",
+                      "Outside office hours"
+                    </small>
+                  </div>
+                )}
+
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    name="autoActivate"
+                    checked={formData.autoActivate}
+                    onChange={handleInputChange}
+                  />
+                  <span>Auto-activate when conditions are met</span>
+                </label>
+              </div>
+            )}
+          </div>
+
+          {/* Form Actions */}
+          <div className="form-actions">
+            <button type="submit" className="btn btn-submit">
+              {editingProfile ? "Update Profile" : "Create Profile"}
+            </button>
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="btn btn-cancel"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    )}
+
+    {/* Profiles List */}
+    <div className="profiles-section">
+      <h3
+        style={{
+          marginBottom: 16,
+          color: colors.text,
+          fontSize: 20,
+          fontWeight: 600,
+        }}
+      >
+        Your Profiles ({profiles.length})
+      </h3>
+
+      {error ? (
+        <div
+          style={{
+            padding: 16,
+            backgroundColor: colors.danger + "20",
+            border: `1px solid ${colors.danger}`,
+            borderRadius: 8,
+            color: colors.danger,
+            marginBottom: 16,
+          }}
+        >
+          <strong>Error loading profiles:</strong> {error}
+        </div>
+      ) : profiles.length === 0 ? (
+        <div className="empty-state">
+          <p style={{ color: colors.textMuted }}>
+            No profiles yet. Create your first security profile!
+          </p>
+        </div>
+      ) : (
+        <div className="profiles-grid">
+          {profiles.map((profile) => {
+            return (
+              <div
+                key={profile.id}
+                className={`profile-card ${
+                  profile.isActive ? "active-profile" : ""
+                }`}
+                style={
+                  styles.profileCardActive(profile.isActive) ||
+                  styles.profileCard
+                }
+              >
+                <div className="profile-content">
+                  <div className="profile-info">
+                    <div className="profile-title">
+                      <h4
+                        style={{
+                          margin: 0,
+                          color: colors.text,
+                          fontSize: 18,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {profile.name}
+                      </h4>
+
+                      <div className="profile-badges">
+                        {profile.isActive && (
+                          <span className="badge badge-active">● ACTIVE</span>
+                        )}
+                        <span className="badge badge-type">
+                          {profile.profileType}
+                        </span>
+                      </div>
+                    </div>
+
+                    {profile.description && (
+                      <p
+                        className="profile-description"
+                        style={styles.profileDescription}
+                      >
+                        {profile.description}
+                      </p>
+                    )}
+
+                    {/* Settings Summary */}
+                    <div className="settings-summary">
+                      <div className="setting-item">
+                        <strong>VPN:</strong>
+                        {profile.vpnEnabled ? (
+                          <span style={styles.statusEnabled}>
+                            ✓ Enabled ({profile.vpnProtocol})
+                          </span>
+                        ) : (
+                          <span style={styles.statusDisabled}>✗ Disabled</span>
+                        )}
+                      </div>
+
+                      <div className="setting-item">
+                        <strong>Firewall:</strong>
+                        {profile.firewallEnabled ? (
+                          <span style={styles.statusEnabled}>
+                            ✓ Enabled ({profile.defaultFirewallAction})
+                          </span>
+                        ) : (
+                          <span style={styles.statusDisabled}>✗ Disabled</span>
+                        )}
+                      </div>
+
+                      <div className="setting-item">
+                        <strong>Scheduling:</strong>
+                        {profile.isScheduled ? (
+                          <span style={styles.statusEnabled}>
+                            ✓ {profile.scheduleType}
+                          </span>
+                        ) : (
+                          <span style={styles.statusDisabled}>✗ None</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Additional Info */}
+                    <div className="profile-meta" style={styles.profileMeta}>
+                      <p>Created: {formatDate(profile.createdAt)}</p>
+
+                      {profile.lastActivatedAt && (
+                        <p>
+                          Last Activated:{" "}
+                          {formatDate(profile.lastActivatedAt)} (
+                          {profile.activationCount} times)
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="profile-actions">
+                      {!profile.isActive ? (
+                        <button
+                          onClick={() => handleActivate(profile.id)}
+                          className="btn btn-activate"
+                        >
+                          Activate
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleDeactivate(profile.id)}
+                          className="btn btn-deactivate"
+                        >
+                          Deactivate
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => handleEdit(profile)}
+                        className="btn btn-edit"
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        onClick={() => handleDelete(profile.id)}
+                        className="btn btn-delete"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
+  </div>
   );
 };
-
+};
 export default ProfileManager;
