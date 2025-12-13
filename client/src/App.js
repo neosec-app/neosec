@@ -1,13 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
-import { authAPI, dashboardAPI, adminAPI, vpnAPI, getErrorMessage } from './services/api';
+import { authAPI, dashboardAPI, adminAPI, getErrorMessage } from './services/api';
 import './index.css';
 
+// Custom Hooks
+import { useTheme } from './hooks/useTheme';
+import { useToastManager } from './hooks/useToastManager';
+import { useScreenSize } from './hooks/useScreenSize';
+
+// Layout Components
+import Sidebar from './components/Layout/Sidebar';
+import DashboardView from './components/Views/DashboardView';
+import AdminUsersView from './components/Views/AdminUsersView';
+import Toast from './components/Common/Toast';
+
+// Feature Components
 import ScanDashboard from './components/ScanDashboard';
 import ProfileManager from './components/ProfileManager';
 import FirewallRuleManagement from './components/FirewallRuleManagement';
-// Module 1 Additional Features
 import AdminAuditTrail from './components/AdminAuditTrail';
 import SystemHealthMetrics from './components/SystemHealthMetrics';
 import MFASettings from './components/MFASettings';
@@ -17,11 +28,8 @@ import FeatureToggles from './components/FeatureToggles';
 import RoleTemplates from './components/RoleTemplates';
 import UserImpersonation from './components/UserImpersonation';
 import AdminNotifications from './components/AdminNotifications';
-import { SiAlwaysdata } from 'react-icons/si';
-import { GoAlertFill } from 'react-icons/go';
-import { MdModeEdit } from 'react-icons/md';
-import { SlReload } from 'react-icons/sl';
-import { RiDeleteBin6Line } from 'react-icons/ri';
+import ThreatBlocker from './components/ThreatBlocker';
+import LogsAndReporting from './components/LogsAndReporting';
 
 // Hierarchy Components
 import Subscription from './components/Hierarchy/Subscription';
@@ -30,125 +38,42 @@ import Invitations from './components/Hierarchy/Invitations';
 import Memberships from './components/Hierarchy/Memberships';
 
 function App() {
-    // Theme
-    const initialTheme = (typeof window !== 'undefined' && localStorage.getItem('theme')) || 'dark';
-    const [theme, setTheme] = useState(initialTheme); // 'dark' | 'light'
-    const themeVars = {
-        // Keep dark close to original green tone
-        dark: {
-            bgMain: '#121212',
-            bgCard: '#181818',
-            bgPanel: '#0a0a0a',
-            text: '#ffffff',
-            textMuted: '#9aa3b5',
-            border: '#242424',
-            accent: '#36E27B',
-            accentSoft: 'rgba(54,226,123,0.12)',
-            warning: '#f0a500',
-            danger: '#e04848',
-            inputBg: '#1c1c1c',
-            inputBorder: '#2c2c2c'
-        },
-        // Light theme aligned to Figma green style
-        light: {
-            bgMain: '#f6f8fb',          // soft gray-blue background
-            bgCard: '#ffffff',          // white cards
-            bgPanel: '#eef3f8',         // slightly tinted panel
-            text: '#0b172a',            // deep navy text
-            textMuted: '#5b6b7a',       // muted gray-blue
-            border: '#d9e2ec',          // subtle border
-            accent: '#1fa45a',          // green primary
-            accentSoft: '#e6f4ed',      // light green tint
-            warning: '#d97706',
-            danger: '#d4183d',
-            inputBg: '#ffffff',
-            inputBorder: '#d9e2ec'
-        }
-    };
-    const palette = themeVars[theme];
+    // Custom Hooks
+    const { theme, setTheme, palette } = useTheme();
+    const { toasts, showToast } = useToastManager();
+    const { isMobile, isTablet } = useScreenSize();
 
-    useEffect(() => {
-        // Smooth theme transition
-        document.documentElement.style.setProperty('color-scheme', theme === 'dark' ? 'dark' : 'light');
-        document.body.style.transition = 'background-color 0.3s ease, color 0.3s ease';
-        document.body.style.backgroundColor = palette.bgMain;
-        document.body.style.color = palette.text;
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('theme', theme);
-        }
-    }, [theme, palette]);
-
-    // Toasts
-    const [toasts, setToasts] = useState([]);
-    const showToast = (message, type = 'info') => {
-        const id = `${Date.now()}-${Math.random()}`;
-        setToasts((prev) => [...prev, { id, message, type }]);
-        setTimeout(() => {
-            setToasts((prev) => prev.filter((t) => t.id !== id));
-        }, 3200);
-    };
-
-    const cardShadow = theme === 'light' ? '0 12px 30px rgba(17, 24, 39, 0.08)' : 'none';
-    const cardBorder = `1px solid ${palette.border}`;
-    const cardBase = {
-        backgroundColor: palette.bgCard,
-        borderRadius: 14,
-        border: cardBorder,
-        boxShadow: cardShadow,
-        transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease'
-    };
-
+    // UI State
     const initialView = (typeof window !== 'undefined' && localStorage.getItem('currentView')) || 'dashboard';
     const [activeTab, setActiveTab] = useState('login');
-    const [isMobile, setIsMobile] = useState(false);
-    const [isTablet, setIsTablet] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    // Track screen size for responsive behavior
-    useEffect(() => {
-        const checkScreenSize = () => {
-            const width = window.innerWidth;
-            setIsMobile(width < 768);
-            setIsTablet(width >= 768 && width < 1024);
-            if (width >= 768) {
-                setSidebarOpen(false); // Auto-close sidebar on larger screens
-            }
-        };
-
-        checkScreenSize();
-        window.addEventListener('resize', checkScreenSize);
-        return () => window.removeEventListener('resize', checkScreenSize);
-    }, []);
-
+    // User & Auth State
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [currentView, setCurrentView] = useState(initialView); // dashboard, vpn, firewall, profiles
+    const [currentView, setCurrentView] = useState(initialView);
+
+    // Dashboard State
     const [dashboardData, setDashboardData] = useState(null);
     const [dashboardLoading, setDashboardLoading] = useState(true);
     const [dashboardError, setDashboardError] = useState(null);
 
-    // Admin state
+    // Admin State
     const [users, setUsers] = useState([]);
-    // eslint-disable-next-line no-unused-vars
-    const [adminStats, setAdminStats] = useState(null);
     const [usersLoading, setUsersLoading] = useState(false);
+    const [adminError, setAdminError] = useState(null);
 
+    // User Management State
     const [editingUser, setEditingUser] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
     const [editModalAnimating, setEditModalAnimating] = useState(false);
     const [userSearchQuery, setUserSearchQuery] = useState('');
     const [userRoleFilter, setUserRoleFilter] = useState('all');
     const [userStatusFilter, setUserStatusFilter] = useState('all');
-    const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
-    const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
-    // Close dropdowns when clicking outside
+
+    // Close sidebar on mobile when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
-            if (!event.target.closest('.custom-dropdown')) {
-                setRoleDropdownOpen(false);
-                setStatusDropdownOpen(false);
-            }
-            // Close sidebar on mobile when clicking outside
             if (isMobile && sidebarOpen && !event.target.closest('.sidebar-container') && !event.target.closest('.mobile-menu-button')) {
                 setSidebarOpen(false);
             }
@@ -156,11 +81,13 @@ function App() {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isMobile, sidebarOpen]);
-    const [navHover, setNavHover] = useState(null);
-    const [logoutHover, setLogoutHover] = useState(false);
-    const [actionButtonHover, setActionButtonHover] = useState(null); // Track hovered action button for user management
 
-    const [adminError, setAdminError] = useState(null);
+    // Auto-close sidebar on larger screens
+    useEffect(() => {
+        if (!isMobile && sidebarOpen) {
+            setSidebarOpen(false);
+        }
+    }, [isMobile, sidebarOpen]);
 
     // Helper to fetch admin data (users + stats)
     const loadAdminData = useCallback(
@@ -185,7 +112,7 @@ function App() {
         [user, currentView]
     );
 
-    // ---------------- AUTH CHECK ----------------
+    // Auth Check
     useEffect(() => {
         const checkAuth = async () => {
             if (authAPI.isAuthenticated()) {
@@ -199,7 +126,6 @@ function App() {
             }
             setLoading(false);
         };
-
         checkAuth();
     }, []);
 
@@ -208,7 +134,6 @@ function App() {
         if (typeof window !== 'undefined') {
             localStorage.setItem('currentView', currentView);
         }
-        // If user is not admin, avoid admin-only views
         if (user && user.role !== 'admin' && currentView === 'users') {
             setCurrentView('dashboard');
         }
@@ -221,15 +146,12 @@ function App() {
                 try {
                     setDashboardLoading(true);
                     setDashboardError(null);
-
                     const response = await dashboardAPI.getDashboard();
-
                     if (response.success) {
                         setDashboardData(response.data);
                     } else {
                         setDashboardError(response.message || 'Failed to load dashboard data');
                     }
-
                 } catch (error) {
                     console.error('Dashboard fetch error:', error);
                     setDashboardError(getErrorMessage(error, 'Failed to load dashboard data'));
@@ -241,13 +163,12 @@ function App() {
         fetchDashboard();
     }, [user, currentView]);
 
-
-    // -------- ADMIN DATA FETCH (USERS + STATS) --
+    // Admin Data Fetch
     useEffect(() => {
         loadAdminData();
     }, [loadAdminData]);
 
-
+    // Admin User Management Handlers
     const handleEditUser = (userToEdit) => {
         setEditingUser({ ...userToEdit });
         setEditModalAnimating(true);
@@ -274,7 +195,6 @@ function App() {
             if (res.success) {
                 setUsers(users.map(u => u.id === editingUser.id ? res.data : u));
                 closeEditModal();
-                // Refresh stats (e.g., pending approvals) without full page refresh
                 await loadAdminData(false);
                 showToast('User updated', 'success');
             }
@@ -292,7 +212,6 @@ function App() {
             const response = await adminAPI.deleteUser(id);
             if (response.success) {
                 setUsers(users.filter(u => u.id !== id));
-                // Refresh stats after delete
                 await loadAdminData(false);
                 showToast('User deleted', 'success');
             }
@@ -304,7 +223,6 @@ function App() {
         }
     };
 
-    // Toggle user approval status
     const handleToggleUserStatus = async (u) => {
         if (u.id === user.id) {
             showToast('You cannot change your own status', 'error');
@@ -329,8 +247,6 @@ function App() {
         }
     };
 
-
-
     const handleLoginSuccess = (userData) => {
         setUser(userData);
     };
@@ -342,7 +258,7 @@ function App() {
         showToast('Logged out', 'info');
     };
 
-    // ---------------- LOADING -------------------
+    // Loading State
     if (loading) {
         return (
             <div style={{
@@ -359,10 +275,9 @@ function App() {
         );
     }
 
-    // --------------- AUTHENTICATED UI -----------
+    // Authenticated UI
     if (user) {
         return (
-
             <>
                 <div style={{
                     minHeight: '100vh',
@@ -370,543 +285,19 @@ function App() {
                     color: palette.text,
                     display: 'flex'
                 }}>
-                    {/* Mobile Menu Button */}
-                    {isMobile && !sidebarOpen && (
-                        <button
-                            className="mobile-menu-button"
-                            onClick={() => setSidebarOpen(!sidebarOpen)}
-                            style={{
-                                position: 'fixed',
-                                top: '12px',
-                                left: '12px',
-                                zIndex: 1001,
-                                padding: '10px',
-                                backgroundColor: palette.bgCard,
-                                border: `1px solid ${palette.border}`,
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                                width: '40px',
-                                height: '40px'
-                            }}
-                        >
-                            <span style={{ fontSize: '18px', color: palette.text }}>☰</span>
-                        </button>
-                    )}
-
-                    {/* Mobile Sidebar Backdrop */}
-                    {isMobile && sidebarOpen && (
-                        <div
-                            onClick={() => setSidebarOpen(false)}
-                            style={{
-                                position: 'fixed',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                                zIndex: 999,
-                                transition: 'opacity 0.3s ease'
-                            }}
-                        />
-                    )}
-
-                    {/* Sidebar */}
-                        <div
-                        className="sidebar-container"
-                        style={{
-                            width: isMobile ? (sidebarOpen ? '260px' : '0') : '260px',
-                            backgroundColor: palette.bgPanel,
-                            padding: isMobile && !sidebarOpen ? '0' : '20px',
-                            borderRight: `1px solid ${palette.border}`,
-                            transition: 'all 0.3s ease',
-                            height: '100vh',
-                            overflowY: 'auto',
-                            overflowX: 'hidden',
-                            position: isMobile ? 'fixed' : 'relative',
-                            zIndex: isMobile ? 1000 : 'auto',
-                            left: isMobile && !sidebarOpen ? '-260px' : '0',
-                            top: 0,
-                        }}
-                        >
-
-                        {isMobile && sidebarOpen && (
-                            <button
-                                onClick={() => setSidebarOpen(false)}
-                                style={{
-                                    position: 'absolute',
-                                    top: '16px',
-                                    right: '16px',
-                                    padding: '4px 8px',
-                                    backgroundColor: 'transparent',
-                                    border: 'none',
-                                    color: palette.text,
-                                    fontSize: '24px',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                ×
-                            </button>
-                        )}
-                        <div style={{
-                            marginBottom: '40px',
-                            paddingBottom: '20px',
-                            borderBottom: `1px solid ${palette.border}`,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '8px',
-                            paddingTop: isMobile && sidebarOpen ? '8px' : '0'
-                        }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div style={{
-                                    width: '14px',
-                                    height: '14px',
-                                    borderRadius: '4px',
-                                    background: theme === 'dark' ? '#7c8bff' : '#030213'
-                                }} />
-                                <h2 style={{
-                                    color: palette.accent,
-                                    margin: 0,
-                                    fontSize: isMobile ? '18px' : '20px',
-                                    letterSpacing: '0.2px'
-                                }}>NeoSec</h2>
-                            </div>
-                            <p style={{
-                                margin: 0,
-                                fontSize: '12px',
-                                color: palette.textMuted
-                            }}>{user.email}</p>
-                            <span style={{
-                                display: 'inline-block',
-                                marginTop: '10px',
-                                padding: '5px 12px',
-                                borderRadius: '15px',
-                                fontSize: '12px',
-                                backgroundColor: user.role === 'admin' ? palette.accentSoft : palette.bgPanel,
-                                color: user.role === 'admin' ? palette.accent : palette.text,
-                                border: user.role === 'admin' ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`
-                            }}>
-                                {user.role === 'admin' ? ' Admin' : ' User'}
-                            </span>
-                            <div style={{
-                                marginTop: '4px',
-                                alignSelf: 'flex-start',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px'
-                            }}>
-                                <span style={{ fontSize: '12px', color: palette.textMuted }}>Theme</span>
-                                <label style={{
-                                    position: 'relative',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    cursor: 'pointer'
-                                }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={theme === 'dark'}
-                                        onChange={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                                        style={{ display: 'none' }}
-                                    />
-                                    <span style={{
-                                        width: '46px',
-                                        height: '24px',
-                                        backgroundColor: theme === 'dark' ? palette.accent : palette.border,
-                                        borderRadius: '999px',
-                                        position: 'relative',
-                                        transition: 'all 0.2s'
-                                    }}>
-                                        <span style={{
-                                            position: 'absolute',
-                                            top: '3px',
-                                            left: theme === 'dark' ? '24px' : '3px',
-                                            width: '18px',
-                                            height: '18px',
-                                            borderRadius: '50%',
-                                            backgroundColor: theme === 'dark' ? '#fff' : palette.text,
-                                            transition: 'all 0.2s',
-                                            boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
-                                        }} />
-                                    </span>
-                                </label>
-                                <span style={{ fontSize: '12px', color: palette.textMuted }}>
-                                    {theme === 'dark' ? 'Dark' : 'Light'}
-                                </span>
-                            </div>
-                        </div>
-
-                        <nav>
-                            <button
-                                onMouseEnter={() => setNavHover('dashboard')}
-                                onMouseLeave={() => setNavHover(null)}
-                                onClick={() => setCurrentView('dashboard')}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 15px',
-                                    marginBottom: '10px',
-                                    backgroundColor: currentView === 'dashboard' || navHover === 'dashboard' ? palette.accentSoft : 'transparent',
-                                    color: currentView === 'dashboard' || navHover === 'dashboard' ? palette.accent : palette.text,
-                                    border: currentView === 'dashboard' || navHover === 'dashboard' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                    borderRadius: '10px',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: navHover === 'dashboard' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                }}
-                            >
-                                Dashboard
-                            </button>
-
-                            <button
-                                onMouseEnter={() => setNavHover('vpn')}
-                                onMouseLeave={() => setNavHover(null)}
-                                onClick={() => setCurrentView('vpn')}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 15px',
-                                    marginBottom: '10px',
-                                    backgroundColor: currentView === 'vpn' || navHover === 'vpn' ? palette.accentSoft : 'transparent',
-                                    color: currentView === 'vpn' || navHover === 'vpn' ? palette.accent : palette.text,
-                                    border: currentView === 'vpn' || navHover === 'vpn' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                    borderRadius: '10px',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: navHover === 'vpn' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                }}
-                            >
-                                VPN Configurations
-                            </button>
-
-                            <button
-                                onMouseEnter={() => setNavHover('firewall')}
-                                onMouseLeave={() => setNavHover(null)}
-                                onClick={() => setCurrentView('firewall')}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 15px',
-                                    marginBottom: '10px',
-                                    backgroundColor: currentView === 'firewall' || navHover === 'firewall' ? palette.accentSoft : 'transparent',
-                                    color: currentView === 'firewall' || navHover === 'firewall' ? palette.accent : palette.text,
-                                    border: currentView === 'firewall' || navHover === 'firewall' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                    borderRadius: '10px',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: navHover === 'firewall' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                }}
-                            >
-                                Firewall Rules
-                            </button>
-
-                            <button
-                                onMouseEnter={() => setNavHover('profiles')}
-                                onMouseLeave={() => setNavHover(null)}
-                                onClick={() => setCurrentView('profiles')}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 15px',
-                                    marginBottom: '10px',
-                                    backgroundColor: currentView === 'profiles' || navHover === 'profiles' ? palette.accentSoft : 'transparent',
-                                    color: currentView === 'profiles' || navHover === 'profiles' ? palette.accent : palette.text,
-                                    border: currentView === 'profiles' || navHover === 'profiles' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                    borderRadius: '10px',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: navHover === 'profiles' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                }}
-                            >
-                                Security Profiles
-                            </button>
-
-                            <nav className="flex-1 space-y-2 text-sm">
-
-
-                                {/* HIERARCHY */}
-                                <SidebarButton label="Subscription" view="subscription" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
-
-                                {user.accountType === "leader" && (
-                                    <SidebarButton label="My Groups" view="groups" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
-                                )}
-
-                                <SidebarButton label="Invitations" view="invitations" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
-                                <SidebarButton label="My Memberships" view="memberships" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
-                            </nav>
-
-                            <button
-                                onMouseEnter={() => setNavHover('scan')}
-                                onMouseLeave={() => setNavHover(null)}
-                                onClick={() => setCurrentView('scan')}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 15px',
-                                    marginBottom: '10px',
-                                    backgroundColor: currentView === 'scan' || navHover === 'scan' ? palette.accentSoft : 'transparent',
-                                    color: currentView === 'scan' || navHover === 'scan' ? palette.accent : palette.text,
-                                    border: currentView === 'scan' || navHover === 'scan' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                    borderRadius: '10px',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: navHover === 'scan' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                }}
-                            >
-                                URL Scanner
-                            </button>
-
-
-                            {user.role === 'admin' && (
-                                <>
-                                    <button
-                                        onMouseEnter={() => setNavHover('users')}
-                                        onMouseLeave={() => setNavHover(null)}
-                                        onClick={() => setCurrentView('users')}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 15px',
-                                            marginBottom: '10px',
-                                            backgroundColor: currentView === 'users' || navHover === 'users' ? palette.accentSoft : 'transparent',
-                                            color: currentView === 'users' || navHover === 'users' ? palette.accent : palette.text,
-                                            border: currentView === 'users' || navHover === 'users' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                            borderRadius: '10px',
-                                            textAlign: 'left',
-                                            cursor: 'pointer',
-                                            fontSize: '14px',
-                                            transition: 'all 0.15s ease',
-                                            boxShadow: navHover === 'users' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                        }}
-                                    >
-                                        User Management
-                                    </button>
-
-                                    <button
-                                        onMouseEnter={() => setNavHover('audit')}
-                                        onMouseLeave={() => setNavHover(null)}
-                                        onClick={() => setCurrentView('audit')}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 15px',
-                                            marginBottom: '10px',
-                                            backgroundColor: currentView === 'audit' || navHover === 'audit' ? palette.accentSoft : 'transparent',
-                                            color: currentView === 'audit' || navHover === 'audit' ? palette.accent : palette.text,
-                                            border: currentView === 'audit' || navHover === 'audit' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                            borderRadius: '10px',
-                                            textAlign: 'left',
-                                            cursor: 'pointer',
-                                            fontSize: '14px',
-                                            transition: 'all 0.15s ease',
-                                            boxShadow: navHover === 'audit' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                        }}
-                                    >
-                                        Audit Trail
-                                    </button>
-                                    <button
-                                        onMouseEnter={() => setNavHover('system-health')}
-                                        onMouseLeave={() => setNavHover(null)}
-                                        onClick={() => setCurrentView('system-health')}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 15px',
-                                            marginBottom: '10px',
-                                            backgroundColor: currentView === 'system-health' || navHover === 'system-health' ? palette.accentSoft : 'transparent',
-                                            color: currentView === 'system-health' || navHover === 'system-health' ? palette.accent : palette.text,
-                                            border: currentView === 'system-health' || navHover === 'system-health' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                            borderRadius: '10px',
-                                            textAlign: 'left',
-                                            cursor: 'pointer',
-                                            fontSize: '14px',
-                                            transition: 'all 0.15s ease',
-                                            boxShadow: navHover === 'system-health' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                        }}
-                                    >
-                                        System Health
-                                    </button>
-                                    <button
-                                        onMouseEnter={() => setNavHover('devices')}
-                                        onMouseLeave={() => setNavHover(null)}
-                                        onClick={() => setCurrentView('devices')}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 15px',
-                                            marginBottom: '10px',
-                                            backgroundColor: currentView === 'devices' || navHover === 'devices' ? palette.accentSoft : 'transparent',
-                                            color: currentView === 'devices' || navHover === 'devices' ? palette.accent : palette.text,
-                                            border: currentView === 'devices' || navHover === 'devices' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                            borderRadius: '10px',
-                                            textAlign: 'left',
-                                            cursor: 'pointer',
-                                            fontSize: '14px',
-                                            transition: 'all 0.15s ease',
-                                            boxShadow: navHover === 'devices' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                        }}
-                                    >
-                                        Device Inventory
-                                    </button>
-                                    <button
-                                        onMouseEnter={() => setNavHover('mfa')}
-                                        onMouseLeave={() => setNavHover(null)}
-                                        onClick={() => setCurrentView('mfa')}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 15px',
-                                            marginBottom: '10px',
-                                            backgroundColor: currentView === 'mfa' || navHover === 'mfa' ? palette.accentSoft : 'transparent',
-                                            color: currentView === 'mfa' || navHover === 'mfa' ? palette.accent : palette.text,
-                                            border: currentView === 'mfa' || navHover === 'mfa' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                            borderRadius: '10px',
-                                            textAlign: 'left',
-                                            cursor: 'pointer',
-                                            fontSize: '14px',
-                                            transition: 'all 0.15s ease',
-                                            boxShadow: navHover === 'mfa' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                        }}
-                                    >
-                                        MFA Settings
-                                    </button>
-                                    <button
-                                        onMouseEnter={() => setNavHover('login-history')}
-                                        onMouseLeave={() => setNavHover(null)}
-                                        onClick={() => setCurrentView('login-history')}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 15px',
-                                            marginBottom: '10px',
-                                            backgroundColor: currentView === 'login-history' || navHover === 'login-history' ? palette.accentSoft : 'transparent',
-                                            color: currentView === 'login-history' || navHover === 'login-history' ? palette.accent : palette.text,
-                                            border: currentView === 'login-history' || navHover === 'login-history' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                            borderRadius: '10px',
-                                            textAlign: 'left',
-                                            cursor: 'pointer',
-                                            fontSize: '14px',
-                                            transition: 'all 0.15s ease',
-                                            boxShadow: navHover === 'login-history' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                        }}
-                                    >
-                                        Login History
-                                    </button>
-                                    <button
-                                        onMouseEnter={() => setNavHover('feature-toggles')}
-                                        onMouseLeave={() => setNavHover(null)}
-                                        onClick={() => setCurrentView('feature-toggles')}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 15px',
-                                            marginBottom: '10px',
-                                            backgroundColor: currentView === 'feature-toggles' || navHover === 'feature-toggles' ? palette.accentSoft : 'transparent',
-                                            color: currentView === 'feature-toggles' || navHover === 'feature-toggles' ? palette.accent : palette.text,
-                                            border: currentView === 'feature-toggles' || navHover === 'feature-toggles' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                            borderRadius: '10px',
-                                            textAlign: 'left',
-                                            cursor: 'pointer',
-                                            fontSize: '14px',
-                                            transition: 'all 0.15s ease',
-                                            boxShadow: navHover === 'feature-toggles' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                        }}
-                                    >
-                                        Feature Toggles
-                                    </button>
-                                    <button
-                                        onMouseEnter={() => setNavHover('role-templates')}
-                                        onMouseLeave={() => setNavHover(null)}
-                                        onClick={() => setCurrentView('role-templates')}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 15px',
-                                            marginBottom: '10px',
-                                            backgroundColor: currentView === 'role-templates' || navHover === 'role-templates' ? palette.accentSoft : 'transparent',
-                                            color: currentView === 'role-templates' || navHover === 'role-templates' ? palette.accent : palette.text,
-                                            border: currentView === 'role-templates' || navHover === 'role-templates' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                            borderRadius: '10px',
-                                            textAlign: 'left',
-                                            cursor: 'pointer',
-                                            fontSize: '14px',
-                                            transition: 'all 0.15s ease',
-                                            boxShadow: navHover === 'role-templates' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                        }}
-                                    >
-                                        Role Templates
-                                    </button>
-                                    <button
-                                        onMouseEnter={() => setNavHover('impersonation')}
-                                        onMouseLeave={() => setNavHover(null)}
-                                        onClick={() => setCurrentView('impersonation')}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 15px',
-                                            marginBottom: '10px',
-                                            backgroundColor: currentView === 'impersonation' || navHover === 'impersonation' ? palette.accentSoft : 'transparent',
-                                            color: currentView === 'impersonation' || navHover === 'impersonation' ? palette.accent : palette.text,
-                                            border: currentView === 'impersonation' || navHover === 'impersonation' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                            borderRadius: '10px',
-                                            textAlign: 'left',
-                                            cursor: 'pointer',
-                                            fontSize: '14px',
-                                            transition: 'all 0.15s ease',
-                                            boxShadow: navHover === 'impersonation' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                        }}
-                                    >
-                                        User Impersonation
-                                    </button>
-                                    <button
-                                        onMouseEnter={() => setNavHover('admin-notifications')}
-                                        onMouseLeave={() => setNavHover(null)}
-                                        onClick={() => setCurrentView('admin-notifications')}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 15px',
-                                            marginBottom: '10px',
-                                            backgroundColor: currentView === 'admin-notifications' || navHover === 'admin-notifications' ? palette.accentSoft : 'transparent',
-                                            color: currentView === 'admin-notifications' || navHover === 'admin-notifications' ? palette.accent : palette.text,
-                                            border: currentView === 'admin-notifications' || navHover === 'admin-notifications' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                            borderRadius: '10px',
-                                            textAlign: 'left',
-                                            cursor: 'pointer',
-                                            fontSize: '14px',
-                                            transition: 'all 0.15s ease',
-                                            boxShadow: navHover === 'admin-notifications' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                        }}
-                                    >
-                                        Admin Notifications
-                                    </button>
-                                </>
-                            )}
-                        </nav>
-                        <button
-                            onClick={handleLogout}
-                            onMouseEnter={() => setLogoutHover(true)}
-                            onMouseLeave={() => setLogoutHover(false)}
-                            style={{
-                                width: '100%',
-                                padding: '12px 15px',
-                                marginTop: '30px',
-                                backgroundColor: logoutHover
-                                    ? (theme === 'dark' ? 'rgba(54,226,123,0.2)' : 'rgba(31,164,90,0.15)')
-                                    : palette.accentSoft,
-                                color: logoutHover ? palette.accent : palette.text,
-                                border: logoutHover
-                                    ? `1px solid ${palette.accent}`
-                                    : `1px solid ${palette.border}`,
-                                borderRadius: '10px',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                fontWeight: logoutHover ? 600 : 500,
-                                transition: 'all 0.15s ease',
-                                boxShadow: logoutHover ? '0 6px 14px rgba(0,0,0,0.08)' : 'none',
-                                transform: logoutHover ? 'translateY(-1px)' : 'translateY(0)'
-                            }}
-                        >
-                            Logout
-                        </button>
-                    </div>
+                    <Sidebar
+                        user={user}
+                        theme={theme}
+                        palette={palette}
+                        currentView={currentView}
+                        setCurrentView={setCurrentView}
+                        setTheme={setTheme}
+                        isMobile={isMobile}
+                        isTablet={isTablet}
+                        sidebarOpen={sidebarOpen}
+                        setSidebarOpen={setSidebarOpen}
+                        handleLogout={handleLogout}
+                    />
 
                     {/* HIERARCHY RENDER */}
                     {currentView === "subscription" && (
@@ -923,7 +314,6 @@ function App() {
                     {currentView === "invitations" && <Invitations />}
                     {currentView === "memberships" && <Memberships />}
 
-
                     {/* Main Content */}
                     <div style={{
                         flex: 1,
@@ -937,442 +327,17 @@ function App() {
                     }}>
                         {/* Dashboard View */}
                         {currentView === 'dashboard' && (
-                            <div>
-                                <h1 style={{
-                                    fontSize: isMobile ? '20px' : '24px',
-                                    marginBottom: isMobile ? '20px' : '30px',
-                                    marginTop: 0,
-                                    color: palette.text,
-                                    fontWeight: 600,
-                                    paddingLeft: isMobile ? '48px' : '0',
-                                    transition: 'padding-left 0.3s ease'
-                                }}>User Dashboard</h1>
-
-                                {!user.isApproved && (
-                                    <div style={{
-                                        padding: '18px',
-                                        backgroundColor: palette.accentSoft,
-                                        border: `1px solid ${palette.warning}`,
-                                        borderRadius: '12px',
-                                        marginBottom: '24px'
-                                    }}>
-                                        <strong style={{ color: palette.warning }}>⚠️ Account Pending Approval</strong>
-                                        <p style={{ margin: '8px 0 0 0', color: palette.textMuted }}>
-                                            Your account is awaiting admin approval. Some features may be restricted.
-                                        </p>
-                                    </div>
-                                )}
-
-                                {/* Dashboard Error Message */}
-                                {dashboardError && !dashboardLoading && (
-                                    <div style={{
-                                        ...cardBase,
-                                        padding: '16px',
-                                        marginBottom: '24px',
-                                        backgroundColor: palette.danger + '20',
-                                        border: `1px solid ${palette.danger}`,
-                                    }}>
-                                        <strong style={{ color: palette.danger }}>Error loading dashboard:</strong>
-                                        <p style={{ margin: '8px 0 0 0', color: palette.danger }}>
-                                            {dashboardError}
-                                        </p>
-                                    </div>
-                                )}
-
-                                {/* Dashboard Grid - 3 columns on desktop, 1 on mobile */}
-                                <div style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: isMobile ? '1fr' : (isTablet ? '1fr 1fr' : '1fr 1fr 1fr'),
-                                    gap: isMobile ? '16px' : '24px',
-                                    marginBottom: isMobile ? '16px' : '24px'
-                                }}>
-                                    {/* VPN Connection Status Card - Spans 2 columns on desktop */}
-                                    <div style={{
-                                        ...cardBase,
-                                        padding: isMobile ? '16px' : '24px',
-                                        position: 'relative',
-                                        gridColumn: isMobile ? '1' : (isTablet ? '1 / 3' : '1 / 3'),
-                                        backgroundColor: dashboardData?.vpnStatus?.connected
-                                            ? (theme === 'light' ? 'rgba(34, 197, 94, 0.08)' : 'rgba(54, 226, 123, 0.12)')
-                                            : palette.bgCard,
-                                        border: dashboardData?.vpnStatus?.connected && theme === 'light'
-                                            ? '1px solid rgba(34, 197, 94, 0.2)'
-                                            : `1px solid ${palette.border}`
-                                    }}>
-                                        <div style={{ marginBottom: isMobile ? '16px' : '20px' }}>
-                                            <p style={{
-                                                fontSize: isMobile ? '13px' : '14px',
-                                                color: palette.textMuted,
-                                                margin: 0,
-                                                marginBottom: '4px'
-                                            }}>
-                                                VPN Connection Status
-                                            </p>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                    {dashboardLoading ? (
-                                                        <div style={{ fontSize: '14px', color: palette.textMuted }}>Loading...</div>
-                                                    ) : dashboardData?.vpnStatus?.connected ? (
-                                                        <>
-                                                            <div style={{
-                                                                width: '32px',
-                                                                height: '32px',
-                                                                borderRadius: '50%',
-                                                                backgroundColor: palette.accent,
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                flexShrink: 0
-                                                            }}>
-                                                                <span style={{ fontSize: '20px', color: theme === 'dark' ? '#121212' : '#fff', fontWeight: 'bold', lineHeight: 1 }}>✓</span>
-                                                            </div>
-                                                            <span style={{ fontSize: isMobile ? '16px' : '18px', color: palette.accent, fontWeight: 600 }}>Connected</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <div style={{
-                                                                width: '32px',
-                                                                height: '32px',
-                                                                borderRadius: '50%',
-                                                                border: `3px solid ${palette.danger}`,
-                                                                backgroundColor: 'transparent',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                flexShrink: 0
-                                                            }}>
-                                                                <span style={{ fontSize: '20px', color: palette.danger, fontWeight: 'bold', lineHeight: 1 }}>✕</span>
-                                                            </div>
-                                                            <span style={{ fontSize: isMobile ? '16px' : '18px', color: palette.danger, fontWeight: 600 }}>Disconnected</span>
-                                                        </>
-                                                    )}
-                                                </div>
-                                                {dashboardData?.vpnStatus?.connected && (
-                                                    <button
-                                                        style={{
-                                                            padding: '8px 16px',
-                                                            backgroundColor: 'transparent',
-                                                            color: palette.text,
-                                                            border: `1px solid ${palette.border}`,
-                                                            borderRadius: '6px',
-                                                            cursor: 'pointer',
-                                                            fontSize: '14px',
-                                                            fontWeight: 500,
-                                                            transition: 'all 0.2s ease'
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            e.target.style.backgroundColor = theme === 'light' ? '#f3f4f6' : palette.bgPanel;
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            e.target.style.backgroundColor = 'transparent';
-                                                        }}
-                                                        onClick={() => {
-                                                            if (dashboardData?.vpnStatus?.configId) {
-                                                                vpnAPI.toggleVpnConfig(dashboardData.vpnStatus.configId);
-                                                            }
-                                                        }}
-                                                    >
-                                                        Disconnect
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {dashboardData?.vpnStatus?.connected && !dashboardLoading && (
-                                            <>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: palette.textMuted, marginBottom: '16px' }}>
-                                                    <SiAlwaysdata style={{ fontSize: '16px', color: palette.accent }} />
-                                                    <span>Active Profile: <span style={{ color: palette.text }}>{dashboardData?.vpnStatus?.configName || dashboardData?.activeProfile?.name || 'Unknown'}</span></span>
-                                                </div>
-                                                <div style={{
-                                                    marginTop: '16px',
-                                                    paddingTop: '16px',
-                                                    borderTop: theme === 'light' && dashboardData?.vpnStatus?.connected
-                                                        ? '1px solid rgba(34, 197, 94, 0.2)'
-                                                        : `1px solid ${palette.border}`
-                                                }}>
-                                                    <div style={{
-                                                        display: 'grid',
-                                                        gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-                                                        gap: isMobile ? '12px' : '16px',
-                                                        fontSize: '13px'
-                                                    }}>
-                                                        <div>
-                                                            <p style={{ color: palette.textMuted, margin: '0 0 4px 0', fontSize: '13px' }}>Server Location</p>
-                                                            <p style={{ color: palette.text, margin: 0, fontWeight: 500 }}>{dashboardData?.vpnStatus?.serverLocation || dashboardData?.vpnStatus?.server || 'Unknown'}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p style={{ color: palette.textMuted, margin: '0 0 4px 0', fontSize: '13px' }}>IP Address</p>
-                                                            <p style={{ color: palette.text, margin: 0, fontWeight: 500 }}>{dashboardData?.vpnStatus?.ipAddress || 'Not assigned'}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p style={{ color: palette.textMuted, margin: '0 0 4px 0', fontSize: '13px' }}>Connection Time</p>
-                                                            <p style={{ color: palette.text, margin: 0, fontWeight: 500 }}>{dashboardData?.vpnStatus?.connectionTime || '0h 0m'}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p style={{ color: palette.textMuted, margin: '0 0 4px 0', fontSize: '13px' }}>Protocol</p>
-                                                            <p style={{ color: palette.text, margin: 0, fontWeight: 500 }}>{dashboardData?.vpnStatus?.protocol || 'Unknown'}</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-
-                                    {/* Threat Summary Card */}
-                                    <div style={{ ...cardBase, padding: isMobile ? '16px' : '24px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: isMobile ? '16px' : '20px' }}>
-                                            <GoAlertFill style={{ fontSize: isMobile ? '18px' : '20px', color: palette.warning }} />
-                                            <h2 style={{ fontSize: isMobile ? '16px' : '18px', margin: 0, color: palette.text, fontWeight: 600 }}>
-                                                Threat Summary
-                                            </h2>
-                                        </div>
-                                        {dashboardLoading ? (
-                                            <div style={{ fontSize: '14px', color: palette.textMuted }}>Loading...</div>
-                                        ) : (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                                <div>
-                                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px' }}>
-                                                        <span style={{ fontSize: isMobile ? '28px' : '32px', color: palette.text, fontWeight: 'bold' }}>
-                                                            {dashboardData?.threatsBlocked?.thisWeek || 0}
-                                                        </span>
-                                                        <div style={{
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: '4px',
-                                                            fontSize: '13px',
-                                                            color: palette.accent,
-                                                            fontWeight: 500
-                                                        }}>
-                                                            <span style={{ fontSize: '12px' }}>⇗</span>
-                                                            <span>{Math.abs(dashboardData?.threatsBlocked?.percentageChange || 0)}%</span>
-                                                        </div>
-                                                    </div>
-                                                    <p style={{ fontSize: '13px', color: palette.textMuted, margin: 0 }}>
-                                                        Blocked Threats This Week
-                                                    </p>
-                                                </div>
-                                                <div style={{
-                                                    height: '1px',
-                                                    backgroundColor: theme === 'light' ? '#e5e7eb' : palette.border,
-                                                    margin: '4px 0'
-                                                }}></div>
-                                                <div>
-                                                    <div style={{ fontSize: isMobile ? '18px' : '20px', color: palette.text, fontWeight: 'bold', marginBottom: '4px' }}>
-                                                        {(dashboardData?.threatsBlocked?.totalBlockedIPs || 0).toLocaleString()}
-                                                    </div>
-                                                    <p style={{ fontSize: '13px', color: palette.textMuted, margin: 0 }}>
-                                                        Total Blocked IPs
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Data Transfer Card */}
-                                    <div style={{ ...cardBase, padding: isMobile ? '16px' : '24px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: isMobile ? '16px' : '20px' }}>
-                                            <SiAlwaysdata style={{ fontSize: isMobile ? '18px' : '20px', color: palette.accent }} />
-                                            <h2 style={{ fontSize: isMobile ? '16px' : '18px', margin: 0, color: palette.text, fontWeight: 600 }}>
-                                                Data Transfer
-                                            </h2>
-                                        </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                            <div>
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: palette.textMuted }}>
-                                                        <span style={{ fontSize: '14px' }}>⇗</span>
-                                                        <span>Data Sent</span>
-                                                    </div>
-                                                    <span style={{ fontSize: '14px', color: palette.text, fontWeight: 600 }}>
-                                                        {dashboardLoading ? '...' : `${dashboardData?.dataTransfer?.gbSent || 0} GB`}
-                                                    </span>
-                                                </div>
-                                                <div style={{
-                                                    width: '100%',
-                                                    height: '8px',
-                                                    backgroundColor: theme === 'light' ? '#e5e7eb' : '#2a2a2a',
-                                                    borderRadius: '4px',
-                                                    overflow: 'hidden'
-                                                }}>
-                                                    <div style={{
-                                                        width: `${dashboardData?.dataTransfer?.sentPercentage || 0}%`,
-                                                        height: '100%',
-                                                        backgroundColor: palette.accent,
-                                                        borderRadius: '4px',
-                                                        transition: 'width 0.3s ease'
-                                                    }} />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: palette.textMuted }}>
-                                                        <span style={{ fontSize: '14px' }}>⇘</span>
-                                                        <span>Data Received</span>
-                                                    </div>
-                                                    <span style={{ fontSize: '14px', color: palette.text, fontWeight: 600 }}>
-                                                        {dashboardLoading ? '...' : `${dashboardData?.dataTransfer?.gbReceived || 0} GB`}
-                                                    </span>
-                                                </div>
-                                                <div style={{
-                                                    width: '100%',
-                                                    height: '8px',
-                                                    backgroundColor: theme === 'light' ? '#e5e7eb' : '#2a2a2a',
-                                                    borderRadius: '4px',
-                                                    overflow: 'hidden'
-                                                }}>
-                                                    <div style={{
-                                                        width: `${dashboardData?.dataTransfer?.receivedPercentage || 0}%`,
-                                                        height: '100%',
-                                                        backgroundColor: palette.accent,
-                                                        borderRadius: '4px',
-                                                        transition: 'width 0.3s ease'
-                                                    }} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Active Profile Card */}
-                                    <div style={{ ...cardBase, padding: isMobile ? '16px' : '24px' }}>
-                                        <h2 style={{ fontSize: isMobile ? '16px' : '18px', margin: '0 0 16px 0', color: palette.text, fontWeight: 600 }}>
-                                            Active Profile
-                                        </h2>
-                                        {dashboardData?.activeProfile ? (
-                                            <>
-                                                <div style={{
-                                                    padding: '16px',
-                                                    backgroundColor: theme === 'light' ? '#f9fafb' : palette.bgPanel,
-                                                    border: `1px solid ${palette.border}`,
-                                                    borderRadius: '8px',
-                                                    marginBottom: '16px'
-                                                }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                                        <span style={{ fontSize: '16px', color: palette.text, fontWeight: 600 }}>
-                                                            {dashboardData.activeProfile.name}
-                                                        </span>
-                                                        <span style={{
-                                                            display: 'inline-block',
-                                                            padding: '4px 10px',
-                                                            borderRadius: '12px',
-                                                            fontSize: '12px',
-                                                            backgroundColor: theme === 'light' ? 'rgba(34, 197, 94, 0.1)' : palette.accentSoft,
-                                                            color: palette.accent,
-                                                            border: `1px solid ${palette.accent}`,
-                                                            fontWeight: 600
-                                                        }}>
-                                                            Active
-                                                        </span>
-                                                    </div>
-                                                    <p style={{ fontSize: '13px', color: palette.textMuted, margin: 0 }}>
-                                                        {dashboardData.activeProfile.description}
-                                                    </p>
-                                                </div>
-                                                <button
-                                                    onClick={() => setCurrentView('profiles')}
-                                                    style={{
-                                                        width: '100%',
-                                                        padding: '10px',
-                                                        backgroundColor: 'transparent',
-                                                        color: palette.text,
-                                                        border: `1px solid ${palette.border}`,
-                                                        borderRadius: '8px',
-                                                        cursor: 'pointer',
-                                                        fontSize: '14px',
-                                                        fontWeight: 500,
-                                                        transition: 'all 0.2s ease'
-                                                    }}
-                                                    onMouseEnter={(e) => {
-                                                        e.target.style.backgroundColor = theme === 'light' ? '#f3f4f6' : palette.bgPanel;
-                                                    }}
-                                                    onMouseLeave={(e) => {
-                                                        e.target.style.backgroundColor = 'transparent';
-                                                    }}
-                                                >
-                                                    View/Manage Profiles
-                                                </button>
-                                            </>
-                                        ) : (
-                                            <div style={{ color: palette.textMuted, fontSize: '14px' }}>
-                                                No active profile. <button
-                                                    onClick={() => setCurrentView('profiles')}
-                                                    style={{
-                                                        background: 'none',
-                                                        border: 'none',
-                                                        color: palette.accent,
-                                                        cursor: 'pointer',
-                                                        textDecoration: 'underline',
-                                                        fontSize: '14px'
-                                                    }}
-                                                >
-                                                    Create one
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Recent Activity Log Card - Spans full width on desktop */}
-                                    <div style={{
-                                        ...cardBase,
-                                        padding: isMobile ? '16px' : '24px',
-                                        gridColumn: isMobile ? '1' : '1 / -1'
-                                    }}>
-                                        <h2 style={{ fontSize: isMobile ? '16px' : '18px', margin: '0 0 16px 0', color: palette.text, fontWeight: 600 }}>
-                                            Recent Activity Log
-                                        </h2>
-                                        <div style={{
-                                            maxHeight: isMobile ? '250px' : '320px',
-                                            overflowY: 'auto',
-                                            paddingRight: '8px'
-                                        }}>
-                                            {dashboardLoading ? (
-                                                <div style={{ fontSize: '14px', color: palette.textMuted }}>Loading...</div>
-                                            ) : dashboardData?.recentActivities && dashboardData.recentActivities.length > 0 ? (
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                                    {dashboardData.recentActivities.map((activity, idx) => (
-                                                        <div key={activity.id || idx} style={{
-                                                            display: 'flex',
-                                                            alignItems: 'flex-start',
-                                                            gap: '12px',
-                                                            padding: '12px',
-                                                            borderRadius: '8px',
-                                                            backgroundColor: 'transparent',
-                                                            transition: 'background-color 0.2s ease'
-                                                        }}
-                                                            onMouseEnter={(e) => {
-                                                                e.currentTarget.style.backgroundColor = theme === 'light' ? '#f9fafb' : palette.bgPanel;
-                                                            }}
-                                                            onMouseLeave={(e) => {
-                                                                e.currentTarget.style.backgroundColor = 'transparent';
-                                                            }}>
-                                                            <div style={{
-                                                                width: '8px',
-                                                                height: '8px',
-                                                                borderRadius: '50%',
-                                                                marginTop: '6px',
-                                                                flexShrink: 0,
-                                                                backgroundColor: activity.isBlocked ? palette.danger : (activity.type === 'vpn' ? palette.accent : palette.textMuted)
-                                                            }}></div>
-                                                            <div style={{ flex: 1 }}>
-                                                                <p style={{ margin: 0, fontSize: '14px', color: palette.text }}>
-                                                                    {activity.message || activity.description || 'Activity'}
-                                                                </p>
-                                                                <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: palette.textMuted }}>
-                                                                    {activity.timestamp || activity.time || activity.timeAgo || 'Just now'}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <div style={{ fontSize: '14px', color: palette.textMuted, textAlign: 'center', padding: '20px' }}>
-                                                    No recent activity
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <DashboardView
+                                user={user}
+                                theme={theme}
+                                palette={palette}
+                                dashboardData={dashboardData}
+                                dashboardLoading={dashboardLoading}
+                                dashboardError={dashboardError}
+                                isMobile={isMobile}
+                                isTablet={isTablet}
+                                setCurrentView={setCurrentView}
+                            />
                         )}
 
                         {/* VPN View */}
@@ -1404,7 +369,6 @@ function App() {
                                         + Add VPN Config
                                     </button>
                                 </div>
-
                                 <div style={{
                                     padding: '25px',
                                     backgroundColor: palette.bgCard,
@@ -1428,852 +392,105 @@ function App() {
                             <ProfileManager theme={theme} palette={palette} />
                         )}
 
-                        {/* Scanner */}
+                        {/* Scan View */}
                         {currentView === 'scan' && (
                             <ScanDashboard theme={theme} palette={palette} />
                         )}
 
-
-                        {/* User Management View (Admin Only) */}
-                        {/* Module 1 Additional Features - Admin Only */}
+                        {/* Audit View */}
                         {currentView === 'audit' && user.role === 'admin' && (
                             <AdminAuditTrail theme={theme} palette={palette} />
                         )}
 
+                        {/* System Health View */}
                         {currentView === 'system-health' && user.role === 'admin' && (
                             <SystemHealthMetrics theme={theme} palette={palette} />
                         )}
 
+                        {/* MFA View */}
                         {currentView === 'mfa' && user.role === 'admin' && (
                             <MFASettings theme={theme} palette={palette} />
                         )}
 
+                        {/* Devices View */}
                         {currentView === 'devices' && user.role === 'admin' && (
                             <DeviceInventory theme={theme} palette={palette} />
                         )}
 
+                        {/* Login History View */}
                         {currentView === 'login-history' && user.role === 'admin' && (
                             <LoginHistory theme={theme} palette={palette} />
                         )}
 
+                        {/* Feature Toggles View */}
                         {currentView === 'feature-toggles' && user.role === 'admin' && (
                             <FeatureToggles theme={theme} palette={palette} />
                         )}
 
+                        {/* Role Templates View */}
                         {currentView === 'role-templates' && user.role === 'admin' && (
                             <RoleTemplates theme={theme} palette={palette} />
                         )}
 
+                        {/* Impersonation View */}
                         {currentView === 'impersonation' && user.role === 'admin' && (
                             <UserImpersonation theme={theme} palette={palette} />
                         )}
 
+                        {/* Admin Notifications View */}
                         {currentView === 'admin-notifications' && user.role === 'admin' && (
                             <AdminNotifications theme={theme} palette={palette} />
                         )}
 
+                        {/* Threat Blocker View */}
+                        {currentView === 'threat-blocker' && (
+                            <ThreatBlocker theme={theme} palette={palette} />
+                        )}
+
+                        {/* Activity Logs View */}
+                        {currentView === 'activity-logs' && (
+                            <LogsAndReporting theme={theme} palette={palette} />
+                        )}
+
+                        {/* Admin Users View */}
                         {currentView === 'users' && user.role === 'admin' && (
-                            <div>
-                                <div style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    marginBottom: '24px'
-                                }}>
-                                    <h1 style={{ fontSize: '24px', margin: 0, color: palette.text }}>User Management</h1>
-                                </div>
-
-                                {/* Users Table */}
-                                <div style={{ ...cardBase, padding: '18px' }}>
-                                    <div style={{
-                                        display: 'flex',
-                                        gap: isMobile ? '8px' : '12px',
-                                        flexWrap: 'wrap',
-                                        marginBottom: '16px',
-                                        flexDirection: isMobile ? 'column' : 'row'
-                                    }}>
-                                        <input
-                                            type="text"
-                                            placeholder="Search by username or ID..."
-                                            value={userSearchQuery}
-                                            onChange={(e) => setUserSearchQuery(e.target.value)}
-                                            style={{
-                                                flex: '1 1 260px',
-                                                minWidth: '240px',
-                                                padding: '10px 12px',
-                                                backgroundColor: theme === 'light' ? '#fff' : '#121212',
-                                                border: theme === 'light' ? `1px solid ${palette.border}` : `1px solid ${palette.border}`,
-                                                borderRadius: '10px',
-                                                color: palette.text,
-                                                fontSize: '14px'
-                                            }}
-                                        />
-                                        {/* Custom Role Dropdown */}
-                                        <div className="custom-dropdown" style={{ position: 'relative', flex: '0 0 160px' }}>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setRoleDropdownOpen(!roleDropdownOpen);
-                                                    setStatusDropdownOpen(false);
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.target.style.borderColor = palette.accent;
-                                                    e.target.style.backgroundColor = theme === 'light'
-                                                        ? 'rgba(34, 197, 94, 0.05)'
-                                                        : 'rgba(34, 197, 94, 0.1)';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.target.style.borderColor = palette.border;
-                                                    e.target.style.backgroundColor = theme === 'light' ? '#fff' : '#121212';
-                                                }}
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '10px 12px',
-                                                    paddingRight: '32px',
-                                                    backgroundColor: theme === 'light' ? '#fff' : '#121212',
-                                                    border: `1px solid ${roleDropdownOpen ? palette.accent : palette.border}`,
-                                                    borderRadius: '10px',
-                                                    color: palette.text,
-                                                    fontSize: '14px',
-                                                    cursor: 'pointer',
-                                                    outline: 'none',
-                                                    transition: 'all 0.2s ease',
-                                                    textAlign: 'left',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'space-between',
-                                                    boxShadow: roleDropdownOpen ? `0 0 0 3px ${theme === 'light' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.2)'}` : 'none'
-                                                }}
-                                            >
-                                                <span>{userRoleFilter === 'all' ? 'All Roles' : userRoleFilter === 'admin' ? 'Admin' : 'User'}</span>
-                                                <span style={{
-                                                    transform: roleDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                                                    transition: 'transform 0.3s ease',
-                                                    display: 'inline-block'
-                                                }}>▼</span>
-                                            </button>
-                                            <div style={{
-                                                position: 'absolute',
-                                                top: '100%',
-                                                left: 0,
-                                                right: 0,
-                                                marginTop: '4px',
-                                                backgroundColor: theme === 'light' ? '#fff' : '#121212',
-                                                border: `1px solid ${palette.border}`,
-                                                borderRadius: '10px',
-                                                overflow: 'hidden',
-                                                zIndex: 1000,
-                                                opacity: roleDropdownOpen ? 1 : 0,
-                                                transform: roleDropdownOpen ? 'translateY(0)' : 'translateY(-10px)',
-                                                pointerEvents: roleDropdownOpen ? 'auto' : 'none',
-                                                transition: 'all 0.3s ease',
-                                                boxShadow: theme === 'light'
-                                                    ? '0 4px 12px rgba(0,0,0,0.1)'
-                                                    : '0 4px 12px rgba(0,0,0,0.3)'
-                                            }}>
-                                                {['all', 'admin', 'user'].map((option) => (
-                                                    <div
-                                                        key={option}
-                                                        onClick={() => {
-                                                            setUserRoleFilter(option);
-                                                            setRoleDropdownOpen(false);
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            e.target.style.backgroundColor = theme === 'light'
-                                                                ? 'rgba(34, 197, 94, 0.1)'
-                                                                : 'rgba(34, 197, 94, 0.15)';
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            e.target.style.backgroundColor = 'transparent';
-                                                        }}
-                                                        style={{
-                                                            padding: '10px 12px',
-                                                            color: palette.text,
-                                                            fontSize: '14px',
-                                                            cursor: 'pointer',
-                                                            transition: 'background-color 0.2s ease',
-                                                            backgroundColor: userRoleFilter === option
-                                                                ? (theme === 'light' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.15)')
-                                                                : 'transparent'
-                                                        }}
-                                                    >
-                                                        {option === 'all' ? 'All Roles' : option === 'admin' ? 'Admin' : 'User'}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        {/* Custom Status Dropdown */}
-                                        <div className="custom-dropdown" style={{ position: 'relative', flex: '0 0 160px' }}>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setStatusDropdownOpen(!statusDropdownOpen);
-                                                    setRoleDropdownOpen(false);
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.target.style.borderColor = palette.accent;
-                                                    e.target.style.backgroundColor = theme === 'light'
-                                                        ? 'rgba(34, 197, 94, 0.05)'
-                                                        : 'rgba(34, 197, 94, 0.1)';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.target.style.borderColor = palette.border;
-                                                    e.target.style.backgroundColor = theme === 'light' ? '#fff' : '#121212';
-                                                }}
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '10px 12px',
-                                                    paddingRight: '32px',
-                                                    backgroundColor: theme === 'light' ? '#fff' : '#121212',
-                                                    border: `1px solid ${statusDropdownOpen ? palette.accent : palette.border}`,
-                                                    borderRadius: '10px',
-                                                    color: palette.text,
-                                                    fontSize: '14px',
-                                                    cursor: 'pointer',
-                                                    outline: 'none',
-                                                    transition: 'all 0.2s ease',
-                                                    textAlign: 'left',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'space-between',
-                                                    boxShadow: statusDropdownOpen ? `0 0 0 3px ${theme === 'light' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.2)'}` : 'none'
-                                                }}
-                                            >
-                                                <span>{userStatusFilter === 'all' ? 'All Status' : userStatusFilter === 'active' ? 'Active' : 'Inactive'}</span>
-                                                <span style={{
-                                                    transform: statusDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                                                    transition: 'transform 0.3s ease',
-                                                    display: 'inline-block'
-                                                }}>▼</span>
-                                            </button>
-                                            <div style={{
-                                                position: 'absolute',
-                                                top: '100%',
-                                                left: 0,
-                                                right: 0,
-                                                marginTop: '4px',
-                                                backgroundColor: theme === 'light' ? '#fff' : '#121212',
-                                                border: `1px solid ${palette.border}`,
-                                                borderRadius: '10px',
-                                                overflow: 'hidden',
-                                                zIndex: 1000,
-                                                opacity: statusDropdownOpen ? 1 : 0,
-                                                transform: statusDropdownOpen ? 'translateY(0)' : 'translateY(-10px)',
-                                                pointerEvents: statusDropdownOpen ? 'auto' : 'none',
-                                                transition: 'all 0.3s ease',
-                                                boxShadow: theme === 'light'
-                                                    ? '0 4px 12px rgba(0,0,0,0.1)'
-                                                    : '0 4px 12px rgba(0,0,0,0.3)'
-                                            }}>
-                                                {['all', 'active', 'inactive'].map((option) => (
-                                                    <div
-                                                        key={option}
-                                                        onClick={() => {
-                                                            setUserStatusFilter(option);
-                                                            setStatusDropdownOpen(false);
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            e.target.style.backgroundColor = theme === 'light'
-                                                                ? 'rgba(34, 197, 94, 0.1)'
-                                                                : 'rgba(34, 197, 94, 0.15)';
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            e.target.style.backgroundColor = 'transparent';
-                                                        }}
-                                                        style={{
-                                                            padding: '10px 12px',
-                                                            color: palette.text,
-                                                            fontSize: '14px',
-                                                            cursor: 'pointer',
-                                                            transition: 'background-color 0.2s ease',
-                                                            backgroundColor: userStatusFilter === option
-                                                                ? (theme === 'light' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.15)')
-                                                                : 'transparent'
-                                                        }}
-                                                    >
-                                                        {option === 'all' ? 'All Status' : option === 'active' ? 'Active' : 'Inactive'}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <button
-                                            style={{
-                                                padding: '10px 16px',
-                                                backgroundColor: palette.text,
-                                                color: theme === 'light' ? '#fff' : '#121212',
-                                                border: 'none',
-                                                borderRadius: '10px',
-                                                fontWeight: 600,
-                                                fontSize: '14px',
-                                                cursor: 'pointer'
-                                            }}
-                                            disabled
-                                        >
-                                            + Add New User
-                                        </button>
-                                    </div>
-
-                                    {usersLoading ? (
-                                        <div style={{ color: palette.textMuted, textAlign: 'center', padding: '40px' }}>Loading users...</div>
-                                    ) : adminError ? (
-                                        <div style={{
-                                            padding: '20px',
-                                            backgroundColor: palette.danger + '20',
-                                            border: `1px solid ${palette.danger}`,
-                                            borderRadius: '10px',
-                                            color: palette.danger,
-                                            textAlign: 'center',
-                                            margin: '20px 0'
-                                        }}>
-                                            <strong>Error loading users:</strong> {adminError}
-                                        </div>
-                                    ) : (() => {
-                                        // Filter users based on search query, role, and status
-                                        const filteredUsers = users.filter(u => {
-                                            // Search filter (by email or ID)
-                                            if (!userSearchQuery) {
-                                                return true;
-                                            }
-
-                                            const searchLower = userSearchQuery.toLowerCase();
-                                            const userIndex = users.indexOf(u) + 1;
-                                            const userIDString = String(userIndex);
-
-                                            // Check email match (partial match)
-                                            const matchesEmail = u.email.toLowerCase().includes(searchLower);
-
-                                            // Check user ID match (exact match only)
-                                            const matchesID = userIDString === userSearchQuery;
-
-                                            const matchesSearch = matchesEmail || matchesID;
-
-                                            // Role filter
-                                            const matchesRole = userRoleFilter === 'all' || u.role === userRoleFilter;
-
-                                            // Status filter
-                                            const matchesStatus = userStatusFilter === 'all' ||
-                                                (userStatusFilter === 'active' && u.isApproved) ||
-                                                (userStatusFilter === 'inactive' && !u.isApproved);
-
-                                            return matchesSearch && matchesRole && matchesStatus;
-                                        });
-
-                                        return filteredUsers.length === 0 ? (
-                                            <div style={{ color: palette.textMuted, textAlign: 'center', padding: '40px' }}>No users found matching your filters</div>
-                                        ) : (
-                                            <div style={{ overflowX: 'auto' }}>
-                                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                                    <thead>
-                                                        <tr style={{ borderBottom: `1px solid ${palette.border}` }}>
-                                                            <th style={{ padding: '12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>User ID</th>
-                                                            <th style={{ padding: '12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Username (Email)</th>
-                                                            <th style={{ padding: '12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Role</th>
-                                                            <th style={{ padding: '12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Status</th>
-                                                            <th style={{ padding: '12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Last Login</th>
-                                                            <th style={{ padding: '12px', textAlign: 'left', color: palette.textMuted, fontWeight: 600, fontSize: '13px' }}>Actions</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {filteredUsers.map((u, idx) => {
-                                                            const isCurrentUser = u.id === user.id;
-                                                            return (
-                                                                <tr key={u.id} style={{
-                                                                    borderBottom: idx === filteredUsers.length - 1 ? 'none' : `1px solid ${palette.border}`,
-                                                                    backgroundColor: isCurrentUser
-                                                                        ? (theme === 'light' ? 'rgba(34, 197, 94, 0.08)' : 'rgba(34, 197, 94, 0.12)')
-                                                                        : 'transparent',
-                                                                    borderLeft: isCurrentUser ? `3px solid ${palette.accent}` : 'none',
-                                                                    transition: 'all 0.2s ease',
-                                                                    position: 'relative'
-                                                                }}>
-                                                                    <td style={{ padding: '12px', color: palette.text, fontSize: '14px' }}>
-                                                                        {String(users.indexOf(u) + 1).padStart(3, '0')}
-                                                                        {isCurrentUser && (
-                                                                            <span style={{
-                                                                                marginLeft: '8px',
-                                                                                padding: '2px 6px',
-                                                                                backgroundColor: palette.accent,
-                                                                                color: theme === 'light' ? '#fff' : '#121212',
-                                                                                borderRadius: '4px',
-                                                                                fontSize: '10px',
-                                                                                fontWeight: 700,
-                                                                                textTransform: 'uppercase',
-                                                                                letterSpacing: '0.5px'
-                                                                            }}>YOU</span>
-                                                                        )}
-                                                                    </td>
-                                                                    <td style={{ padding: '12px', color: palette.text, fontSize: '14px', fontWeight: isCurrentUser ? 600 : 400 }}>
-                                                                        {u.email}
-                                                                    </td>
-                                                                    <td style={{ padding: '12px' }}>
-                                                                        <span style={{
-                                                                            padding: '4px 10px',
-                                                                            borderRadius: '12px',
-                                                                            fontSize: '12px',
-                                                                            backgroundColor: u.role === 'admin' ? '#0b0b14' : palette.accentSoft,
-                                                                            color: u.role === 'admin' ? '#fff' : palette.accent,
-                                                                            border: u.role === 'admin' ? '1px solid #0b0b14' : `1px solid ${palette.border}`,
-                                                                            fontWeight: 600
-                                                                        }}>
-                                                                            {u.role === 'admin' ? 'Admin' : 'User'}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td style={{ padding: '12px' }}>
-                                                                        <span style={{
-                                                                            display: 'inline-block',
-                                                                            minWidth: '78px',
-                                                                            textAlign: 'center',
-                                                                            padding: '4px 10px',
-                                                                            borderRadius: '12px',
-                                                                            fontSize: '12px',
-                                                                            backgroundColor: u.isApproved
-                                                                                ? (theme === 'dark' ? palette.accentSoft : '#e6f6ed')
-                                                                                : (theme === 'dark' ? '#2b1b12' : '#fff5e6'),
-                                                                            color: u.isApproved
-                                                                                ? (theme === 'dark' ? palette.accent : '#1fa45a')
-                                                                                : (theme === 'dark' ? '#f6ae4c' : '#d97706'),
-                                                                            border: u.isApproved
-                                                                                ? (theme === 'dark' ? `1px solid ${palette.accent}` : '1px solid #c9ecd8')
-                                                                                : (theme === 'dark' ? '1px solid #3a2a1f' : '1px solid #f3d9a4'),
-                                                                            fontWeight: 600
-                                                                        }}>
-                                                                            {u.isApproved ? 'Active' : 'Inactive'}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td style={{ padding: '12px', color: palette.textMuted, fontSize: '13px' }}>
-                                                                        {/* placeholder since we don't store last login */}
-                                                                        —
-                                                                    </td>
-                                                                    <td style={{ padding: '12px' }}>
-                                                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                                            {/* Edit - 1st button */}
-                                                                            <button
-                                                                                onClick={() => handleEditUser(u)}
-                                                                                onMouseEnter={() => setActionButtonHover(`edit-user-${u.id}`)}
-                                                                                onMouseLeave={() => setActionButtonHover(null)}
-                                                                                title="Edit user"
-                                                                                style={{
-                                                                                    background: actionButtonHover === `edit-user-${u.id}`
-                                                                                        ? (theme === 'dark' ? 'rgba(54,226,123,0.15)' : 'rgba(31,164,90,0.1)')
-                                                                                        : 'none',
-                                                                                    border: 'none',
-                                                                                    color: actionButtonHover === `edit-user-${u.id}`
-                                                                                        ? palette.accent
-                                                                                        : palette.textMuted,
-                                                                                    cursor: 'pointer',
-                                                                                    fontSize: '16px',
-                                                                                    padding: '4px 6px',
-                                                                                    borderRadius: '6px',
-                                                                                    transition: 'all 0.15s ease',
-                                                                                    transform: actionButtonHover === `edit-user-${u.id}` ? 'scale(1.1)' : 'scale(1)'
-                                                                                }}
-                                                                            >
-                                                                                <MdModeEdit />
-                                                                            </button>
-                                                                            {/* Toggle status - 2nd button */}
-                                                                            {u.id !== user.id && (
-                                                                                <button
-                                                                                    onClick={() => handleToggleUserStatus(u)}
-                                                                                    onMouseEnter={() => setActionButtonHover(`toggle-user-${u.id}`)}
-                                                                                    onMouseLeave={() => setActionButtonHover(null)}
-                                                                                    title={u.isApproved ? 'Mark inactive' : 'Mark active'}
-                                                                                    style={{
-                                                                                        background: actionButtonHover === `toggle-user-${u.id}`
-                                                                                            ? (theme === 'dark' ? 'rgba(54,226,123,0.20)' : 'rgba(31,164,90,0.15)')
-                                                                                            : (u.isApproved
-                                                                                                ? (theme === 'dark' ? 'rgba(54,226,123,0.08)' : '#e6f6ed')
-                                                                                                : (theme === 'dark' ? 'rgba(246,174,76,0.10)' : '#fff7e6')),
-                                                                                        border: u.isApproved
-                                                                                            ? (theme === 'dark' ? `1px solid ${palette.accent}` : '1px solid #c9ecd8')
-                                                                                            : (theme === 'dark' ? '1px solid #3a2a1f' : '1px solid #f3d9a4'),
-                                                                                        color: actionButtonHover === `toggle-user-${u.id}`
-                                                                                            ? palette.accent
-                                                                                            : (u.isApproved
-                                                                                                ? (theme === 'dark' ? palette.accent : '#1fa45a')
-                                                                                                : (theme === 'dark' ? '#f6ae4c' : '#d97706')),
-                                                                                        cursor: 'pointer',
-                                                                                        fontSize: '16px',
-                                                                                        padding: '6px 10px',
-                                                                                        borderRadius: '12px',
-                                                                                        transition: 'all 0.2s ease',
-                                                                                        transform: actionButtonHover === `toggle-user-${u.id}` ? 'scale(1.08)' : 'scale(1)',
-                                                                                        boxShadow: actionButtonHover === `toggle-user-${u.id}` ? '0 6px 14px rgba(0,0,0,0.12)' : 'none'
-                                                                                    }}
-                                                                                >
-                                                                                    <SlReload />
-                                                                                </button>
-                                                                            )}
-                                                                            {/* Delete - 3rd button */}
-                                                                            {u.id !== user.id && (
-                                                                                <button
-                                                                                    onClick={() => handleDeleteUser(u.id)}
-                                                                                    onMouseEnter={() => setActionButtonHover(`delete-user-${u.id}`)}
-                                                                                    onMouseLeave={() => setActionButtonHover(null)}
-                                                                                    title="Delete user"
-                                                                                    style={{
-                                                                                        background: actionButtonHover === `delete-user-${u.id}`
-                                                                                            ? (theme === 'dark' ? 'rgba(224,72,72,0.15)' : 'rgba(212,24,61,0.1)')
-                                                                                            : 'none',
-                                                                                        border: 'none',
-                                                                                        color: palette.danger,
-                                                                                        cursor: 'pointer',
-                                                                                        fontSize: '16px',
-                                                                                        padding: '4px 6px',
-                                                                                        borderRadius: '6px',
-                                                                                        transition: 'all 0.15s ease',
-                                                                                        transform: actionButtonHover === `delete-user-${u.id}` ? 'scale(1.1)' : 'scale(1)',
-                                                                                        opacity: actionButtonHover === `delete-user-${u.id}` ? 1 : 0.8
-                                                                                    }}
-                                                                                >
-                                                                                    <RiDeleteBin6Line />
-                                                                                </button>
-                                                                            )}
-                                                                        </div>
-                                                                    </td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-
-                                {/* Edit User Modal */}
-                                {(showEditModal || editModalAnimating) && editingUser && (
-                                    <div
-                                        onClick={closeEditModal}
-                                        style={{
-                                            position: 'fixed',
-                                            top: 0,
-                                            left: 0,
-                                            right: 0,
-                                            bottom: 0,
-                                            backgroundColor: editModalAnimating ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.5)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            zIndex: 1000,
-                                            opacity: showEditModal ? 1 : 0,
-                                            transition: 'opacity 0.3s ease'
-                                        }}
-                                    >
-                                        <div
-                                            onClick={(e) => e.stopPropagation()}
-                                            style={{
-                                                backgroundColor: theme === 'light' ? '#ffffff' : palette.bgCard,
-                                                padding: '32px',
-                                                borderRadius: '16px',
-                                                border: theme === 'light' ? '1px solid #e5e7eb' : `1px solid ${palette.border}`,
-                                                width: '90%',
-                                                maxWidth: '520px',
-                                                boxShadow: theme === 'light'
-                                                    ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-                                                    : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
-                                                transform: showEditModal ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(-20px)',
-                                                opacity: showEditModal ? 1 : 0,
-                                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                position: 'relative'
-                                            }}
-                                        >
-                                            {/* Close Button */}
-                                            <button
-                                                onClick={closeEditModal}
-                                                style={{
-                                                    position: 'absolute',
-                                                    top: '16px',
-                                                    right: '16px',
-                                                    background: 'none',
-                                                    border: 'none',
-                                                    color: palette.textMuted,
-                                                    fontSize: '24px',
-                                                    cursor: 'pointer',
-                                                    padding: '4px 8px',
-                                                    borderRadius: '6px',
-                                                    transition: 'all 0.2s ease',
-                                                    lineHeight: 1,
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center'
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.target.style.color = palette.text;
-                                                    e.target.style.backgroundColor = theme === 'light' ? '#f3f4f6' : 'rgba(255, 255, 255, 0.1)';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.target.style.color = palette.textMuted;
-                                                    e.target.style.backgroundColor = 'transparent';
-                                                }}
-                                            >
-                                                ×
-                                            </button>
-
-                                            {/* Title and Subtitle */}
-                                            <div style={{ marginBottom: '28px' }}>
-                                                <h2 style={{
-                                                    color: palette.text,
-                                                    marginTop: 0,
-                                                    marginBottom: '6px',
-                                                    fontSize: '24px',
-                                                    fontWeight: 700
-                                                }}>
-                                                    Edit User
-                                                </h2>
-                                                <p style={{
-                                                    color: palette.textMuted,
-                                                    margin: 0,
-                                                    fontSize: '14px',
-                                                    fontWeight: 400
-                                                }}>
-                                                    Update user details and permissions
-                                                </p>
-                                            </div>
-
-                                            {/* Username / Email Field */}
-                                            <div style={{ marginBottom: '24px' }}>
-                                                <label style={{
-                                                    display: 'block',
-                                                    color: palette.text,
-                                                    marginBottom: '8px',
-                                                    fontSize: '14px',
-                                                    fontWeight: 500
-                                                }}>
-                                                    Username / Email
-                                                </label>
-                                                <input
-                                                    type="email"
-                                                    value={editingUser.email}
-                                                    readOnly
-                                                    disabled
-                                                    style={{
-                                                        width: '100%',
-                                                        padding: '12px 14px',
-                                                        backgroundColor: theme === 'light' ? '#f9fafb' : '#1a1a1a',
-                                                        border: theme === 'light' ? '1px solid #e5e7eb' : `1px solid ${palette.border}`,
-                                                        borderRadius: '8px',
-                                                        color: palette.textMuted,
-                                                        fontSize: '14px',
-                                                        cursor: 'not-allowed',
-                                                        boxSizing: 'border-box'
-                                                    }}
-                                                />
-                                                <p style={{
-                                                    color: palette.textMuted,
-                                                    margin: '6px 0 0 0',
-                                                    fontSize: '12px'
-                                                }}>
-                                                    Email cannot be changed
-                                                </p>
-                                            </div>
-
-                                            {/* Role Dropdown */}
-                                            <div style={{ marginBottom: '24px' }}>
-                                                <label style={{
-                                                    display: 'block',
-                                                    color: palette.text,
-                                                    marginBottom: '8px',
-                                                    fontSize: '14px',
-                                                    fontWeight: 500
-                                                }}>
-                                                    Role
-                                                </label>
-                                                <select
-                                                    value={editingUser.role}
-                                                    onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
-                                                    disabled={editingUser.id === user.id}
-                                                    style={{
-                                                        width: '100%',
-                                                        padding: '12px 14px',
-                                                        paddingRight: '40px',
-                                                        backgroundColor: theme === 'light' ? '#ffffff' : '#1a1a1a',
-                                                        border: theme === 'light' ? '1px solid #e5e7eb' : `1px solid ${palette.border}`,
-                                                        borderRadius: '8px',
-                                                        color: palette.text,
-                                                        fontSize: '14px',
-                                                        cursor: editingUser.id === user.id ? 'not-allowed' : 'pointer',
-                                                        outline: 'none',
-                                                        appearance: 'none',
-                                                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='${theme === 'light' ? '%231a1a1a' : '%23ffffff'}' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
-                                                        backgroundRepeat: 'no-repeat',
-                                                        backgroundPosition: 'right 14px center',
-                                                        backgroundSize: '12px',
-                                                        transition: 'all 0.2s ease',
-                                                        boxSizing: 'border-box'
-                                                    }}
-                                                    onFocus={(e) => {
-                                                        e.target.style.borderColor = palette.accent;
-                                                        e.target.style.boxShadow = `0 0 0 3px ${theme === 'light' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.2)'}`;
-                                                    }}
-                                                    onBlur={(e) => {
-                                                        e.target.style.borderColor = theme === 'light' ? '#e5e7eb' : palette.border;
-                                                        e.target.style.boxShadow = 'none';
-                                                    }}
-                                                >
-                                                    <option value="user">User</option>
-                                                    <option value="admin">Admin</option>
-                                                </select>
-                                            </div>
-
-                                            {/* Status Toggle */}
-                                            <div style={{ marginBottom: '32px' }}>
-                                                <div style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'space-between'
-                                                }}>
-                                                    <span style={{
-                                                        color: palette.text,
-                                                        fontSize: '14px',
-                                                        fontWeight: 400
-                                                    }}>
-                                                        User account is {editingUser.isApproved ? 'active' : 'inactive'}
-                                                    </span>
-                                                    <label style={{
-                                                        position: 'relative',
-                                                        display: 'inline-block',
-                                                        width: '52px',
-                                                        height: '28px',
-                                                        cursor: 'pointer'
-                                                    }}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={editingUser.isApproved}
-                                                            onChange={(e) => setEditingUser({ ...editingUser, isApproved: e.target.checked })}
-                                                            style={{
-                                                                opacity: 0,
-                                                                width: 0,
-                                                                height: 0
-                                                            }}
-                                                        />
-                                                        <span style={{
-                                                            position: 'absolute',
-                                                            cursor: 'pointer',
-                                                            top: 0,
-                                                            left: 0,
-                                                            right: 0,
-                                                            bottom: 0,
-                                                            backgroundColor: editingUser.isApproved ? palette.accent : (theme === 'light' ? '#d1d5db' : '#4b5563'),
-                                                            borderRadius: '28px',
-                                                            transition: 'background-color 0.3s ease',
-                                                            boxShadow: editingUser.isApproved
-                                                                ? (theme === 'light' ? '0 2px 4px rgba(34, 197, 94, 0.2)' : '0 2px 4px rgba(34, 197, 94, 0.3)')
-                                                                : 'none'
-                                                        }}>
-                                                            <span style={{
-                                                                position: 'absolute',
-                                                                content: '""',
-                                                                height: '22px',
-                                                                width: '22px',
-                                                                left: editingUser.isApproved ? '26px' : '3px',
-                                                                bottom: '3px',
-                                                                backgroundColor: '#ffffff',
-                                                                borderRadius: '50%',
-                                                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
-                                                            }} />
-                                                        </span>
-                                                    </label>
-                                                </div>
-                                            </div>
-
-                                            {/* Action Buttons */}
-                                            <div style={{
-                                                display: 'flex',
-                                                gap: isMobile ? '8px' : '12px',
-                                                justifyContent: 'flex-end',
-                                                paddingTop: '8px',
-                                                borderTop: theme === 'light' ? '1px solid #e5e7eb' : `1px solid ${palette.border}`,
-                                                flexDirection: isMobile ? 'column-reverse' : 'row'
-                                            }}>
-                                                <button
-                                                    onClick={closeEditModal}
-                                                    style={{
-                                                        padding: '10px 20px',
-                                                        backgroundColor: theme === 'light' ? '#ffffff' : 'transparent',
-                                                        color: palette.text,
-                                                        border: theme === 'light' ? '1px solid #e5e7eb' : `1px solid ${palette.border}`,
-                                                        borderRadius: '8px',
-                                                        cursor: 'pointer',
-                                                        fontSize: '14px',
-                                                        fontWeight: 500,
-                                                        transition: 'all 0.2s ease'
-                                                    }}
-                                                    onMouseEnter={(e) => {
-                                                        e.target.style.backgroundColor = theme === 'light' ? '#f9fafb' : 'rgba(255, 255, 255, 0.05)';
-                                                    }}
-                                                    onMouseLeave={(e) => {
-                                                        e.target.style.backgroundColor = theme === 'light' ? '#ffffff' : 'transparent';
-                                                    }}
-                                                >
-                                                    Cancel
-                                                </button>
-                                                <button
-                                                    onClick={handleSaveUser}
-                                                    style={{
-                                                        padding: '10px 20px',
-                                                        backgroundColor: theme === 'light' ? '#1a1a1a' : palette.accent,
-                                                        color: theme === 'light' ? '#ffffff' : '#121212',
-                                                        border: 'none',
-                                                        borderRadius: '8px',
-                                                        cursor: 'pointer',
-                                                        fontSize: '14px',
-                                                        fontWeight: 600,
-                                                        transition: 'all 0.2s ease'
-                                                    }}
-                                                    onMouseEnter={(e) => {
-                                                        e.target.style.backgroundColor = theme === 'light' ? '#2a2a2a' : '#2dd47e';
-                                                        e.target.style.transform = 'translateY(-1px)';
-                                                        e.target.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.15)';
-                                                    }}
-                                                    onMouseLeave={(e) => {
-                                                        e.target.style.backgroundColor = theme === 'light' ? '#1a1a1a' : palette.accent;
-                                                        e.target.style.transform = 'translateY(0)';
-                                                        e.target.style.boxShadow = 'none';
-                                                    }}
-                                                >
-                                                    Save Changes
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                            <AdminUsersView
+                                user={user}
+                                theme={theme}
+                                palette={palette}
+                                users={users}
+                                usersLoading={usersLoading}
+                                adminError={adminError}
+                                isMobile={isMobile}
+                                isTablet={isTablet}
+                                editingUser={editingUser}
+                                setEditingUser={setEditingUser}
+                                showEditModal={showEditModal}
+                                setShowEditModal={setShowEditModal}
+                                editModalAnimating={editModalAnimating}
+                                userSearchQuery={userSearchQuery}
+                                setUserSearchQuery={setUserSearchQuery}
+                                userRoleFilter={userRoleFilter}
+                                setUserRoleFilter={setUserRoleFilter}
+                                userStatusFilter={userStatusFilter}
+                                setUserStatusFilter={setUserStatusFilter}
+                                handleEditUser={handleEditUser}
+                                handleDeleteUser={handleDeleteUser}
+                                handleToggleUserStatus={handleToggleUserStatus}
+                                handleSaveUser={handleSaveUser}
+                                closeEditModal={closeEditModal}
+                            />
                         )}
                     </div>
                 </div>
 
-
-                {/* Toasts */}
-                <div style={{
-                    position: 'fixed',
-                    bottom: '20px',
-                    right: '20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '10px',
-                    zIndex: 1500
-                }}>
-                    {toasts.map((t) => (
-                        <div key={t.id} style={{
-                            minWidth: '260px',
-                            padding: '12px 14px',
-                            borderRadius: '10px',
-                            backgroundColor: t.type === 'error' ? palette.danger : t.type === 'success' ? palette.accent : palette.bgCard,
-                            color: t.type === 'error' || t.type === 'success' ? '#fff' : palette.text,
-                            border: `1px solid ${palette.border}`,
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
-                        }}>
-                            {t.message}
-                        </div>
-                    ))}
-                </div>
+                {/* Toast Component */}
+                <Toast toasts={toasts} palette={palette} />
             </>
         );
     }
 
-    // Show login/register forms
+    // Login/Register UI
     return (
         <>
             <div className="app-container" style={{ backgroundColor: palette.bgMain, color: palette.text }}>
@@ -2296,7 +513,6 @@ function App() {
                             Register
                         </button>
                     </div>
-
                     <div className="auth-content">
                         {activeTab === 'login' ? (
                             <Login
@@ -2312,332 +528,10 @@ function App() {
                 </div>
             </div>
 
-            {/* Toasts */}
-            <div style={{
-                position: 'fixed',
-                bottom: '20px',
-                right: '20px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                zIndex: 1500
-            }}>
-                {toasts.map((t) => (
-                    <div key={t.id} style={{
-                        minWidth: '260px',
-                        padding: '12px 14px',
-                        borderRadius: '10px',
-                        backgroundColor: t.type === 'error' ? palette.danger : t.type === 'success' ? palette.accent : palette.bgCard,
-                        color: t.type === 'error' || t.type === 'success' ? '#fff' : palette.text,
-                        border: `1px solid ${palette.border}`,
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
-                    }}>
-                        {t.message}
-                    </div>
-                ))}
-            </div>
+            {/* Toast Component */}
+            <Toast toasts={toasts} palette={palette} />
         </>
     );
 }
-
-function SidebarButton({ label, view, currentView, setCurrentView, theme = 'dark', palette }) {
-    const active = currentView === view;
-    const [hover, setHover] = useState(false);
-
-    return (
-        <button
-            onClick={() => setCurrentView(view)}
-            onMouseEnter={() => setHover(true)}
-            onMouseLeave={() => setHover(false)}
-            style={{
-                width: '100%',
-                padding: '12px 15px',
-                marginBottom: '10px',
-                backgroundColor: active || hover
-                    ? (theme === 'light' ? palette.accentSoft : (active ? '#1E402C' : 'rgba(255, 255, 255, 0.1)'))
-                    : 'transparent',
-                color: active
-                    ? palette.accent
-                    : (theme === 'light' ? palette.text : '#ffffff'),
-                border: active || hover
-                    ? `1px solid ${palette.accent}`
-                    : '1px solid transparent',
-                borderRadius: '10px',
-                textAlign: 'left',
-                cursor: 'pointer',
-                fontSize: '14px',
-                transition: 'all 0.15s ease',
-                boxShadow: hover ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-            }}
-        >
-            {label}
-        </button>
-    );
-}
-
-// eslint-disable-next-line no-unused-vars
-function EmptyPanel({ title, buttonLabel }) {
-    return (
-        <section>
-            <div className="flex items-center justify-between mb-6">
-                <h1 className="text-3xl font-semibold">{title}</h1>
-                <button className="btn-primary">{buttonLabel}</button>
-            </div>
-            <div className="card text-center text-[#B3B3B3]">
-                <p>No data available yet.</p>
-            </div>
-        </section>
-    );
-}
-
-// eslint-disable-next-line no-unused-vars
-function DashboardPanel({ user, dashboardData, dashboardLoading }) {
-    return (
-        <section>
-            <h1 className="text-3xl font-semibold mb-1">Welcome to NeoSec</h1>
-            <p className="text-sm text-[#B3B3B3] mb-6">VPN &amp; Firewall Manager Dashboard</p>
-
-            {!user.isApproved && (
-                <div className="card border border-amber-500 bg-[#282828] mb-6">
-                    <p className="text-amber-400 font-semibold flex items-center gap-2">
-                        ⚠️ Account Pending Approval
-                    </p>
-                    <p className="text-sm text-[#ddd] mt-2">
-                        Your account is awaiting admin approval. Some features may be restricted.
-                    </p>
-                </div>
-            )}
-
-            <div className="grid gap-5 mb-6 md:grid-cols-3">
-                <div className="card">
-                    <p className="card-title">VPN Status</p>
-                    {dashboardLoading ? (
-                        <p className="small-text">Loading...</p>
-                    ) : (
-                        <>
-                            <p
-                                className={`card-value ${dashboardData?.vpnStatus?.connected ? 'text-primary' : 'text-amber-400'
-                                    }`}
-                            >
-                                {dashboardData?.vpnStatus?.connected ? 'Connected' : 'Disconnected'}
-                            </p>
-                            <p className="small-text mt-2">
-                                {dashboardData?.vpnStatus?.server
-                                    ? `Server: ${dashboardData.vpnStatus.server}`
-                                    : 'No active connection'}
-                            </p>
-                        </>
-                    )}
-                </div>
-
-                <div className="card">
-                    <p className="card-title">Threats Blocked</p>
-                    {dashboardLoading ? (
-                        <p className="small-text">Loading...</p>
-                    ) : (
-                        <>
-                            <p className="card-value">{dashboardData?.threatsBlocked?.last24Hours || 0}</p>
-                            <p className="small-text mt-2">
-                                Last 24 hours (Total: {dashboardData?.threatsBlocked?.total || 0})
-                            </p>
-                        </>
-                    )}
-                </div>
-
-                <div className="card">
-                    <p className="card-title">Active Rules</p>
-                    <p className="card-value">12</p>
-                    <p className="small-text mt-2">Firewall rules active</p>
-                </div>
-            </div>
-
-            <div className="card">
-                <h2 className="text-xl font-semibold mb-4">Account Information</h2>
-                <div className="space-y-2 text-sm">
-                    <p><span className="text-[#B3B3B3]">Email: </span>{user.email}</p>
-                    <p>
-                        <span className="text-[#B3B3B3]">Role: </span>
-                        <span className={user.role === 'admin' ? 'text-primary font-semibold' : ''}>
-                            {user.role}
-                        </span>
-                    </p>
-                    <p>
-                        <span className="text-[#B3B3B3]">Status: </span>
-                        <span className={user.isApproved ? 'text-primary' : 'text-amber-400'}>
-                            {user.isApproved ? '✅ Approved' : '⏳ Pending'}
-                        </span>
-                    </p>
-                </div>
-            </div>
-        </section>
-    );
-}
-
-// eslint-disable-next-line no-unused-vars
-function UserManagementPanel({
-    users,
-    usersLoading,
-    adminStats,
-    editingUser,
-    setEditingUser,
-    showEditModal,
-    setShowEditModal,
-    handleEditUser,
-    handleSaveUser,
-    handleDeleteUser,
-    user
-}) {
-    return (
-        <section>
-            <div className="flex items-center justify-between mb-6">
-                <h1 className="text-3xl font-semibold">User Management</h1>
-            </div>
-
-            {adminStats && (
-                <div className="grid gap-4 mb-6 md:grid-cols-4">
-                    <div className="card">
-                        <p className="card-title">Total Users</p>
-                        <p className="card-value">{adminStats.users?.total || 0}</p>
-                    </div>
-                    <div className="card">
-                        <p className="card-title">Pending Approvals</p>
-                        <p className="card-value text-amber-400">{adminStats.users?.pendingApprovals || 0}</p>
-                    </div>
-                    <div className="card">
-                        <p className="card-title">Total Threats Blocked</p>
-                        <p className="card-value">{adminStats.threats?.totalBlocked || 0}</p>
-                    </div>
-                    <div className="card">
-                        <p className="card-title">Application Health</p>
-                        <p className="card-value">{adminStats.applicationHealth?.status || 'Unknown'}</p>
-                    </div>
-                </div>
-            )}
-
-            <div className="card">
-                <h2 className="text-lg font-semibold mb-4">All Users</h2>
-
-                {usersLoading ? (
-                    <p className="text-center text-[#B3B3B3] py-6">Loading users...</p>
-                ) : users.length === 0 ? (
-                    <p className="text-center text-[#B3B3B3] py-6">No users found.</p>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-[#282828] text-[#B3B3B3]">
-                                    <th className="px-3 py-2 text-left">Email</th>
-                                    <th className="px-3 py-2 text-left">Role</th>
-                                    <th className="px-3 py-2 text-left">Status</th>
-                                    <th className="px-3 py-2 text-left">Created</th>
-                                    <th className="px-3 py-2 text-left">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {users.map((u) => (
-                                    <tr key={u.id} className="border-b border-[#282828]">
-                                        <td className="px-3 py-2">{u.email}</td>
-                                        <td className="px-3 py-2">{u.role}</td>
-                                        <td className="px-3 py-2">
-                                            {u.isApproved ? '✅ Approved' : '⏳ Pending'}
-                                        </td>
-                                        <td className="px-3 py-2 text-[#B3B3B3]">
-                                            {new Date(u.createdAt).toLocaleDateString()}
-                                        </td>
-                                        <td className="px-3 py-2 space-x-2">
-                                            <button
-                                                onClick={() => handleEditUser(u)}
-                                                className="btn-primary !py-1 !px-3 text-xs"
-                                            >
-                                                Edit
-                                            </button>
-                                            {u.id !== user.id && (
-                                                <button
-                                                    onClick={() => handleDeleteUser(u.id)}
-                                                    className="btn-danger !py-1 !px-3 text-xs"
-                                                >
-                                                    Delete
-                                                </button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-
-            {showEditModal && editingUser && (
-                <EditUserModal
-                    editingUser={editingUser}
-                    setEditingUser={setEditingUser}
-                    setShowEditModal={setShowEditModal}
-                    handleSaveUser={handleSaveUser}
-                    currentUser={user}
-                />
-            )}
-        </section>
-    );
-}
-
-function EditUserModal({ editingUser, setEditingUser, setShowEditModal, handleSaveUser, currentUser }) {
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-            <div className="card w-full max-w-lg">
-                <h2 className="text-xl font-semibold mb-4">Edit User</h2>
-
-                <div className="space-y-4 text-sm">
-                    <div>
-                        <label className="block text-[#B3B3B3] mb-1">Email</label>
-                        <input
-                            type="email"
-                            value={editingUser.email}
-                            onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                            className="w-full px-3 py-2 bg-[#121212] border border-[#282828] rounded-lg text-sm"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-[#B3B3B3] mb-1">Role</label>
-                        <select
-                            value={editingUser.role}
-                            onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
-                            disabled={editingUser.id === currentUser.id}
-                            className="w-full px-3 py-2 bg-[#121212] border border-[#282828] rounded-lg text-sm"
-                        >
-                            <option value="user">User</option>
-                            <option value="admin">Admin</option>
-                        </select>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <input
-                            id="approved"
-                            type="checkbox"
-                            checked={editingUser.isApproved}
-                            onChange={(e) => setEditingUser({ ...editingUser, isApproved: e.target.checked })}
-                            className="w-4 h-4 accent-primary"
-                        />
-                        <label htmlFor="approved" className="text-[#B3B3B3]">Approved</label>
-                    </div>
-                </div>
-
-                <div className="mt-6 flex justify-end gap-3 text-sm">
-                    <button
-                        onClick={() => { setShowEditModal(false); setEditingUser(null); }}
-                        className="btn-secondary"
-                    >
-                        Cancel
-                    </button>
-                    <button onClick={handleSaveUser} className="btn-primary">
-                        Save
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 
 export default App;
