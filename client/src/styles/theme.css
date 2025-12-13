@@ -1,0 +1,31 @@
+/* Theme CSS Variables */
+[data-theme="dark"] {
+    --bg-main: #121212;
+    --bg-card: #181818;
+    --bg-panel: #0a0a0a;
+    --text: #ffffff;
+    --text-muted: #9aa3b5;
+    --border: #242424;
+    --accent: #36E27B;
+    --accent-soft: rgba(54,226,123,0.12);
+    --warning: #f0a500;
+    --danger: #e04848;
+    --input-bg: #1c1c1c;
+    --input-border: #2c2c2c;
+}
+
+[data-theme="light"] {
+    --bg-main: #f6f8fb;
+    --bg-card: #ffffff;
+    --bg-panel: #eef3f8;
+    --text: #0b172a;
+    --text-muted: #5b6b7a;
+    --border: #d9e2ec;
+    --accent: #1fa45a;
+    --accent-soft: #e6f4ed;
+    --warning: #d97706;
+    --danger: #d4183d;
+    --input-bg: #ffffff;
+    --input-border: #d9e2ec;
+}
+

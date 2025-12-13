@@ -259,7 +259,14 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
     const [toasts, setToasts] = useState([]);
     const showToast = (message, type = 'info') => {
         const id = Date.now();
-        setToasts((prev) => [...prev, { id, message, type }]);
+        setToasts((prev) => [...prev, { id, message, type, visible: true }]);
+        
+        // Start fade out animation before removal
+        setTimeout(() => {
+            setToasts((prev) => prev.map(t => t.id === id ? { ...t, visible: false } : t));
+        }, 2700);
+        
+        // Remove from array after fade out completes
         setTimeout(() => {
             setToasts((prev) => prev.filter((t) => t.id !== id));
         }, 3000);
@@ -1299,26 +1306,63 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
             {/* Toasts */}
             <div style={{
                 position: 'fixed',
-                bottom: '20px',
-                right: '20px',
+                top: '20px',
+                left: '50%',
+                transform: 'translateX(-50%)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '10px',
-                zIndex: 1500
+                zIndex: 1500,
+                alignItems: 'center',
+                pointerEvents: 'none'
             }}>
                 {toasts.map((t) => (
-                    <div key={t.id} style={{
-                        minWidth: '260px',
-                        padding: '12px 14px',
-                        borderRadius: '10px',
-                        backgroundColor: t.type === 'error' ? colors.danger : t.type === 'success' ? colors.accent : colors.bgCard,
-                        color: t.type === 'error' || t.type === 'success' ? '#fff' : colors.text,
-                        border: `1px solid ${colors.border}`,
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
-                    }}>
+                    <div
+                        key={t.id}
+                        style={{
+                            minWidth: '260px',
+                            maxWidth: '500px',
+                            padding: '14px 18px',
+                            borderRadius: '12px',
+                            backgroundColor: t.type === 'error' ? colors.danger : t.type === 'success' ? colors.accent : colors.bgCard,
+                            color: t.type === 'error' || t.type === 'success' ? '#fff' : colors.text,
+                            border: `1px solid ${colors.border}`,
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                            fontSize: '14px',
+                            fontWeight: 500,
+                            animation: t.visible !== false 
+                                ? 'toastSlideIn 0.3s ease-out' 
+                                : 'toastFadeOut 0.3s ease-in',
+                            animationFillMode: 'forwards',
+                            pointerEvents: 'auto',
+                            transition: 'opacity 0.3s ease, transform 0.3s ease'
+                        }}
+                    >
                         {t.message}
                     </div>
                 ))}
+                <style>{`
+                    @keyframes toastSlideIn {
+                        from {
+                            opacity: 0;
+                            transform: translateY(-20px) scale(0.95);
+                        }
+                        to {
+                            opacity: 1;
+                            transform: translateY(0) scale(1);
+                        }
+                    }
+                    @keyframes toastFadeOut {
+                        from {
+                            opacity: 1;
+                            transform: translateY(0) scale(1);
+                        }
+                        to {
+                            opacity: 0;
+                            transform: translateY(-10px) scale(0.95);
+                        }
+                    }
+                `}</style>
             </div>
         </div>
     );
