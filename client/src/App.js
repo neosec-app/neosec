@@ -60,7 +60,6 @@ function App() {
 
     // Admin State
     const [users, setUsers] = useState([]);
-    const [adminStats, setAdminStats] = useState(null);
     const [usersLoading, setUsersLoading] = useState(false);
     const [adminError, setAdminError] = useState(null);
 
