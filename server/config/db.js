@@ -86,6 +86,8 @@ const connectDB = async () => {
             'role_templates',
             'mfa_settings',
             'impersonation_sessions',
+            'blocklist_ips',
+            'activity_logs'
         ];
 
         const missingTables = await getMissingTables(tablesToCheck);

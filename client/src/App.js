@@ -17,6 +17,8 @@ import FeatureToggles from './components/FeatureToggles';
 import RoleTemplates from './components/RoleTemplates';
 import UserImpersonation from './components/UserImpersonation';
 import AdminNotifications from './components/AdminNotifications';
+import ThreatBlocker from './components/ThreatBlocker';
+import LogsAndReporting from './components/LogsAndReporting';
 import { SiAlwaysdata } from 'react-icons/si';
 import { GoAlertFill } from 'react-icons/go';
 import { MdModeEdit } from 'react-icons/md';
@@ -873,6 +875,48 @@ function App() {
                                     >
                                         Admin Notifications
                                     </button>
+                                    <button
+                                        onMouseEnter={() => setNavHover('threat-blocker')}
+                                        onMouseLeave={() => setNavHover(null)}
+                                        onClick={() => setCurrentView('threat-blocker')}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 15px',
+                                            marginBottom: '10px',
+                                            backgroundColor: currentView === 'threat-blocker' || navHover === 'threat-blocker' ? palette.accentSoft : 'transparent',
+                                            color: currentView === 'threat-blocker' || navHover === 'threat-blocker' ? palette.accent : palette.text,
+                                            border: currentView === 'threat-blocker' || navHover === 'threat-blocker' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                            borderRadius: '10px',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            transition: 'all 0.15s ease',
+                                            boxShadow: navHover === 'threat-blocker' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                        }}
+                                    >
+                                        Threat Blocker
+                                    </button>
+                                    <button
+                                        onMouseEnter={() => setNavHover('activity-logs')}
+                                        onMouseLeave={() => setNavHover(null)}
+                                        onClick={() => setCurrentView('activity-logs')}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 15px',
+                                            marginBottom: '10px',
+                                            backgroundColor: currentView === 'activity-logs' || navHover === 'activity-logs' ? palette.accentSoft : 'transparent',
+                                            color: currentView === 'activity-logs' || navHover === 'activity-logs' ? palette.accent : palette.text,
+                                            border: currentView === 'activity-logs' || navHover === 'activity-logs' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                            borderRadius: '10px',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            transition: 'all 0.15s ease',
+                                            boxShadow: navHover === 'activity-logs' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                        }}
+                                    >
+                                        Activity Logs
+                                    </button>
                                 </>
                             )}
                         </nav>
@@ -1466,6 +1510,14 @@ function App() {
 
                         {currentView === 'admin-notifications' && user.role === 'admin' && (
                             <AdminNotifications theme={theme} palette={palette} />
+                        )}
+
+                        {currentView === 'threat-blocker' && (
+                            <ThreatBlocker theme={theme} palette={palette} />
+                        )}
+
+                        {currentView === 'activity-logs' && (
+                            <LogsAndReporting theme={theme} palette={palette} />
                         )}
 
                         {currentView === 'users' && user.role === 'admin' && (

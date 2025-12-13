@@ -272,6 +272,35 @@ exports.markAsRead = async (req, res) => {
     }
 };
 
+// Mark all notifications as read
+exports.markAllAsRead = async (req, res) => {
+    try {
+        const whereClause = { userId: req.user.id, status: 'unread' };
+
+        // Admins can mark all for a specific user if userId is provided
+        if (req.user.role === 'admin' && req.body.userId) {
+            whereClause.userId = req.body.userId;
+        }
+
+        const result = await Notification.update(
+            { status: 'read' },
+            { where: whereClause }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: 'All notifications marked as read',
+            updated: result[0]
+        });
+    } catch (error) {
+        console.error('Mark all as read error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to mark all notifications as read'
+        });
+    }
+};
+
 // Delete notification
 exports.deleteNotification = async (req, res) => {
     try {

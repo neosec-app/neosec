@@ -27,7 +27,14 @@ const Notification = sequelize.define('Notification', {
             'certificate_expiring',
             'rule_violation',
             'connection_failed',
-            'security_alert'
+            'security_alert',
+            'threat_blocked',
+            'blocklist_updated',
+            'blocklist_update_failed',
+            'critical_threat_detected',
+            'scheduled_profile_failed',
+            'system_error',
+            'log_export_ready'
         ),
         allowNull: false
     },
@@ -35,6 +42,11 @@ const Notification = sequelize.define('Notification', {
         type: DataTypes.ENUM('low', 'medium', 'high', 'critical'),
         defaultValue: 'medium',
         allowNull: false
+    },
+    severity: {
+        type: DataTypes.ENUM('critical', 'warning', 'info'),
+        allowNull: true,
+        defaultValue: null
     },
     status: {
         type: DataTypes.ENUM('unread', 'read', 'archived'),

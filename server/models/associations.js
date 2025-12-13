@@ -94,6 +94,8 @@ const FeatureToggle = require('./FeatureToggle');
 const RoleTemplate = require('./RoleTemplate');
 const MFASettings = require('./MFASettings');
 const ImpersonationSession = require('./ImpersonationSession');
+const BlocklistIP = require('./BlocklistIP');
+const ActivityLog = require('./ActivityLog');
 
 // User <-> AuditLog
 User.hasMany(AuditLog, {
@@ -137,6 +139,18 @@ User.hasMany(ImpersonationSession, {
     as: 'impersonationSessions'
 });
 
+// User <-> ActivityLog
+User.hasMany(ActivityLog, {
+    foreignKey: 'userId',
+    as: 'activityLogs'
+});
+
+// Device <-> ActivityLog
+Device.hasMany(ActivityLog, {
+    foreignKey: 'deviceId',
+    as: 'activityLogs'
+});
+
 module.exports = {
     User,
     Group,
@@ -150,7 +164,9 @@ module.exports = {
     FeatureToggle,
     RoleTemplate,
     MFASettings,
-    ImpersonationSession
+    ImpersonationSession,
+    BlocklistIP,
+    ActivityLog
 };
 
 

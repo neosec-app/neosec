@@ -7,6 +7,7 @@ const {
     simulateCertificateExpiring,
     simulateFirewallError,
     markAsRead,
+    markAllAsRead,
     deleteNotification,
     getNotificationStats
 } = require('../controllers/notificationController');
@@ -20,6 +21,7 @@ router.get('/', getNotifications);                           // Get all notifica
 router.post('/', createNotification);                        // Create notification (MAIN API)
 router.get('/stats', getNotificationStats);                  // Get statistics
 router.patch('/:id/read', markAsRead);                       // Mark as read
+router.patch('/mark-all-read', markAllAsRead);              // Mark all as read
 router.delete('/:id', deleteNotification);                   // Delete
 
 // Simulation routes (for demo purposes)

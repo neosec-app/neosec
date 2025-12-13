@@ -25,6 +25,10 @@ const RoleTemplate = require('./models/RoleTemplate');
 const MFASettings = require('./models/MFASettings');
 const ImpersonationSession = require('./models/ImpersonationSession');
 
+// NEW: Add Module 3 models
+const BlocklistIP = require('./models/BlocklistIP');
+const ActivityLog = require('./models/ActivityLog');
+
 // NEW: Set up associations
 require('./models/associations');
 
@@ -120,6 +124,12 @@ app.use('/api/feature-toggles', featureToggleRoutes);
 app.use('/api/role-templates', roleTemplateRoutes);
 app.use('/api/mfa', mfaRoutes);
 app.use('/api/impersonation', impersonationRoutes);
+
+// Module 3 routes
+const threatBlockerRoutes = require('./routes/threatBlockerRoutes');
+const activityLogRoutes = require('./routes/activityLogRoutes');
+app.use('/api/threat-blocker', threatBlockerRoutes);
+app.use('/api/activity-logs', activityLogRoutes);
 
 
 // Health check route with database status

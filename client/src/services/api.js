@@ -347,6 +347,84 @@ export const deviceAPI = {
   }
 };
 
+// Threat Blocker API functions
+export const threatBlockerAPI = {
+  getStatus: async () => {
+    const response = await api.get('/threat-blocker/status');
+    return response.data;
+  },
+  getBlocklist: async (params = {}) => {
+    const response = await api.get('/threat-blocker/blocklist', { params });
+    return response.data;
+  },
+  forceUpdate: async () => {
+    const response = await api.post('/threat-blocker/force-update');
+    return response.data;
+  },
+  getStats: async () => {
+    const response = await api.get('/threat-blocker/stats');
+    return response.data;
+  },
+  updateSettings: async (settings) => {
+    const response = await api.put('/threat-blocker/settings', settings);
+    return response.data;
+  },
+  exportBlocklist: async (format = 'csv') => {
+    const response = await api.get('/threat-blocker/export', {
+      params: { format },
+      responseType: format === 'csv' ? 'blob' : 'json'
+    });
+    return response.data;
+  }
+};
+
+// Activity Log API functions
+export const activityLogAPI = {
+  getLogs: async (params = {}) => {
+    const response = await api.get('/activity-logs', { params });
+    return response.data;
+  },
+  getLogById: async (id) => {
+    const response = await api.get(`/activity-logs/${id}`);
+    return response.data;
+  },
+  exportLogs: async (params = {}, format = 'csv') => {
+    const response = await api.post('/activity-logs/export', params, {
+      params: { format },
+      responseType: format === 'csv' ? 'blob' : 'json'
+    });
+    return response.data;
+  },
+  clearLogs: async (days = 90) => {
+    const response = await api.delete('/activity-logs', { params: { days } });
+    return response.data;
+  }
+};
+
+// Notification API extensions
+export const notificationAPI = {
+  getNotifications: async (params = {}) => {
+    const response = await api.get('/notifications', { params });
+    return response.data;
+  },
+  markAsRead: async (notificationId) => {
+    const response = await api.patch(`/notifications/${notificationId}/read`);
+    return response.data;
+  },
+  markAllAsRead: async (userId = null) => {
+    const response = await api.patch('/notifications/mark-all-read', userId ? { userId } : {});
+    return response.data;
+  },
+  deleteNotification: async (notificationId) => {
+    const response = await api.delete(`/notifications/${notificationId}`);
+    return response.data;
+  },
+  getStats: async () => {
+    const response = await api.get('/notifications/stats');
+    return response.data;
+  }
+};
+
 // Login History API functions
 export const loginHistoryAPI = {
   getLoginHistory: async (params = {}) => {
@@ -440,22 +518,6 @@ export const impersonationAPI = {
   },
   getImpersonationSessions: async (activeOnly = false) => {
     const response = await api.get('/impersonation/sessions', { params: { activeOnly } });
-    return response.data;
-  }
-};
-
-// Notification API functions
-export const notificationAPI = {
-  getNotifications: async (params = {}) => {
-    const response = await api.get('/notifications', { params });
-    return response.data;
-  },
-  markAsRead: async (notificationId) => {
-    const response = await api.put(`/notifications/${notificationId}/read`);
-    return response.data;
-  },
-  deleteNotification: async (notificationId) => {
-    const response = await api.delete(`/notifications/${notificationId}`);
     return response.data;
   }
 };
