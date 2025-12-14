@@ -96,7 +96,7 @@ const Login = ({ onSwitchToRegister, onLoginSuccess }) => {
                     textAlign: 'center',
                     fontSize: '14px',
                     margin: '0 0 32px 0'
-                }}>Welcome back to NeoShield</p>
+                }}>Welcome back to NeoSec</p>
 
                 {error && (
                     <div style={{
@@ -123,7 +123,7 @@ const Login = ({ onSwitchToRegister, onLoginSuccess }) => {
                             fontSize: '13px',
                             fontWeight: '400'
                         }}>
-                            Username
+                            Email
                         </label>
                         <input
                             type="email"
