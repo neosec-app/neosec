@@ -322,8 +322,9 @@ function App() {
                         overflowY: 'auto',
                         backgroundColor: palette.bgMain,
                         color: palette.text,
-                        marginLeft: isMobile && sidebarOpen ? '260px' : '0',
-                        transition: 'background-color 0.3s ease, color 0.3s ease, padding 0.3s ease, margin-left 0.3s ease, padding-top 0.3s ease'
+                        marginLeft: isMobile ? (sidebarOpen ? '260px' : '0') : '260px',  
+                        transition: 'background-color 0.3s ease, color 0.3s ease, padding 0.3s ease, margin-left 0.3s ease, padding-top 0.3s ease',
+                        height: '100vh'  
                     }}>
                         {/* Dashboard View */}
                         {currentView === 'dashboard' && (

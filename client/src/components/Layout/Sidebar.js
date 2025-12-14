@@ -58,12 +58,13 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                 padding: isMobile && !sidebarOpen ? '0' : '20px',
                 borderRight: `1px solid ${palette.border}`,
                 transition: 'all 0.3s ease',
-                overflow: isMobile && !sidebarOpen ? 'hidden' : 'visible',
-                position: isMobile ? 'fixed' : 'relative',
-                height: isMobile ? '100vh' : 'auto',
+                overflow: isMobile && !sidebarOpen ? 'hidden' : 'auto',  // Changed to 'auto'
+                position: 'fixed',  // Changed from 'relative' to 'fixed'
+                height: '100vh',
+                overflowY: 'auto',
                 zIndex: isMobile ? 1000 : 'auto',
                 left: isMobile && !sidebarOpen ? '-260px' : '0',
-                top: isMobile ? '0' : 'auto',
+                top: 0,  // Always start from top
                 boxShadow: isMobile && sidebarOpen ? '4px 0 12px rgba(0,0,0,0.15)' : 'none'
             }}>
                 {isMobile && sidebarOpen && (
@@ -84,93 +85,108 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                         ×
                     </button>
                 )}
-                <div style={{
-                    marginBottom: '40px',
-                    paddingBottom: '20px',
-                    borderBottom: `1px solid ${palette.border}`,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                    paddingTop: isMobile && sidebarOpen ? '8px' : '0'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{
-                            width: '14px',
-                            height: '14px',
-                            borderRadius: '4px',
-                            background: theme === 'dark' ? '#7c8bff' : '#030213'
-                        }} />
-                        <h2 style={{
-                            color: palette.accent,
-                            margin: 0,
-                            fontSize: isMobile ? '18px' : '20px',
-                            letterSpacing: '0.2px'
-                        }}>NeoSec</h2>
-                    </div>
-                    <p style={{
-                        margin: 0,
-                        fontSize: '12px',
-                        color: palette.textMuted
-                    }}>{user.email}</p>
-                    <span style={{
-                        display: 'inline-block',
-                        marginTop: '10px',
-                        padding: '5px 12px',
-                        borderRadius: '15px',
-                        fontSize: '12px',
-                        backgroundColor: user.role === 'admin' ? palette.accentSoft : palette.bgPanel,
-                        color: user.role === 'admin' ? palette.accent : palette.text,
-                        border: user.role === 'admin' ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`
-                    }}>
-                        {user.role === 'admin' ? ' Admin' : ' User'}
-                    </span>
                     <div style={{
-                        marginTop: '4px',
-                        alignSelf: 'flex-start',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                    }}>
-                        <span style={{ fontSize: '12px', color: palette.textMuted }}>Theme</span>
-                        <label style={{
-                            position: 'relative',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            cursor: 'pointer'
-                        }}>
-                            <input
-                                type="checkbox"
-                                checked={theme === 'dark'}
-                                onChange={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                                style={{ display: 'none' }}
-                            />
-                            <span style={{
-                                width: '46px',
-                                height: '24px',
-                                backgroundColor: theme === 'dark' ? palette.accent : palette.border,
-                                borderRadius: '999px',
-                                position: 'relative',
-                                transition: 'all 0.2s'
+                            marginBottom: '40px',
+                            paddingBottom: '20px',
+                            borderBottom: `1px solid ${palette.border}`,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                            paddingTop: isMobile && sidebarOpen ? '8px' : '0'
                             }}>
-                                <span style={{
-                                    position: 'absolute',
-                                    top: '3px',
-                                    left: theme === 'dark' ? '24px' : '3px',
-                                    width: '18px',
-                                    height: '18px',
-                                    borderRadius: '50%',
-                                    backgroundColor: theme === 'dark' ? '#fff' : palette.text,
-                                    transition: 'all 0.2s',
-                                    boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
+                            {/* Clickable Logo */}
+                            <button
+                                onClick={() => setCurrentView('dashboard')}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: 0,
+                                    cursor: 'pointer',
+                                    transition: 'opacity 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
+                                onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                            >
+                                <div style={{
+                                    width: '14px',
+                                    height: '14px',
+                                    borderRadius: '4px',
+                                    background: theme === 'dark' ? '#7c8bff' : '#030213'
                                 }} />
-                            </span>
-                        </label>
-                        <span style={{ fontSize: '12px', color: palette.textMuted }}>
-                            {theme === 'dark' ? 'Dark' : 'Light'}
-                        </span>
-                    </div>
-                </div>
+                                <h2 style={{
+                                    color: palette.accent,
+                                    margin: 0,
+                                    fontSize: isMobile ? '18px' : '20px',
+                                    letterSpacing: '0.2px'
+                                }}>NeoSec</h2>
+                            </button>
 
+                            <p style={{
+                                margin: 0,
+                                fontSize: '12px',
+                                color: palette.textMuted
+                            }}>{user.email}</p>
+                            <span style={{
+                                display: 'inline-block',
+                                marginTop: '10px',
+                                padding: '5px 12px',
+                                borderRadius: '15px',
+                                fontSize: '12px',
+                                backgroundColor: user.role === 'admin' ? palette.accentSoft : palette.bgPanel,
+                                color: user.role === 'admin' ? palette.accent : palette.text,
+                                border: user.role === 'admin' ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`
+                            }}>
+                                {user.role === 'admin' ? ' Admin' : ' User'}
+                            </span>
+                            <div style={{
+                                marginTop: '4px',
+                                alignSelf: 'flex-start',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                            }}>
+                                <span style={{ fontSize: '12px', color: palette.textMuted }}>Theme</span>
+                                <label style={{
+                                    position: 'relative',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    cursor: 'pointer'
+                                }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={theme === 'dark'}
+                                        onChange={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                                        style={{ display: 'none' }}
+                                    />
+                                    <span style={{
+                                        width: '46px',
+                                        height: '24px',
+                                        backgroundColor: theme === 'dark' ? palette.accent : palette.border,
+                                        borderRadius: '999px',
+                                        position: 'relative',
+                                        transition: 'all 0.2s'
+                                    }}>
+                                        <span style={{
+                                            position: 'absolute',
+                                            top: '3px',
+                                            left: theme === 'dark' ? '24px' : '3px',
+                                            width: '18px',
+                                            height: '18px',
+                                            borderRadius: '50%',
+                                            backgroundColor: theme === 'dark' ? '#fff' : palette.text,
+                                            transition: 'all 0.2s',
+                                            boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
+                                        }} />
+                                    </span>
+                                </label>
+                                <span style={{ fontSize: '12px', color: palette.textMuted }}>
+                                    {theme === 'dark' ? 'Dark' : 'Light'}
+                                </span>
+                            </div>
+                            </div>
                 <nav>
                     <button
                         onMouseEnter={() => setNavHover('dashboard')}
