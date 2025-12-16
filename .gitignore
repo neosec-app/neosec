@@ -58,5 +58,5 @@ ig/
 __pycache__/
 *.pyc
 
-# Userdata from the desktop client
-desktop-client/data/
+# User data from the desktop client
+neosec-desktop/data/
