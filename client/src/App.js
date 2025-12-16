@@ -322,8 +322,9 @@ function App() {
                         overflowY: 'auto',
                         backgroundColor: palette.bgMain,
                         color: palette.text,
-                        marginLeft: isMobile && sidebarOpen ? '260px' : '0',
-                        transition: 'background-color 0.3s ease, color 0.3s ease, padding 0.3s ease, margin-left 0.3s ease, padding-top 0.3s ease'
+                        marginLeft: isMobile ? (sidebarOpen ? '260px' : '0') : '260px',  
+                        transition: 'background-color 0.3s ease, color 0.3s ease, padding 0.3s ease, margin-left 0.3s ease, padding-top 0.3s ease',
+                        height: '100vh'  
                     }}>
                         {/* Dashboard View */}
                         {currentView === 'dashboard' && (
@@ -492,46 +493,22 @@ function App() {
 
     // Login/Register UI
     return (
-        <>
-            <div className="app-container" style={{ backgroundColor: palette.bgMain, color: palette.text }}>
-                <div className="auth-container" style={{ backgroundColor: palette.bgCard, color: palette.text }}>
-                    <div className="auth-header">
-                        <h1>NeoSec</h1>
-                        <p>Welcome! Please login or register to continue.</p>
-                    </div>
-                    <div className="auth-tabs">
-                        <button
-                            className={`tab-button ${activeTab === 'login' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('login')}
-                        >
-                            Login
-                        </button>
-                        <button
-                            className={`tab-button ${activeTab === 'register' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('register')}
-                        >
-                            Register
-                        </button>
-                    </div>
-                    <div className="auth-content">
-                        {activeTab === 'login' ? (
-                            <Login
-                                onSwitchToRegister={() => setActiveTab('register')}
-                                onLoginSuccess={handleLoginSuccess}
-                            />
-                        ) : (
-                            <Register
-                                onSwitchToLogin={() => setActiveTab('login')}
-                            />
-                        )}
-                    </div>
-                </div>
-            </div>
+    <>
+        {activeTab === 'login' ? (
+            <Login
+                onSwitchToRegister={() => setActiveTab('register')}
+                onLoginSuccess={handleLoginSuccess}
+            />
+        ) : (
+            <Register
+                onSwitchToLogin={() => setActiveTab('login')}
+            />
+        )}
 
-            {/* Toast Component */}
-            <Toast toasts={toasts} palette={palette} />
-        </>
-    );
+        {/* Toast Component */}
+        <Toast toasts={toasts} palette={palette} />
+    </>
+);
 }
 
 export default App;
