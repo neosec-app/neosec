@@ -53,3 +53,7 @@ ig/
 # VPN Configs
 *.ovpn
 *.conf
+
+# Python compiled files
+__pycache__/
+*.pyc
