@@ -79,6 +79,15 @@ const connectDB = async () => {
             'subscriptions',
             'profiles',
             'profile_logs',
+            'audit_logs',
+            'devices',
+            'login_history',
+            'feature_toggles',
+            'role_templates',
+            'mfa_settings',
+            'impersonation_sessions',
+            'blocklist_ips',
+            'activity_logs'
         ];
 
         const missingTables = await getMissingTables(tablesToCheck);

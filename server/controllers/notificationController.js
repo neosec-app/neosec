@@ -1,12 +1,21 @@
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 
-// Get all notifications for current user
+// Get all notifications for current user (or all if admin)
 exports.getNotifications = async (req, res) => {
     try {
-        const { status, priority } = req.query;
+        const { status, priority, userId } = req.query;
 
-        const whereClause = { userId: req.user.id };
+        const whereClause = {};
+        
+        // Admins can view all notifications or filter by userId
+        if (req.user.role === 'admin' && userId) {
+            whereClause.userId = userId;
+        } else if (req.user.role !== 'admin') {
+            // Regular users only see their own notifications
+            whereClause.userId = req.user.id;
+        }
+        // If admin and no userId specified, show all notifications
 
         if (status) {
             whereClause.status = status;
@@ -18,6 +27,14 @@ exports.getNotifications = async (req, res) => {
 
         const notifications = await Notification.findAll({
             where: whereClause,
+            include: [
+                {
+                    model: require('../models/User'),
+                    as: 'user',
+                    attributes: ['id', 'email'],
+                    required: false
+                }
+            ],
             order: [
                 ['priority', 'DESC'], // Critical first
                 ['createdAt', 'DESC']
@@ -251,6 +268,35 @@ exports.markAsRead = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to mark notification as read'
+        });
+    }
+};
+
+// Mark all notifications as read
+exports.markAllAsRead = async (req, res) => {
+    try {
+        const whereClause = { userId: req.user.id, status: 'unread' };
+
+        // Admins can mark all for a specific user if userId is provided
+        if (req.user.role === 'admin' && req.body.userId) {
+            whereClause.userId = req.body.userId;
+        }
+
+        const result = await Notification.update(
+            { status: 'read' },
+            { where: whereClause }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: 'All notifications marked as read',
+            updated: result[0]
+        });
+    } catch (error) {
+        console.error('Mark all as read error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to mark all notifications as read'
         });
     }
 };
