@@ -57,3 +57,6 @@ ig/
 # Python compiled files
 __pycache__/
 *.pyc
+
+# Userdata from the desktop client
+desktop-client/data/
