@@ -87,5 +87,7 @@ def neosec():
     engine = QQmlApplicationEngine()
     engine.rootContext().setContextProperty("backend", backend)
     engine.load(f"{base_dir}/qml/main.qml")
+    if not engine.rootObjects():
+        sys.exit(-1)
     backend.checkSavedAuth()
     sys.exit(app.exec())
