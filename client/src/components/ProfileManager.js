@@ -1,6 +1,181 @@
-import React, { useState, useEffect } from 'react';
-
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
+
+
+const ConfirmModal = ({ message, onConfirm, onCancel, colors }) => {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10001,
+      }}
+      onClick={onCancel}
+    >
+      <div
+        style={{
+          backgroundColor: colors.bgCard,
+          border: `1px solid ${colors.border}`,
+          borderRadius: 12,
+          padding: 24,
+          maxWidth: 400,
+          width: '90%',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3
+          style={{
+            margin: '0 0 16px 0',
+            color: colors.text,
+            fontSize: 18,
+            fontWeight: 600,
+          }}
+        >
+          localhost:3000 says
+        </h3>
+        <p
+          style={{
+            margin: '0 0 24px 0',
+            color: colors.textMuted,
+            fontSize: 14,
+            lineHeight: 1.5,
+          }}
+        >
+          {message}
+        </p>
+        <div
+          style={{
+            display: 'flex',
+            gap: 12,
+            justifyContent: 'flex-end',
+          }}
+        >
+          <button
+            onClick={onConfirm}
+            style={{
+              padding: '10px 20px',
+              borderRadius: 8,
+              border: 'none',
+              backgroundColor: colors.accent,
+              color: '#ffffff',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            OK
+          </button>
+          <button
+            onClick={onCancel}
+            style={{
+              padding: '10px 20px',
+              borderRadius: 8,
+              border: 'none',
+              backgroundColor: colors.danger,
+              color: '#ffffff',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Toast notification component
+const Toast = ({message, type, onClose, colors = {}, theme = 'dark' }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 5000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const getBgColor = () => {
+    if (type === 'success') return theme === 'dark' ? '#1a3a2a' : 'rgba(31,164,90,0.1)';
+    if (type === 'error') return theme === 'dark' ? '#2A1515' : 'rgba(212,24,61,0.08)';
+    return theme === 'dark' ? '#2a2a1a' : 'rgba(240,165,0,0.1)';
+  };
+
+  const getTextColor = () => {
+    if (type === 'success') return theme === 'dark' ? '#7fdf9f' : colors.accent;
+    if (type === 'error') return theme === 'dark' ? '#FFB3B3' : colors.danger;
+    return colors.warning;
+  };
+
+  const getBorderColor = () => {
+    if (type === 'success') return colors.accent || '#36E27B';
+    if (type === 'error') return colors.danger || '#e04848';
+    return colors.warning || '#f0a500';
+  };
+
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        padding: '16px 20px',
+        backgroundColor: getBgColor(),
+        border: `1px solid ${getBorderColor()}`,
+        borderRadius: '8px',
+        color: getTextColor(),
+        fontSize: '14px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        zIndex: 10000,
+        maxWidth: '400px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: '12px',
+        animation: 'slideIn 0.3s ease-out',
+      }}
+    >
+      <span>{message}</span>
+      <button
+        onClick={onClose}
+        style={{
+          background: 'none',
+          border: 'none',
+          color: getTextColor(),
+          cursor: 'pointer',
+          fontSize: '18px',
+          padding: 0,
+          lineHeight: 1,
+        }}
+      >
+        ×
+      </button>
+
+      <style>
+        {`
+          @keyframes slideIn {
+            from {
+              transform: translateX(100%);
+              opacity: 0;
+            }
+            to {
+              transform: translateX(0);
+              opacity: 1;
+            }
+          }
+        `}
+      </style>
+    </div>
+  );
+};
+
 
 // Same idea as App.js / ScanDashboard
 const darkPalette = {
@@ -136,6 +311,14 @@ const makeStyles = (c) => ({
     borderRadius: 12,
     padding: 20,
   },
+  settingsSummary: {
+  marginTop: 16,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 6,
+  maxWidth: 420,
+},
+
   profileCardActive: (isActive) =>
     isActive
       ? {
@@ -171,6 +354,48 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
   const [showForm, setShowForm] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [editingProfile, setEditingProfile] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [confirmModal, setConfirmModal] = useState(null);
+  const [firewallRules, setFirewallRules] = useState([]);
+
+
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type });
+  };
+
+  const fetchFirewallRules = useCallback(async () => {
+    try {
+      const res = await api.get('/firewall');
+      setFirewallRules(res.data.data || []);
+    } catch (err) {
+      console.error('Error fetching firewall rules', err);
+      showToast('Failed to load firewall rules', 'error');
+    }
+  }, []);
+useEffect(() => {
+  fetchProfiles();
+  fetchLogs();
+  fetchFirewallRules();
+}, [fetchFirewallRules]);
+
+
+
+  const showConfirm = (message) => {
+    return new Promise((resolve) => {
+      setConfirmModal({
+        message,
+        onConfirm: () => {
+          setConfirmModal(null);
+          resolve(true);
+        },
+        onCancel: () => {
+          setConfirmModal(null);
+          resolve(false);
+        },
+      });
+    });
+  };
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -186,13 +411,7 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
     // Firewall
     firewallEnabled: true,
     defaultFirewallAction: 'DENY',
-    firewallRules: '',
-
-    // Access Control
-    allowedIps: '',
-    blockedIps: '',
-    allowedPorts: '',
-    blockedPorts: '',
+    firewallRules: [],
 
     // Scheduling
     isScheduled: false,
@@ -263,12 +482,7 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
             ? parseInt(formData.vpnPort)
             : null,
 
-        firewallRules: formData.firewallRules
-          ? formData.firewallRules
-            .split(',')
-            .map((r) => r.trim())
-            .filter((r) => r !== '')
-          : [],
+        firewallRules: formData.firewallRules,
 
         allowedIps: formData.allowedIps
           ? formData.allowedIps
@@ -303,10 +517,10 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
 
       if (editingProfile) {
         await api.put(`/profiles/${editingProfile.id}`, submitData);
-        alert('Profile updated successfully!');
+        showToast('Profile updated successfully!','success');
       } else {
         await api.post(`/profiles`, submitData);
-        alert('Profile created successfully!');
+        showToast('Profile created successfully!', 'success');
       }
 
       setShowForm(false);
@@ -316,9 +530,10 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
       fetchLogs();
     } catch (error) {
       console.error('Error saving profile:', error);
-      alert(
+      showToast(
         'Error saving profile: ' +
-        (error.response?.data?.message || error.message)
+        (error.response?.data?.message || error.message),
+        'error'
       );
     }
   };
@@ -338,9 +553,7 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
 
       firewallEnabled: profile.firewallEnabled,
       defaultFirewallAction: profile.defaultFirewallAction || 'DENY',
-      firewallRules: Array.isArray(profile.firewallRules)
-        ? profile.firewallRules.join(', ')
-        : '',
+      firewallRules: profile.firewallRules || [],
 
       dnsEnabled: profile.dnsEnabled,
       primaryDns: profile.primaryDns || '',
@@ -372,29 +585,31 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
   };
 
   const handleDeactivate = async (id) => {
-    if (window.confirm('Are you sure you want to deactivate this profile?')) {
+    const confirmed = await showConfirm('Are you sure you want to deactivate this profile?');
+    if (confirmed) {
       try {
         await api.put(`/profiles/${id}/deactivate`, {});
-        alert('Profile deactivated successfully!');
+        showToast('Profile deactivated successfully!');
         fetchProfiles();
         fetchLogs();
       } catch (error) {
         console.error('Error deactivating profile:', error);
-        alert('Error deactivating profile');
+        showToast('Error deactivating profile', 'error');
       }
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this profile?')) {
+    const confirmed = await showConfirm('Are you sure you want to delete this profile?');
+    if (confirmed) {
       try {
         await api.delete(`/profiles/${id}`);
-        alert('Profile deleted successfully!');
+        showToast('Profile deleted successfully!', 'success');
         fetchProfiles();
         fetchLogs();
       } catch (error) {
         console.error('Error deleting profile:', error);
-        alert('Error deleting profile');
+        showToast('Error deleting profile', 'error');
       }
     }
   };
@@ -402,12 +617,12 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
   const handleActivate = async (id) => {
     try {
       await api.put(`/profiles/${id}/activate`, {});
-      alert('Profile activated successfully!');
+      showToast('Profile activated successfully!', 'success');
       fetchProfiles();
       fetchLogs();
     } catch (error) {
       console.error('Error activating profile:', error);
-      alert('Error activating profile');
+      showToast('Error activating profile', 'error');
     }
   };
 
@@ -423,7 +638,7 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
       vpnUsername: '',
       firewallEnabled: true,
       defaultFirewallAction: 'DENY',
-      firewallRules: '',
+      firewallRules: [],
       dnsEnabled: false,
       primaryDns: '',
       secondaryDns: '',
@@ -478,6 +693,28 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
 
   return (
     <div className="profile-manager" style={styles.container}>
+      {/* Confirmation Modal */}
+      {confirmModal && (
+        <ConfirmModal
+          message={confirmModal.message}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={confirmModal.onCancel}
+          colors={colors}
+        />
+      )}
+
+      {/* Toast notifications */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+          colors={colors}
+          theme={theme}
+        />
+      )}
+
+
       {/* Header */}
       <div
         className="pm-header"
@@ -551,18 +788,16 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
                 <div key={log.id} className="log-card" style={styles.logCard}>
                   <div
                     className="log-card-header"
-                    style={{
+                     style={{
                       display: 'flex',
-                      justifyContent: 'space-between',
                       alignItems: 'center',
-                      marginBottom: 6,
+                      gap: 12,
                     }}
                   >
                     <span className="log-date" style={styles.logDate}>
                       {formatDate(log.createdAt)}
                     </span>
 
-                    {/* 👇 change only this span */}
                     <span
                       className={`action-badge ${getActionBadgeClass(log.action)}`}
                       style={{
@@ -574,12 +809,12 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
                         letterSpacing: 0.5,
                         backgroundColor:
                           log.action === 'DEACTIVATED'
-                            ? 'rgba(249,115,22,0.12)' // orange bg
-                            : colors.accentSoft,        // green-ish for others
+                            ? 'rgba(249,115,22,0.12)'
+                            : colors.accentSoft,
                         color:
                           log.action === 'DEACTIVATED'
-                            ? '#f97316'                // orange text
-                            : colors.accent,           // green text for others
+                            ? '#f97316'
+                            : colors.accent,
                       }}
                     >
                       {log.action}
@@ -772,134 +1007,98 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
             </div>
 
             {/* Firewall Settings */}
-            <div className="form-section" style={styles.formSection}>
-              <h4
-                style={{
-                  marginTop: 0,
-                  marginBottom: 16,
-                  color: colors.accent,
-                  fontSize: 18,
-                  fontWeight: 600,
-                }}
-              >
-                Firewall Settings
-              </h4>
-              <label
-                className="checkbox-label"
-                style={styles.checkboxLabel}
-              >
-                <input
-                  type="checkbox"
-                  name="firewallEnabled"
-                  checked={formData.firewallEnabled}
-                  onChange={handleInputChange}
-                />
-                <span>Enable Firewall</span>
-              </label>
+              <div className="form-section" style={styles.formSection}>
+                <h4
+                  style={{
+                    marginTop: 0,
+                    marginBottom: 16,
+                    color: colors.accent,
+                    fontSize: 18,
+                    fontWeight: 600,
+                  }}
+                >
+                  Firewall Settings
+                </h4>
 
+                <label className="checkbox-label" style={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    name="firewallEnabled"
+                    checked={formData.firewallEnabled}
+                    onChange={handleInputChange}
+                  />
+                  <span>Enable Firewall</span>
+                </label>
 
-              {formData.firewallEnabled && (
-                <div className="nested-fields">
-                  <div className="form-group">
-                    <label>Default Action</label>
-                    <select
-                      name="defaultFirewallAction"
-                      value={formData.defaultFirewallAction}
-                      onChange={handleInputChange}
-                      className="form-select"
-                      style={styles.select}
-                    >
-                      <option value="ALLOW">
-                        Allow All (Blacklist Mode)
-                      </option>
-                      <option value="DENY">
-                        Deny All (Whitelist Mode)
-                      </option>
-                    </select>
+                {formData.firewallEnabled && (
+                  <div className="nested-fields">
+                    {/* Default Action */}
+                    <div className="form-group">
+                      <label>Default Action</label>
+                      <select
+                        name="defaultFirewallAction"
+                        value={formData.defaultFirewallAction}
+                        onChange={handleInputChange}
+                        style={styles.select}
+                      >
+                        <option value="ALLOW">Allow All (Blacklist Mode)</option>
+                        <option value="DENY">Deny All (Whitelist Mode)</option>
+                      </select>
+                    </div>
+
+                    {/* Rule Selector */}
+                    <div className="form-group">
+                      <label>Select Firewall Rules</label>
+
+                      {firewallRules.length === 0 ? (
+                        <p style={{ color: colors.textMuted, fontSize: 13 }}>
+                          No firewall rules found. Create rules in Firewall Management.
+                        </p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {firewallRules.map((rule) => (
+                            <label
+                              key={rule.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                fontSize: 13,
+                                color: colors.text,
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={formData.firewallRules.includes(rule.id)}
+                                onChange={() =>
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    firewallRules: prev.firewallRules.includes(rule.id)
+                                      ? prev.firewallRules.filter((id) => id !== rule.id)
+                                      : [...prev.firewallRules, rule.id],
+                                  }))
+                                }
+                              />
+                              <span
+                                style={{
+                                  fontWeight: 700,
+                                  color: rule.action === 'allow' ? colors.accent : colors.danger,
+                                }}
+                              >
+                                {rule.action.toUpperCase()}
+                              </span>
+                              <span style={{ color: colors.textMuted }}>
+                                {rule.protocol.toUpperCase()} • {rule.direction.toUpperCase()}
+                              </span>
+
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-
-                  <div className="form-group">
-                    <label>Custom Rules (comma-separated)</label>
-                    <input
-                      type="text"
-                      name="firewallRules"
-                      placeholder="rule1, rule2, rule3"
-                      value={formData.firewallRules}
-                      onChange={handleInputChange}
-                      className="form-input"
-                      style={styles.formInput}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Access Control */}
-            <div className="form-section" style={styles.formSection}>
-              <h4
-                style={{
-                  marginTop: 0,
-                  marginBottom: 16,
-                  color: colors.accent,
-                  fontSize: 18,
-                  fontWeight: 600,
-                }}
-              >
-                Access Control
-              </h4>
-
-              <div className="form-group">
-                <label>Allowed IPs (comma-separated)</label>
-                <input
-                  type="text"
-                  name="allowedIps"
-                  placeholder="192.168.1.1, 10.0.0.1"
-                  value={formData.allowedIps}
-                  onChange={handleInputChange}
-                  className="form-input"
-                  style={styles.formInput}
-                />
+                )}
               </div>
-
-              <div className="form-group">
-                <label>Blocked IPs (comma-separated)</label>
-                <input
-                  type="text"
-                  name="blockedIps"
-                  placeholder="192.168.1.100, 10.0.0.50"
-                  value={formData.blockedIps}
-                  onChange={handleInputChange}
-                  className="form-input"
-                  style={styles.formInput}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Allowed Ports (comma-separated)</label>
-                <input
-                  type="text"
-                  name="allowedPorts"
-                  placeholder="80, 443, 8080"
-                  value={formData.allowedPorts}
-                  onChange={handleInputChange}
-                  className="form-input"
-                  style={styles.formInput}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Blocked Ports (comma-separated)</label>
-                <input
-                  type="text"
-                  name="blockedPorts"
-                  placeholder="21, 23, 25"
-                  value={formData.blockedPorts}
-                  onChange={handleInputChange}
-                  className="form-input"
-                  style={styles.formInput}
-                />
-              </div>
-            </div>
 
             {/* Scheduling */}
             <div className="form-section" style={styles.formSection}>
@@ -1135,12 +1334,12 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
                   {/* LEFT: info */}
                   <div
                     className="profile-info"
-                    style={{ flex: 1, minWidth: 0 }}
+                    style={{ maxWidth: 520 }}
                   >
                     <div
                       className="profile-title"
                       style={{
-                        marginBottom: 10,
+                        marginBottom: 12,
                       }}
                     >
                       {/* Name on its own line */}
@@ -1150,6 +1349,7 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
                           color: colors.text,
                           fontSize: 18,
                           fontWeight: 600,
+                          marginBottom: 8,
                         }}
                       >
                         {profile.name}
@@ -1162,7 +1362,6 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
                           display: 'flex',
                           gap: 6,
                           flexWrap: 'wrap',
-                          marginTop: 4,
                         }}
                       >
                         {profile.isActive && (
@@ -1184,11 +1383,12 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
                           className="badge badge-type"
                           style={{
                             padding: '3px 8px',
-                            borderRadius: 999,
+                            borderRadius: 4,
                             fontSize: 11,
-                            backgroundColor: colors.accentSoft,
+                            backgroundColor: 'transparent',
                             color: colors.accent,
                             fontWeight: 500,
+                            border: `1px solid ${colors.accent}`,
                           }}
                         >
                           {profile.profileType}
@@ -1201,7 +1401,8 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
                       <p
                         style={{
                           color: colors.textMuted,
-                          marginBottom: 12,
+                          marginBottom: 16,
+                          margin: 0,
                         }}
                       >
                         {profile.description}
@@ -1209,9 +1410,38 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
                     )}
 
                     {/* Settings Summary */}
-                    <div className="settings-summary">
-                      <div className="setting-item">
-                        <strong>VPN:</strong>{' '}
+                    <div
+                      className="settings-summary"
+                      style={{
+                        marginTop: 14,
+                        paddingLeft: 12,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8,
+                        maxWidth: 420,
+                      }}
+
+
+                    >
+                      <div 
+                        className="setting-item" 
+                        style={{ 
+                          display: 'grid',
+                          gridTemplateColumns: '100px auto',
+                          alignItems: 'center',
+                          gap: '8px',
+                        }}
+
+                      >
+                        <strong
+                          style={{
+                            color: colors.textMuted,
+                            fontWeight: 600,
+                          }}
+                        >
+                          VPN:
+                        </strong>
+
                         {profile.vpnEnabled ? (
                           <span
                             style={{ color: colors.accent, fontWeight: 500 }}
@@ -1227,8 +1457,20 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
                         )}
                       </div>
 
-                      <div className="setting-item">
-                        <strong>Firewall:</strong>{' '}
+                      <div 
+                        className="setting-item" 
+                        style={{ 
+                          display: 'grid',
+                          gridTemplateColumns: '120px auto',
+                          alignItems: 'center',
+                          gap: '8px',
+                        }}
+
+                      >
+                        <strong style={{ color: colors.textMuted, fontWeight: 600 }}>
+                          Firewall:
+                        </strong>
+
                         {profile.firewallEnabled ? (
                           <span
                             style={{ color: colors.accent, fontWeight: 500 }}
@@ -1244,8 +1486,20 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
                         )}
                       </div>
 
-                      <div className="setting-item">
-                        <strong>Scheduling:</strong>{' '}
+                      <div 
+                        className="setting-item"
+                        style={{ 
+                          display: 'grid',
+                          gridTemplateColumns: '120px auto',
+                          alignItems: 'center',
+                          gap: '8px',
+                        }}
+
+                      >
+                        <strong style={{ color: colors.textMuted, fontWeight: 600 }}>
+                          Scheduling:
+                        </strong>
+
                         {profile.isScheduled ? (
                           <span
                             style={{ color: colors.accent, fontWeight: 500 }}
@@ -1268,15 +1522,14 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
                       style={{
                         fontSize: 12,
                         color: colors.textMuted,
-                        marginTop: 12,
+                        marginTop: 16,
                       }}
                     >
-                      <p>Created: {formatDate(profile.createdAt)}</p>
+                      <p style={{ margin: '4px 0' }}>Created: {formatDate(profile.createdAt)}</p>
                       {profile.lastActivatedAt && (
-                        <p>
+                        <p style={{ margin: '4px 0' }}>
                           Last Activated:{' '}
-                          {formatDate(profile.lastActivatedAt)} (
-                          {profile.activationCount} times)
+                          {formatDate(profile.lastActivatedAt)} ({profile.activationCount} times)
                         </p>
                       )}
                     </div>
