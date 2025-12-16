@@ -53,3 +53,10 @@ ig/
 # VPN Configs
 *.ovpn
 *.conf
+
+# Python compiled files
+__pycache__/
+*.pyc
+
+# User data from the desktop client
+neosec-desktop/data/
