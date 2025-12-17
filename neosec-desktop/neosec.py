@@ -21,6 +21,7 @@ class AuthWorker(QRunnable):
     def run(self):
         if self.user and self.password:
             try: 
+                os.remove(auth_file)
                 authenticationResponse = requests.post(auth_url, data={"email": self.user, "password": self.password}, timeout=10).json()
                 message = authenticationResponse.get("message")
                 if authenticationResponse.get('success'):
