@@ -364,14 +364,12 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
   };
 
   const fetchFirewallRules = useCallback(async () => {
-    try {
-      const res = await api.get('/firewall');
-      setFirewallRules(res.data.data || []);
-    } catch (err) {
-      console.error('Error fetching firewall rules', err);
-      showToast('Failed to load firewall rules', 'error');
-    }
+    const res = await api.get('/firewall');
+    setFirewallRules(res.data.data || []);
   }, []);
+
+
+
 useEffect(() => {
   fetchProfiles();
   fetchLogs();
@@ -422,6 +420,9 @@ useEffect(() => {
     scheduleCondition: '',
     autoActivate: false,
   });
+    const selectedFirewallRules = firewallRules.filter(rule =>
+      formData.firewallRules.includes(rule.id)
+    );
 
   useEffect(() => {
     fetchProfiles();
@@ -553,7 +554,12 @@ useEffect(() => {
 
       firewallEnabled: profile.firewallEnabled,
       defaultFirewallAction: profile.defaultFirewallAction || 'DENY',
-      firewallRules: profile.firewallRules || [],
+      firewallRules: Array.isArray(profile.firewallRules)
+        ? profile.firewallRules.map(r =>
+            typeof r === 'string' ? r : r.id
+          )
+        : [],
+
 
       dnsEnabled: profile.dnsEnabled,
       primaryDns: profile.primaryDns || '',
@@ -655,6 +661,7 @@ useEffect(() => {
       autoActivate: false,
     });
   };
+
 
   const handleCancel = () => {
     setShowForm(false);
@@ -1006,99 +1013,277 @@ useEffect(() => {
               )}
             </div>
 
-            {/* Firewall Settings */}
-              <div className="form-section" style={styles.formSection}>
-                <h4
-                  style={{
-                    marginTop: 0,
-                    marginBottom: 16,
-                    color: colors.accent,
-                    fontSize: 18,
-                    fontWeight: 600,
-                  }}
-                >
-                  Firewall Settings
-                </h4>
+            {/* Firewall Rules Selection */}
+            <div className="form-section" style={styles.formSection}>
+              <h4
+                style={{
+                  marginTop: 0,
+                  marginBottom: 16,
+                  color: colors.accent,
+                  fontSize: 18,
+                  fontWeight: 600,
+                }}
+              >
+                Firewall Rules
+              </h4>
 
-                <label className="checkbox-label" style={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    name="firewallEnabled"
-                    checked={formData.firewallEnabled}
-                    onChange={handleInputChange}
-                  />
-                  <span>Enable Firewall</span>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', marginBottom: 8, color: colors.text, fontWeight: 500 }}>
+                  Select Firewall Rule Set to Apply
                 </label>
-
-                {formData.firewallEnabled && (
-                  <div className="nested-fields">
-                    {/* Default Action */}
-                    <div className="form-group">
-                      <label>Default Action</label>
-                      <select
-                        name="defaultFirewallAction"
-                        value={formData.defaultFirewallAction}
-                        onChange={handleInputChange}
-                        style={styles.select}
-                      >
-                        <option value="ALLOW">Allow All (Blacklist Mode)</option>
-                        <option value="DENY">Deny All (Whitelist Mode)</option>
-                      </select>
-                    </div>
-
-                    {/* Rule Selector */}
-                    <div className="form-group">
-                      <label>Select Firewall Rules</label>
-
-                      {firewallRules.length === 0 ? (
-                        <p style={{ color: colors.textMuted, fontSize: 13 }}>
-                          No firewall rules found. Create rules in Firewall Management.
-                        </p>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {firewallRules.map((rule) => (
-                            <label
-                              key={rule.id}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                fontSize: 13,
-                                color: colors.text,
-                              }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={formData.firewallRules.includes(rule.id)}
-                                onChange={() =>
-                                  setFormData((prev) => ({
-                                    ...prev,
-                                    firewallRules: prev.firewallRules.includes(rule.id)
-                                      ? prev.firewallRules.filter((id) => id !== rule.id)
-                                      : [...prev.firewallRules, rule.id],
-                                  }))
-                                }
-                              />
+                <p style={{ fontSize: 12, color: colors.textMuted, marginBottom: 12 }}>
+                  Choose one firewall rule configuration for this profile
+                </p>
+                
+                {firewallRules.length === 0 ? (
+                  <p style={{ color: colors.textMuted, fontSize: 13 }}>
+                    No firewall rules available. Create rules in the Firewall Management section first.
+                  </p>
+                ) : (
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: 10,
+                    maxHeight: 300,
+                    overflowY: 'auto',
+                    padding: 4
+                  }}>
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 12,
+                        padding: 12,
+                        borderRadius: 8,
+                        border: `2px solid ${formData.firewallRules.length === 0 ? colors.accent : colors.border}`,
+                        backgroundColor: formData.firewallRules.length === 0
+                          ? (theme === 'dark' ? 'rgba(54,226,123,0.08)' : colors.accentSoft)
+                          : colors.bgPanel,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (formData.firewallRules.length !== 0) {
+                          e.currentTarget.style.borderColor = colors.textMuted;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (formData.firewallRules.length !== 0) {
+                          e.currentTarget.style.borderColor = colors.border;
+                        }
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="firewallRuleSelection"
+                        checked={formData.firewallRules.length === 0}
+                        onChange={() => {
+                          setFormData({
+                            ...formData,
+                            firewallRules: []
+                          });
+                        }}
+                        style={{
+                          marginTop: 2,
+                          cursor: 'pointer',
+                          width: 16,
+                          height: 16,
+                          accentColor: colors.accent
+                        }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ 
+                          fontSize: 14, 
+                          fontWeight: 700, 
+                          color: colors.text,
+                          marginBottom: 4
+                        }}>
+                          No Firewall Rule (Default)
+                        </div>
+                        <div style={{ fontSize: 12, color: colors.textMuted }}>
+                          Use system default firewall settings only
+                        </div>
+                      </div>
+                    </label>
+                    
+                    {firewallRules.map((rule, index) => {
+                      const isSelected = formData.firewallRules.includes(rule.id);
+                      return (
+                        <label
+                          key={rule.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: 12,
+                            padding: 12,
+                            borderRadius: 8,
+                            border: `2px solid ${isSelected ? colors.accent : colors.border}`,
+                            backgroundColor: isSelected 
+                              ? (theme === 'dark' ? 'rgba(54,226,123,0.08)' : colors.accentSoft)
+                              : colors.bgPanel,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.borderColor = colors.textMuted;
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.borderColor = colors.border;
+                            }
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="firewallRuleSelection"
+                            checked={isSelected}
+                            onChange={() => {
+                              setFormData({
+                                ...formData,
+                                firewallRules: [rule.id]
+                              });
+                            }}
+                            style={{
+                              marginTop: 2,
+                              cursor: 'pointer',
+                              width: 16,
+                              height: 16,
+                              accentColor: colors.accent
+                            }}
+                          />
+                          
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                               <span
                                 style={{
+                                  fontSize: 14,
                                   fontWeight: 700,
-                                  color: rule.action === 'allow' ? colors.accent : colors.danger,
+                                  color: colors.text,
                                 }}
                               >
-                                {rule.action.toUpperCase()}
+                                Firewall Rule {index + 1}
                               </span>
-                              <span style={{ color: colors.textMuted }}>
-                                {rule.protocol.toUpperCase()} • {rule.direction.toUpperCase()}
+                              
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  color: colors.textMuted,
+                                  fontFamily: 'monospace',
+                                  opacity: 0.6
+                                }}
+                              >
+                                
                               </span>
+                              
+                              <span
+                                style={{
+                                  padding: '3px 10px',
+                                  borderRadius: 12,
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  backgroundColor: rule.action === 'allow'
+                                    ? (theme === 'dark' ? '#1E402C' : '#e6f4ed')
+                                    : (theme === 'dark' ? '#40201E' : '#fee2e2'),
+                                  color: rule.action === 'allow'
+                                    ? (theme === 'dark' ? '#36E27B' : '#1fa45a')
+                                    : (theme === 'dark' ? '#FF7777' : '#d4183d'),
+                                }}
+                              >
+                                {rule.action === 'allow' ? '✓' : '✗'} {rule.action.toUpperCase()}
+                              </span>
+                              
+                              <span
+                                style={{
+                                  padding: '3px 8px',
+                                  borderRadius: 12,
+                                  fontSize: 11,
+                                  backgroundColor: theme === 'light' ? '#f1f3f5' : '#2a2a2a',
+                                  color: colors.textMuted,
+                                  fontWeight: 500
+                                }}
+                              >
+                                {(rule.protocol || 'any').toUpperCase()}
+                              </span>
+                              
+                              <span style={{ fontSize: 11, color: colors.textMuted }}>
+                                {rule.direction.toUpperCase()}
+                              </span>
+                            </div>
 
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                            <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 3 }}>
+                              <strong>Source:</strong> {rule.sourceIP || 'Any'}:{rule.sourcePort || 'Any'}
+                            </div>
+
+                            <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 3 }}>
+                              <strong>Destination:</strong> {rule.destinationIP || 'Any'}:{rule.destinationPort || 'Any'}
+                            </div>
+
+                            {rule.description && (
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  fontStyle: 'italic',
+                                  color: colors.textMuted,
+                                  marginTop: 6,
+                                }}
+                              >
+                                "{rule.description}"
+                              </div>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
                   </div>
                 )}
               </div>
+
+              {/* Selected Rule Summary */}
+              {selectedFirewallRules.length > 0 && (
+                <div style={{ 
+                  marginTop: 16, 
+                  padding: 12, 
+                  backgroundColor: colors.bgCard,
+                  borderRadius: 8,
+                  border: `1px solid ${colors.accent}`
+                }}>
+                  <div style={{ 
+                    fontSize: 13, 
+                    fontWeight: 600, 
+                    color: colors.text,
+                    marginBottom: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6
+                  }}>
+                    <span>✓</span> Selected Rule
+                  </div>
+                  <div style={{ fontSize: 12, color: colors.textMuted }}>
+                    {selectedFirewallRules.map((rule) => {
+                      const ruleIndex = firewallRules.findIndex(r => r.id === rule.id);
+                      return (
+                        <div key={rule.id} style={{ 
+                          padding: 8,
+                          backgroundColor: colors.bgPanel,
+                          borderRadius: 6,
+                          border: `1px solid ${colors.border}`
+                        }}>
+                          <div style={{ fontWeight: 600, color: colors.text, marginBottom: 4 }}>
+                            Firewall Rule {ruleIndex + 1}
+                          </div>
+                          <div>
+                            {rule.action.toUpperCase()} - {rule.protocol.toUpperCase()} ({rule.direction})
+                            {rule.description && ` - ${rule.description}`}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Scheduling */}
             <div className="form-section" style={styles.formSection}>
@@ -1625,5 +1810,6 @@ useEffect(() => {
     </div>
   );
 };
+
 
 export default ProfileManager;
