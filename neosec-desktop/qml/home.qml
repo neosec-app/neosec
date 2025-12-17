@@ -3,9 +3,6 @@ import QtQuick.Controls
 
 Page {
     id: page
-    Component.onCompleted: {
-        leftBarMenuStack.push(dashboardPage)
-    }
     anchors.centerIn: parent
     height: 720
     width: 1080
@@ -91,8 +88,8 @@ Page {
                 width: parent.width
                 onClicked: {
                     page.currentSelection = "dashboardBtn"
-                    if (leftBarMenuStack.currentItem !== dashboardPage) {
-                        leftBarMenuStack.push(dashboardPage)
+                    if (contentStack.currentItem !== dashboardView) {
+                        contentStack.push(dashboardView, StackView.Immediate)
                     }
                 }
                 contentItem: Row {
@@ -127,8 +124,8 @@ Page {
                 width: parent.width
                 onClicked: {
                     page.currentSelection = "vpnBtn"
-                    if (leftBarMenuStack.currentItem !== vpnPage) {
-                        leftBarMenuStack.push(vpnPage)
+                    if (contentStack.currentItem !== vpnView) {
+                        contentStack.push(vpnView, StackView.Immediate)
                     }
                 }
                 contentItem: Row {
@@ -163,8 +160,8 @@ Page {
                 width: parent.width
                 onClicked: {
                     page.currentSelection = "firewallBtn"
-                    if (leftBarMenuStack.currentItem !== firewallPage) {
-                        leftBarMenuStack.push(firewallPage)
+                    if (contentStack.currentItem !== firewallView) {
+                        contentStack.push(firewallView, StackView.Immediate)
                     }
                 }
                 contentItem: Row {
@@ -219,5 +216,32 @@ Page {
             }
         }
 
+    }
+
+    StackView {
+        id: contentStack
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: leftBar.right
+        anchors.right: parent.right
+        clip: true
+        initialItem: dashboardView
+
+        Component {
+                id: dashboardView
+                // Loads the QML file named DashboardView.qml
+                Loader { source: "dashboard.qml" }
+            }
+
+            Component {
+                id: vpnView
+                // Loads the QML file named VpnView.qml
+                Loader { source: "vpn.qml" }
+            }
+
+            Component {
+                id: firewallView
+                Loader { source: "firewall.qml" }
+            }
     }
 }

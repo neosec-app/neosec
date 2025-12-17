@@ -42,10 +42,21 @@ logs/
 # Custom folders
 ig/
 
-#QT Project files
+# QT Project files
 *.qmlproject
 *.qtds
 *.qrc
 
-#client auth credentials
+# client auth credentials
 **auth.json
+
+# VPN Configs
+*.ovpn
+*.conf
+
+# Python compiled files
+__pycache__/
+*.pyc
+
+# User data from the desktop client
+neosec-desktop/data/

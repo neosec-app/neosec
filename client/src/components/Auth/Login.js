@@ -9,6 +9,8 @@ const Login = ({ onSwitchToRegister, onLoginSuccess }) => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
+    const [capsLockOn, setCapsLockOn] = useState(false);
+    const [showSuccessToast, setShowSuccessToast] = useState(false);
 
     const handleChange = (e) => {
         setFormData({
@@ -16,6 +18,10 @@ const Login = ({ onSwitchToRegister, onLoginSuccess }) => {
             [e.target.name]: e.target.value
         });
         setError('');
+    };
+
+    const handleKeyDown = (e) => {
+        setCapsLockOn(e.getModifierState('CapsLock'));
     };
 
     const handleSubmit = async (e) => {
@@ -27,9 +33,12 @@ const Login = ({ onSwitchToRegister, onLoginSuccess }) => {
             const response = await authAPI.login(formData.email, formData.password);
 
             if (response.success) {
-                if (onLoginSuccess) {
-                    onLoginSuccess(response.user);
-                }
+                setShowSuccessToast(true);
+                setTimeout(() => {
+                    if (onLoginSuccess) {
+                        onLoginSuccess(response.user);
+                    }
+                }, 1500);
             } else {
                 setError(response.message || 'Login failed. Please try again.');
             }
@@ -50,16 +59,82 @@ const Login = ({ onSwitchToRegister, onLoginSuccess }) => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '20px'
+            padding: '20px',
+            position: 'relative'
         }}>
+            {/* Success Toast - Outside the box */}
+            {showSuccessToast && (
+                <div style={{
+                    position: 'fixed',
+                    top: '20px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'rgba(28, 28, 28, 0.95)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(54, 226, 123, 0.3)',
+                    borderRadius: '8px',
+                    padding: '14px 24px',
+                    color: '#fff',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    animation: 'slideInFromTop 0.3s ease',
+                    zIndex: 10000,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)'
+                }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#36E27B" strokeWidth="2.5">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                    Login successful
+                </div>
+            )}
+
             <div style={{
                 width: '100%',
                 maxWidth: '380px',
-                backgroundColor: '#1c1c1c',
+                background: 'rgba(28, 28, 28, 0.6)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
                 borderRadius: '8px',
                 padding: '40px 35px',
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)'
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+                position: 'relative',
+                overflow: 'hidden'
             }}>
+                {/* Loading Bar */}
+                {loading && (
+                    <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '3px',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        overflow: 'hidden'
+                    }}>
+                        <div style={{
+                            height: '100%',
+                            background: 'linear-gradient(90deg, transparent, #36E27B, transparent)',
+                            animation: 'loading 1.5s infinite',
+                            width: '50%'
+                        }} />
+                    </div>
+                )}
+                <style>{`
+                    @keyframes loading {
+                        0% { transform: translateX(-100%); }
+                        100% { transform: translateX(300%); }
+                    }
+                    @keyframes slideInFromTop {
+                        from { transform: translate(-50%, -100%); opacity: 0; }
+                        to { transform: translate(-50%, 0); opacity: 1; }
+                    }
+                `}</style>
                 {/* Shield Icon */}
                 <div style={{
                     textAlign: 'center',
@@ -96,12 +171,12 @@ const Login = ({ onSwitchToRegister, onLoginSuccess }) => {
                     textAlign: 'center',
                     fontSize: '14px',
                     margin: '0 0 32px 0'
-                }}>Welcome back to NeoShield</p>
+                }}>Welcome back to NeoSec</p>
 
                 {error && (
                     <div style={{
                         padding: '12px 15px',
-                        backgroundColor: '#2a1515',
+                        backgroundColor: 'rgba(42, 21, 21, 0.8)',
                         border: '1px solid #ff4444',
                         borderRadius: '6px',
                         color: '#ff6666',
@@ -123,21 +198,23 @@ const Login = ({ onSwitchToRegister, onLoginSuccess }) => {
                             fontSize: '13px',
                             fontWeight: '400'
                         }}>
-                            Username
+                            Email
                         </label>
                         <input
                             type="email"
                             name="email"
                             value={formData.email}
                             onChange={handleChange}
+                            onKeyDown={handleKeyDown}
+                            onKeyUp={handleKeyDown}
                             required
-                            placeholder="Enter your username"
+                            placeholder="Enter your email"
                             autoComplete="email"
                             style={{
                                 width: '100%',
                                 padding: '12px 14px',
-                                backgroundColor: '#2a2a2a',
-                                border: '1px solid #3a3a3a',
+                                backgroundColor: 'rgba(42, 42, 42, 0.6)',
+                                border: '1px solid rgba(58, 58, 58, 0.8)',
                                 borderRadius: '6px',
                                 color: '#fff',
                                 fontSize: '14px',
@@ -146,7 +223,7 @@ const Login = ({ onSwitchToRegister, onLoginSuccess }) => {
                                 boxSizing: 'border-box'
                             }}
                             onFocus={(e) => e.target.style.borderColor = '#36E27B'}
-                            onBlur={(e) => e.target.style.borderColor = '#3a3a3a'}
+                            onBlur={(e) => e.target.style.borderColor = 'rgba(58, 58, 58, 0.8)'}
                         />
                     </div>
 
@@ -166,14 +243,16 @@ const Login = ({ onSwitchToRegister, onLoginSuccess }) => {
                             name="password"
                             value={formData.password}
                             onChange={handleChange}
+                            onKeyDown={handleKeyDown}
+                            onKeyUp={handleKeyDown}
                             required
                             placeholder="Enter your password"
                             autoComplete="current-password"
                             style={{
                                 width: '100%',
                                 padding: '12px 14px',
-                                backgroundColor: '#2a2a2a',
-                                border: '1px solid #3a3a3a',
+                                backgroundColor: 'rgba(42, 42, 42, 0.6)',
+                                border: '1px solid rgba(58, 58, 58, 0.8)',
                                 borderRadius: '6px',
                                 color: '#fff',
                                 fontSize: '14px',
@@ -182,8 +261,18 @@ const Login = ({ onSwitchToRegister, onLoginSuccess }) => {
                                 boxSizing: 'border-box'
                             }}
                             onFocus={(e) => e.target.style.borderColor = '#36E27B'}
-                            onBlur={(e) => e.target.style.borderColor = '#3a3a3a'}
+                            onBlur={(e) => e.target.style.borderColor = 'rgba(58, 58, 58, 0.8)'}
                         />
+                        {capsLockOn && (
+                            <div style={{
+                                marginTop: '8px',
+                                color: '#f0a500',
+                                fontSize: '12px',
+                                fontFamily: 'monospace'
+                            }}>
+                                ⚠ Caps Lock is on
+                            </div>
+                        )}
                     </div>
 
                     {/* Checkboxes */}
