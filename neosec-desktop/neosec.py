@@ -20,15 +20,18 @@ class AuthWorker(QRunnable):
 
     def run(self):
         if self.user and self.password:
-            authenticationResponse = requests.post(auth_url, data={"email": self.user, "password": self.password}).json()
-            message = authenticationResponse.get("message")
-            if authenticationResponse.get('success'):
-                with open(auth_file, 'w') as file:
-                    json.dump(authenticationResponse, file, indent=4)
-                username = authenticationResponse.get("user").get("email")
-                self.signals.loginSuccess.emit(username)
-            else:
-                self.signals.loginFailed.emit(message)
+            try: 
+                authenticationResponse = requests.post(auth_url, data={"email": self.user, "password": self.password}, timeout=10).json()
+                message = authenticationResponse.get("message")
+                if authenticationResponse.get('success'):
+                    with open(auth_file, 'w') as file:
+                        json.dump(authenticationResponse, file, indent=4)
+                    username = authenticationResponse.get("user").get("email")
+                    self.signals.loginSuccess.emit(username)
+                else:
+                    self.signals.loginFailed.emit(message)
+            except:
+                self.signals.loginFailed.emit("Timed out trying to reach server.")
         else:
             self.signals.loginFailed.emit("Please enter valid email and password")
         self.signals.authenticationFinished.emit()
@@ -45,12 +48,15 @@ class AuthFileWorker(QRunnable):
             token = authenticationResponse.get("token")
             username = authenticationResponse.get("user", {}).get("email")
             if token and username:
-                response = requests.get(dashboard_url, headers={"Authorization": f"Bearer {token}"}).json()
-                if response.get("success"):
-                    self.signals.loginSuccess.emit(username)
-                else:
-                    self.signals.loginFailed.emit("Authentication token expired")
-                    os.remove(auth_file)
+                try:
+                    response = requests.get(dashboard_url, headers={"Authorization": f"Bearer {token}"}, timeout=10).json()
+                    if response.get("success"):
+                        self.signals.loginSuccess.emit(username)
+                    else:
+                        self.signals.loginFailed.emit("Authentication token expired")
+                        os.remove(auth_file)
+                except:
+                        self.signals.loginFailed.emit("Timed out trying to reach server.")
 
         self.signals.authenticationFinished.emit()
 
