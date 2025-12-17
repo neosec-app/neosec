@@ -92,6 +92,9 @@ Page {
                         contentStack.push(dashboardView, StackView.Immediate)
                     }
                 }
+                HoverHandler {
+                    cursorShape: parent.hovered ? Qt.PointingHandCursor : Qt.ArrowCursor
+                }
                 contentItem: Row {
                     spacing: 10
                     anchors.left: parent.left
@@ -128,6 +131,9 @@ Page {
                         contentStack.push(vpnView, StackView.Immediate)
                     }
                 }
+                HoverHandler {
+                    cursorShape: parent.hovered ? Qt.PointingHandCursor : Qt.ArrowCursor
+                }
                 contentItem: Row {
                     spacing: 10
                     anchors.left: parent.left
@@ -163,6 +169,9 @@ Page {
                     if (contentStack.currentItem !== firewallView) {
                         contentStack.push(firewallView, StackView.Immediate)
                     }
+                }
+                HoverHandler {
+                    cursorShape: parent.hovered ? Qt.PointingHandCursor : Qt.ArrowCursor
                 }
                 contentItem: Row {
                     spacing: 10
@@ -213,6 +222,9 @@ Page {
             background: Rectangle {
                 color: error_red
                 radius: 5
+            }
+            HoverHandler {
+                cursorShape: parent.hovered ? Qt.PointingHandCursor : Qt.ArrowCursor
             }
         }
 
