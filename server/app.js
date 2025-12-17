@@ -10,9 +10,32 @@ const Threat = require('./models/Threat');
 const FirewallRule = require('./models/FirewallRule');
 const DataTransfer = require('./models/DataTransfer');
 
+// NEW: Add hierarchy models
+const Group = require('./models/Group');
+const GroupMember = require('./models/GroupMember');
+const Invitation = require('./models/Invitation');
+const Subscription = require('./models/Subscription');
+
+// NEW: Add Module 1 additional feature models
+const AuditLog = require('./models/AuditLog');
+const Device = require('./models/Device');
+const LoginHistory = require('./models/LoginHistory');
+const FeatureToggle = require('./models/FeatureToggle');
+const RoleTemplate = require('./models/RoleTemplate');
+const MFASettings = require('./models/MFASettings');
+const ImpersonationSession = require('./models/ImpersonationSession');
+
+// NEW: Add Module 3 models
+const BlocklistIP = require('./models/BlocklistIP');
+const ActivityLog = require('./models/ActivityLog');
+
+// NEW: Set up associations
+require('./models/associations');
+
 // Now connect to database (this will sync the models)
 const { connectDB } = require('./config/db');
 
+// Import routes
 const authRoutes = require('./routes/authRoutes');
 require("./scheduler");
 
@@ -20,15 +43,27 @@ const VpnRoutes = require('./routes/VpnRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const hierarchyRoutes = require('./routes/hierarchyRoutes');
 const scanRoutes = require('./routes/scanRoutes');
 const firewallRoutes = require('./routes/firewallRoutes');
-
+const auditRoutes = require('./routes/auditRoutes');
+const systemHealthRoutes = require('./routes/systemHealthRoutes');
+const deviceRoutes = require('./routes/deviceRoutes');
+const loginHistoryRoutes = require('./routes/loginHistoryRoutes');
+const featureToggleRoutes = require('./routes/featureToggleRoutes');
+const roleTemplateRoutes = require('./routes/roleTemplateRoutes');
+const mfaRoutes = require('./routes/mfaRoutes');
+const impersonationRoutes = require('./routes/impersonationRoutes');
 
 // Initialize Express app
 const app = express();
 
-// Connect to database
-connectDB();
+// Connect to database (async, but don't block server startup)
+connectDB().catch(err => {
+    console.error('Failed to connect to database:', err);
+    // In production, we might want to retry or handle this differently
+    // For now, log the error and let the server start
+});
 
 // CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS
@@ -39,15 +74,15 @@ app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-        
+
         // Check if origin is in allowed list
         if (allowedOrigins.includes(origin)) {
             callback(null, true);
-        } 
+        }
         // Also allow any Vercel preview URL in production
         else if (process.env.NODE_ENV === 'production' && origin.includes('.vercel.app')) {
             callback(null, true);
-        } 
+        }
         else {
             console.log('CORS blocked origin:', origin);
             console.log('Allowed origins:', allowedOrigins);
@@ -74,19 +109,59 @@ app.use('/api/vpn', VpnRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/hierarchy', hierarchyRoutes);
 app.use('/api/scan', scanRoutes);
 app.use('/api/firewall', firewallRoutes);
 const dataTransferRoutes = require('./routes/dataTransferRoutes');
 app.use('/api/data-transfer', dataTransferRoutes);
 
+// New Module 1 additional features routes
+app.use('/api/audit', auditRoutes);
+app.use('/api/system-health', systemHealthRoutes);
+app.use('/api/devices', deviceRoutes);
+app.use('/api/login-history', loginHistoryRoutes);
+app.use('/api/feature-toggles', featureToggleRoutes);
+app.use('/api/role-templates', roleTemplateRoutes);
+app.use('/api/mfa', mfaRoutes);
+app.use('/api/impersonation', impersonationRoutes);
 
-// Health check route
-app.get('/api/health', (req, res) => {
-    res.status(200).json({
-        success: true,
-        message: 'Server is running',
-        timestamp: new Date().toISOString()
-    });
+// Module 3 routes
+const threatBlockerRoutes = require('./routes/threatBlockerRoutes');
+const activityLogRoutes = require('./routes/activityLogRoutes');
+app.use('/api/threat-blocker', threatBlockerRoutes);
+app.use('/api/activity-logs', activityLogRoutes);
+
+
+// Health check route with database status
+app.get('/api/health', async (req, res) => {
+    const { sequelize } = require('./config/db');
+    try {
+        await sequelize.authenticate();
+        res.status(200).json({
+            success: true,
+            message: 'Server is running',
+            database: 'connected',
+            timestamp: new Date().toISOString(),
+            env: {
+                hasJWTSecret: !!process.env.JWT_SECRET,
+                hasDatabaseUrl: !!process.env.DATABASE_URL,
+                nodeEnv: process.env.NODE_ENV || 'development'
+            }
+        });
+    } catch (error) {
+        res.status(503).json({
+            success: false,
+            message: 'Server is running but database is not connected',
+            database: 'disconnected',
+            error: error.message,
+            timestamp: new Date().toISOString(),
+            env: {
+                hasJWTSecret: !!process.env.JWT_SECRET,
+                hasDatabaseUrl: !!process.env.DATABASE_URL,
+                nodeEnv: process.env.NODE_ENV || 'development'
+            }
+        });
+    }
 });
 
 // Root route
@@ -119,8 +194,23 @@ app.use((err, req, res, next) => {
 // Start server
 // Render provides PORT environment variable automatically
 const PORT = process.env.PORT || 5000;
+
+// Check required environment variables
+if (!process.env.JWT_SECRET) {
+    console.error('ERROR: JWT_SECRET environment variable is not set!');
+    console.error('Please set JWT_SECRET in your environment variables.');
+}
+
+if (!process.env.DATABASE_URL) {
+    console.error('ERROR: DATABASE_URL environment variable is not set!');
+    console.error('Please set DATABASE_URL in your environment variables.');
+}
+
 app.listen(PORT, () => {
     console.log(`Server started on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`JWT_SECRET: ${process.env.JWT_SECRET ? 'Set' : 'NOT SET - THIS WILL CAUSE ERRORS!'}`);
+    console.log(`DATABASE_URL: ${process.env.DATABASE_URL ? 'Set' : 'NOT SET - THIS WILL CAUSE ERRORS!'}`);
 });
 
 

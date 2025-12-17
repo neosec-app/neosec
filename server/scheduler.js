@@ -1,6 +1,7 @@
 const cron = require("node-cron");
 const Profile = require("./models/Profile");
 const profileController = require("./controllers/profileController");
+const threatBlockerController = require("./controllers/threatBlockerController");
 
 function parseTime(t) {
   if (!t) return null;
@@ -59,5 +60,32 @@ cron.schedule("* * * * *", async () => {
         );
       }
     }
+  }
+});
+
+// Daily blocklist update cron job - runs at 2 AM every day
+cron.schedule("0 2 * * *", async () => {
+  console.log("🔄 Starting daily blocklist update from AbuseIPDB...");
+  
+  try {
+    // Create a mock request/response object for the controller
+    const mockReq = {
+      user: { id: null, role: 'system' } // System-initiated update
+    };
+    const mockRes = {
+      status: (code) => ({
+        json: (data) => {
+          if (data.success) {
+            console.log(`✅ Blocklist updated successfully: ${data.data.added} new, ${data.data.updated} updated`);
+          } else {
+            console.error(`❌ Blocklist update failed: ${data.message}`);
+          }
+        }
+      })
+    };
+
+    await threatBlockerController.forceUpdate(mockReq, mockRes);
+  } catch (error) {
+    console.error("❌ Error in scheduled blocklist update:", error.message);
   }
 });

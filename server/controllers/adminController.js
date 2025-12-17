@@ -3,6 +3,7 @@ const User = require('../models/User');
 const VpnConfig = require('../models/VpnConfig');
 const Threat = require('../models/Threat');
 const bcrypt = require('bcryptjs');
+const { createAuditLog } = require('../middleware/auditLogger');
 
 // @desc    Get all users
 // @route   GET /api/admin/users
@@ -82,7 +83,7 @@ const updateUser = async (req, res) => {
     const userId = req.params.id;
 
     // Don't allow updating the current admin user's role
-    if (userId === req.user.userId && role && role !== 'admin') {
+    if (userId === req.user.id && role && role !== 'admin') {
       return res.status(400).json({
         success: false,
         message: 'You cannot change your own admin role'
@@ -104,6 +105,21 @@ const updateUser = async (req, res) => {
     if (isApproved !== undefined) user.isApproved = isApproved;
 
     await user.save();
+
+    // Log the action
+    const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    await createAuditLog(
+      req.user.id,
+      'User Updated',
+      'User Management',
+      {
+        targetUserId: userId,
+        details: `Updated user: ${email ? `email=${email}` : ''} ${role ? `role=${role}` : ''} ${isApproved !== undefined ? `isApproved=${isApproved}` : ''}`,
+        ipAddress,
+        userAgent
+      }
+    );
 
     // Return user without password
     const userData = user.toJSON();
@@ -130,7 +146,7 @@ const deleteUser = async (req, res) => {
     const userId = req.params.id;
 
     // Don't allow deleting yourself
-    if (userId === req.user.userId) {
+    if (userId === req.user.id) {
       return res.status(400).json({
         success: false,
         message: 'You cannot delete your own account'
@@ -145,6 +161,21 @@ const deleteUser = async (req, res) => {
         message: 'User not found'
       });
     }
+
+    // Log the action before deletion
+    const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    await createAuditLog(
+      req.user.id,
+      'User Deleted',
+      'User Management',
+      {
+        targetUserId: userId,
+        details: `Deleted user account: ${user.email}`,
+        ipAddress,
+        userAgent
+      }
+    );
 
     await user.destroy();
 

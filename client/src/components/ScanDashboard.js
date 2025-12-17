@@ -1,6 +1,6 @@
 // client/src/components/ScanDashboard.js
 import React, { useState, useEffect } from 'react';
-import { scanAPI } from '../services/api';
+import { scanAPI, getErrorMessage } from '../services/api';
 
 const darkPalette = {
   bgMain: '#121212',
@@ -44,6 +44,7 @@ function ScanDashboard({ theme = 'dark', palette }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [history, setHistory] = useState([]);
+  const [historyError, setHistoryError] = useState(null);
 
   // Poll scan status when we have a scanId
   useEffect(() => {
@@ -71,11 +72,16 @@ function ScanDashboard({ theme = 'dark', palette }) {
   useEffect(() => {
     const loadHistory = async () => {
       try {
+        setHistoryError(null);
         const data = await scanAPI.getHistory();
-        setHistory(data);
+        if (data.success !== false) {
+          setHistory(Array.isArray(data) ? data : (data.history || []));
+        } else {
+          setHistoryError(data.message || 'Failed to load scan history');
+        }
       } catch (err) {
         console.error('Failed to load history:', err);
-        setError('Could not load scan history.');
+        setHistoryError(getErrorMessage(err, 'Could not load scan history'));
       }
     };
 
@@ -100,7 +106,7 @@ function ScanDashboard({ theme = 'dark', palette }) {
       setStatus('PENDING');
     } catch (err) {
       console.error('Scan error:', err);
-      setError(err.response?.data?.message || 'Failed to submit URL');
+      setError(getErrorMessage(err, 'Failed to submit URL'));
     } finally {
       setLoading(false);
     }
@@ -244,7 +250,22 @@ function ScanDashboard({ theme = 'dark', palette }) {
       {/* HISTORY */}
       <h2 style={{ marginTop: '40px', color: colors.text }}>Scan History</h2>
 
-      {history.length === 0 ? (
+      {historyError ? (
+        <div
+          style={{
+            marginTop: '10px',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            border: `1px solid ${colors.danger}`,
+            backgroundColor:
+              theme === 'dark' ? '#2A1515' : 'rgba(212,24,61,0.08)',
+            color: theme === 'dark' ? '#FFB3B3' : colors.danger,
+            fontSize: '14px',
+          }}
+        >
+          <strong>Error loading history:</strong> {historyError}
+        </div>
+      ) : history.length === 0 ? (
         <p style={{ color: colors.textMuted }}>No previous scans.</p>
       ) : (
         history.map((item) => (

@@ -6,7 +6,7 @@ const { Op } = require('sequelize');
 exports.getVpnConfigs = async (req, res) => {
     try {
         const vpnConfigs = await VpnConfig.findAll({
-            where: { userId: req.user.userId },
+            where: { userId: req.user.id },
             order: [['createdAt', 'DESC']]
         });
 
@@ -30,7 +30,7 @@ exports.getVpnConfig = async (req, res) => {
         const vpnConfig = await VpnConfig.findOne({
             where: {
                 id: req.params.id,
-                userId: req.user.userId
+                userId: req.user.id
             }
         });
 
@@ -67,7 +67,7 @@ exports.createVpnConfig = async (req, res) => {
             username,
             password,
             description,
-            userId: req.user.userId
+            userId: req.user.id
         });
 
         res.status(201).json({
@@ -90,7 +90,7 @@ exports.updateVpnConfig = async (req, res) => {
         const vpnConfig = await VpnConfig.findOne({
             where: {
                 id: req.params.id,
-                userId: req.user.userId
+                userId: req.user.id
             }
         });
 
@@ -134,7 +134,7 @@ exports.deleteVpnConfig = async (req, res) => {
         const vpnConfig = await VpnConfig.findOne({
             where: {
                 id: req.params.id,
-                userId: req.user.userId
+                userId: req.user.id
             }
         });
 
@@ -166,7 +166,7 @@ exports.toggleVpnConfig = async (req, res) => {
         const vpnConfig = await VpnConfig.findOne({
             where: {
                 id: req.params.id,
-                userId: req.user.userId
+                userId: req.user.id
             }
         });
 
@@ -186,7 +186,7 @@ exports.toggleVpnConfig = async (req, res) => {
                 { isActive: false },
                 {
                     where: {
-                        userId: req.user.userId,
+                        userId: req.user.id,
                         id: { [Op.ne]: vpnConfig.id }
                     }
                 }
@@ -197,7 +197,7 @@ exports.toggleVpnConfig = async (req, res) => {
                 { isActive: false, sessionEnd: new Date() },
                 {
                     where: {
-                        userId: req.user.userId,
+                        userId: req.user.id,
                         isActive: true
                     }
                 }
@@ -205,7 +205,7 @@ exports.toggleVpnConfig = async (req, res) => {
             
             // Create new data transfer session
             await DataTransfer.create({
-                userId: req.user.userId,
+                userId: req.user.id,
                 vpnConfigId: vpnConfig.id,
                 bytesSent: 0,
                 bytesReceived: 0,
@@ -218,7 +218,7 @@ exports.toggleVpnConfig = async (req, res) => {
                 { isActive: false, sessionEnd: new Date() },
                 {
                     where: {
-                        userId: req.user.userId,
+                        userId: req.user.id,
                         vpnConfigId: vpnConfig.id,
                         isActive: true
                     }
@@ -250,7 +250,7 @@ exports.cloneVpnConfig = async (req, res) => {
         const original = await VpnConfig.findOne({
             where: {
                 id: req.params.id,
-                userId: req.user.userId
+                userId: req.user.id
             }
         });
 
@@ -271,7 +271,7 @@ exports.cloneVpnConfig = async (req, res) => {
             password: original.password,
             description: original.description,
             isActive: false,
-            userId: req.user.userId
+            userId: req.user.id
         });
 
         res.status(201).json({
@@ -296,7 +296,7 @@ exports.assignVpnTask = async (req, res) => {
         const vpnConfig = await VpnConfig.findOne({
             where: {
                 id: req.params.id,
-                userId: req.user.userId
+                userId: req.user.id
             }
         });
 
