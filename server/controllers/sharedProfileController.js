@@ -422,14 +422,6 @@ exports.revokeShareLink = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Share link not found' });
     }
 
-    // Check profileSnapshot
-    if (!sharedProfile.profileSnapshot || !sharedProfile.profileSnapshot.name) {
-      return res.status(500).json({
-        success: false,
-        message: 'Shared profile data is corrupted'
-      });
-    }
-
     await sharedProfile.update({
       isActive: false,
       revokedAt: new Date()

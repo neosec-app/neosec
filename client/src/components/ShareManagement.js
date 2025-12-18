@@ -368,7 +368,8 @@ useEffect(() => {
       message: 'Are you sure you want to revoke this share link? All recipients will lose access immediately.',
       onConfirm: async () => {
         try {
-          await api.put(`/shared-profiles/${id}/revoke`);
+          // Fix: Use the correct API path
+          await api.put(`/auth/shared-profiles/${id}/revoke`);
           showToast('Share link revoked successfully', 'success');
           fetchShareLinks();
         } catch (error) {
@@ -386,7 +387,7 @@ useEffect(() => {
       message: 'Are you sure you want to delete this share link? This action cannot be undone.',
       onConfirm: async () => {
         try {
-          await api.delete(`/shared-profiles/${id}`);
+          await api.delete(`/auth/shared-profiles/${id}`);
           showToast('Share link deleted successfully', 'success');
           fetchShareLinks();
         } catch (error) {
