@@ -1,242 +1,419 @@
 // src/components/Hierarchy/Subscription.js
-import React, { useState, useEffect } from 'react';
-import { hierarchyAPI } from '../../services/hierarchyAPI';
+import React, { useEffect, useState } from 'react';
+import { API_BASE } from '../../services/api';
 
-const Subscription = ({ user, onUpgradeSuccess }) => {
-    const [loading, setLoading] = useState(false);
-    // eslint-disable-next-line no-unused-vars
-    const [subscription, setSubscription] = useState(null);
-    const [selectedTier, setSelectedTier] = useState('basic');
+const darkPalette = {
+  bgMain: '#121212',
+  bgCard: '#181818',
+  bgPanel: '#0a0a0a',
+  text: '#ffffff',
+  textMuted: '#9aa3b5',
+  border: '#242424',
+  accent: '#36E27B',
+  accentSoft: 'rgba(54,226,123,0.12)',
+  danger: '#e04848',
+};
 
-    const tiers = [
-        {
-            id: 'basic',
-            name: 'Basic',
-            price: '$9.99/month',
-            features: [
-                '1 Group',
-                'Up to 10 members',
-                'Basic VPN features',
-                'Standard firewall rules',
-                'Email support'
-            ],
-            maxGroups: 1,
-            maxMembers: 10
+const plans = [
+  {
+    id: 'basic',
+    name: 'Basic',
+    price: '$9.99',
+    period: '/ month',
+    features: [
+      'Up to 5 profiles',
+      '1 group',
+      '10 members',
+      'Standard firewall rules',
+      'Email support',
+    ],
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    price: '$29.99',
+    period: '/ month',
+    popular: true,
+    features: [
+      'Up to 20 profiles',
+      '5 groups',
+      '50 members',
+      'Advanced firewall rules',
+      'Priority support',
+    ],
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    price: '$49.99',
+    period: '/ month',
+    features: [
+      'Unlimited profiles',
+      'Unlimited groups',
+      'Unlimited members',
+      'Advanced security policies',
+      '24/7 premium support',
+    ],
+  },
+];
+
+const Subscription = () => {
+  const colors = darkPalette;
+
+  const [currentPlan, setCurrentPlan] = useState('free');
+  const [billingHistory, setBillingHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [processingTier, setProcessingTier] = useState(null);
+  const [message, setMessage] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetchData();
+    checkURLParams();
+  }, []);
+
+  const checkURLParams = () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('success')) {
+      setMessage('Payment successful! Your subscription will be updated shortly.');
+      // Clear URL params
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    if (params.get('canceled')) {
+      setMessage('Payment was canceled.');
+      // Clear URL params
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  };
+
+  const fetchData = async () => {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      setError('No authentication token found');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch subscription
+      const subRes = await fetch(`${API_BASE}/subscription/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-        {
-            id: 'pro',
-            name: 'Pro',
-            price: '$29.99/month',
-            features: [
-                '5 Groups',
-                'Up to 50 members per group',
-                'Advanced VPN features',
-                'Custom firewall rules',
-                'Priority support',
-                'Analytics dashboard'
-            ],
-            maxGroups: 5,
-            maxMembers: 50,
-            popular: true
+      });
+
+      if (!subRes.ok) {
+        throw new Error(`Failed to fetch subscription: ${subRes.status}`);
+      }
+
+      const subData = await subRes.json();
+      console.log('Subscription data:', subData);
+      setCurrentPlan(subData.subscription?.tier || 'free');
+
+      // Fetch billing history
+      const billRes = await fetch(`${API_BASE}/subscription/billing`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-        {
-            id: 'enterprise',
-            name: 'Enterprise',
-            price: '$99.99/month',
-            features: [
-                'Unlimited Groups',
-                'Unlimited members',
-                'Enterprise VPN features',
-                'Advanced security rules',
-                '24/7 Premium support',
-                'Custom integrations',
-                'Dedicated account manager'
-            ],
-            maxGroups: 999,
-            maxMembers: 999
-        }
-    ];
+      });
 
-    useEffect(() => {
-        fetchSubscription();
-    }, []);
+      if (!billRes.ok) {
+        throw new Error(`Failed to fetch billing: ${billRes.status}`);
+      }
 
-    const fetchSubscription = async () => {
-        try {
-            const response = await hierarchyAPI.getMySubscription();
-            if (response.success) {
-                setSubscription(response.subscription);
-            }
-        } catch (error) {
-            console.error('Fetch subscription error:', error);
-        }
-    };
+      const billData = await billRes.json();
+      console.log('Billing data:', billData);
+      setBillingHistory(billData.history || []);
 
-    const handleUpgrade = async () => {
-        setLoading(true);
-        try {
-            // For now, this is a mock upgrade. Later integrate with Stripe/PayPal
-            const response = await hierarchyAPI.upgradeToLeader(selectedTier);
+    } catch (err) {
+      console.error('Fetch error:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-            if (response.success || response.message === 'Not implemented yet') {
-                alert(`Upgrade to ${selectedTier} tier successful! (Mock payment)`);
+  const startCheckout = async (tier) => {
+    setProcessingTier(tier);
+    setError(null);
 
-                // Update user in parent component
-                if (onUpgradeSuccess) {
-                    onUpgradeSuccess({
-                        ...user,
-                        accountType: 'leader',
-                        subscriptionTier: selectedTier,
-                        isPaid: true
-                    });
-                }
-            }
-        } catch (error) {
-            console.error('Upgrade error:', error);
-            alert('Upgrade failed: ' + (error.message || 'Unknown error'));
-        } finally {
-            setLoading(false);
-        }
-    };
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
 
-    const isCurrentTier = (tierId) => {
-        return user?.subscriptionTier === tierId;
-    };
+      const res = await fetch(`${API_BASE}/subscription/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ tier }),
+      });
 
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to create checkout session');
+      }
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
+    } catch (err) {
+      console.error('Checkout error:', err);
+      setError(err.message);
+      alert(err.message);
+    } finally {
+      setProcessingTier(null);
+    }
+  };
+
+  if (loading) {
     return (
-        <div className="min-h-screen bg-background-dark text-text-light p-8">
-            <div className="max-w-7xl mx-auto">
-                {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold mb-2">Upgrade to Leader</h1>
-                    <p className="text-text-muted">
-                        Choose a plan to create groups and manage team members
-                    </p>
-                </div>
-
-                {/* Current Status */}
-                {user?.accountType === 'leader' && (
-                    <div className="mb-8 p-6 bg-form-background-dark border border-primary rounded-lg">
-                        <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-primary bg-opacity-20 rounded-full flex items-center justify-center">
-                                <span className="text-2xl">👑</span>
-                            </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-primary">You're a Leader!</h2>
-                                <p className="text-text-muted">
-                                    Current plan: <span className="text-text-light font-semibold capitalize">{user.subscriptionTier}</span>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Pricing Cards */}
-                <div className="grid md:grid-cols-3 gap-6">
-                    {tiers.map((tier) => (
-                        <div
-                            key={tier.id}
-                            className={`relative p-6 rounded-lg border-2 transition-all ${selectedTier === tier.id
-                                    ? 'border-primary bg-form-background-dark'
-                                    : 'border-input-background-dark bg-form-background-dark hover:border-primary'
-                                } ${tier.popular ? 'ring-2 ring-primary' : ''}`}
-                        >
-                            {/* Popular Badge */}
-                            {tier.popular && (
-                                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                                    <span className="px-4 py-1 bg-primary text-background-dark text-sm font-bold rounded-full">
-                                        POPULAR
-                                    </span>
-                                </div>
-                            )}
-
-                            {/* Current Badge */}
-                            {isCurrentTier(tier.id) && (
-                                <div className="absolute -top-3 right-4">
-                                    <span className="px-3 py-1 bg-primary text-background-dark text-xs font-bold rounded-full">
-                                        CURRENT
-                                    </span>
-                                </div>
-                            )}
-
-                            {/* Tier Header */}
-                            <div className="mb-6">
-                                <h3 className="text-2xl font-bold mb-2">{tier.name}</h3>
-                                <div className="text-3xl font-bold text-primary mb-4">
-                                    {tier.price}
-                                </div>
-                            </div>
-
-                            {/* Features List */}
-                            <ul className="space-y-3 mb-6">
-                                {tier.features.map((feature, index) => (
-                                    <li key={index} className="flex items-start gap-2">
-                                        <span className="text-primary mt-1">✓</span>
-                                        <span className="text-text-muted text-sm">{feature}</span>
-                                    </li>
-                                ))}
-                            </ul>
-
-                            {/* Select Button */}
-                            <button
-                                onClick={() => setSelectedTier(tier.id)}
-                                disabled={isCurrentTier(tier.id)}
-                                className={`w-full py-3 rounded-lg font-semibold transition-all ${isCurrentTier(tier.id)
-                                        ? 'bg-input-background-dark text-text-muted cursor-not-allowed'
-                                        : selectedTier === tier.id
-                                            ? 'bg-primary text-background-dark'
-                                            : 'bg-input-background-dark text-text-light hover:bg-primary hover:text-background-dark'
-                                    }`}
-                            >
-                                {isCurrentTier(tier.id) ? 'Current Plan' : selectedTier === tier.id ? 'Selected' : 'Select Plan'}
-                            </button>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Action Button */}
-                {user?.accountType !== 'leader' && (
-                    <div className="mt-8 text-center">
-                        <button
-                            onClick={handleUpgrade}
-                            disabled={loading}
-                            className="px-8 py-4 bg-primary text-background-dark rounded-lg font-bold text-lg hover:bg-opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {loading ? 'Processing...' : `Upgrade to ${selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)}`}
-                        </button>
-                        <p className="mt-4 text-text-muted text-sm">
-                            Payment integration coming soon. Currently using mock payment for testing.
-                        </p>
-                    </div>
-                )}
-
-                {/* FAQ Section */}
-                <div className="mt-12 p-6 bg-form-background-dark rounded-lg border border-input-background-dark">
-                    <h3 className="text-xl font-bold mb-4">Frequently Asked Questions</h3>
-                    <div className="space-y-4 text-sm">
-                        <div>
-                            <p className="font-semibold text-text-light mb-1">What can I do as a Leader?</p>
-                            <p className="text-text-muted">
-                                Leaders can create groups, invite members, and manage security configurations for their team members.
-                            </p>
-                        </div>
-                        <div>
-                            <p className="font-semibold text-text-light mb-1">Can I cancel anytime?</p>
-                            <p className="text-text-muted">
-                                Yes, you can cancel your subscription at any time. Your access will continue until the end of your billing period.
-                            </p>
-                        </div>
-                        <div>
-                            <p className="font-semibold text-text-light mb-1">What happens to my groups if I downgrade?</p>
-                            <p className="text-text-muted">
-                                Your groups will remain active, but you won't be able to create new ones if you exceed the limit of your new tier.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+      <div style={{ 
+        padding: 32, 
+        maxWidth: 1200, 
+        color: colors.text,
+        minHeight: '100vh'
+      }}>
+        <h2 style={{ fontSize: 30 }}>Loading subscription...</h2>
+      </div>
     );
+  }
+
+  return (
+    <div style={{ 
+      padding: 32, 
+      maxWidth: 1200, 
+      margin: '0 auto',
+      color: colors.text,
+      minHeight: '100vh'
+    }}>
+      <h2 style={{ fontSize: 30, marginBottom: 8 }}>Subscription & Billing</h2>
+      <p style={{ color: colors.textMuted, marginBottom: 24 }}>
+        Manage your plan and billing
+      </p>
+
+      {/* Error Message */}
+      {error && (
+        <div
+          style={{
+            backgroundColor: 'rgba(224, 72, 72, 0.12)',
+            border: `1px solid ${colors.danger}`,
+            padding: 14,
+            borderRadius: 8,
+            marginBottom: 24,
+            color: colors.danger,
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {/* Success/Cancel Message */}
+      {message && (
+        <div
+          style={{
+            backgroundColor: colors.accentSoft,
+            border: `1px solid ${colors.accent}`,
+            padding: 14,
+            borderRadius: 8,
+            marginBottom: 24,
+            color: colors.accent,
+          }}
+        >
+          {message}
+        </div>
+      )}
+
+      {/* Current Plan Card */}
+      <div
+        style={{
+          backgroundColor: colors.bgCard,
+          border: `1px solid ${colors.border}`,
+          borderRadius: 12,
+          padding: 24,
+          marginBottom: 32,
+        }}
+      >
+        <h3 style={{ margin: 0, fontSize: 18, marginBottom: 8 }}>
+          Current Plan:{' '}
+          <span style={{ color: colors.accent, fontSize: 22, fontWeight: 700 }}>
+            {currentPlan.toUpperCase()}
+          </span>
+        </h3>
+        <p style={{ color: colors.textMuted, margin: 0 }}>
+          {currentPlan === 'free' 
+            ? 'Upgrade to unlock more features' 
+            : 'Thank you for being a premium member'}
+        </p>
+      </div>
+
+      {/* Plans Grid */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: 20,
+          marginBottom: 40,
+        }}
+      >
+        {plans.map((plan) => {
+          const isCurrent = plan.id === currentPlan;
+          const isProcessing = processingTier === plan.id;
+
+          return (
+            <div
+              key={plan.id}
+              style={{
+                backgroundColor: colors.bgCard,
+                border: `2px solid ${
+                  isCurrent ? colors.accent : plan.popular ? colors.accent + '80' : colors.border
+                }`,
+                borderRadius: 14,
+                padding: 24,
+                position: 'relative',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+              }}
+            >
+              {plan.popular && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: -12,
+                    right: 20,
+                    backgroundColor: colors.accent,
+                    color: '#121212',
+                    padding: '4px 12px',
+                    borderRadius: 999,
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  POPULAR
+                </div>
+              )}
+
+              <h3 style={{ margin: 0, marginBottom: 8, fontSize: 22 }}>{plan.name}</h3>
+              
+              <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: 20 }}>
+                <span style={{ fontSize: 32, fontWeight: 700, color: colors.accent }}>
+                  {plan.price}
+                </span>
+                <span style={{ fontSize: 16, color: colors.textMuted, marginLeft: 4 }}>
+                  {plan.period}
+                </span>
+              </div>
+
+              <ul style={{ 
+                paddingLeft: 0, 
+                listStyle: 'none',
+                margin: '0 0 20px 0'
+              }}>
+                {plan.features.map((f, i) => (
+                  <li 
+                    key={i} 
+                    style={{ 
+                      color: colors.textMuted,
+                      marginBottom: 12,
+                      paddingLeft: 24,
+                      position: 'relative'
+                    }}
+                  >
+                    <span style={{
+                      position: 'absolute',
+                      left: 0,
+                      color: colors.accent
+                    }}>✓</span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+
+              <button
+                disabled={isCurrent || isProcessing}
+                onClick={() => startCheckout(plan.id)}
+                style={{
+                  width: '100%',
+                  padding: '12px 0',
+                  borderRadius: 8,
+                  border: 'none',
+                  backgroundColor: isCurrent 
+                    ? colors.border 
+                    : isProcessing 
+                      ? colors.textMuted
+                      : colors.accent,
+                  color: isCurrent ? colors.textMuted : '#121212',
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: isCurrent || isProcessing ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s ease',
+                  opacity: isCurrent || isProcessing ? 0.6 : 1,
+                }}
+              >
+                {isCurrent 
+                  ? 'Current Plan' 
+                  : isProcessing 
+                    ? 'Processing...' 
+                    : 'Upgrade Now'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Billing History */}
+      <div
+        style={{
+          backgroundColor: colors.bgCard,
+          border: `1px solid ${colors.border}`,
+          borderRadius: 12,
+          padding: 24,
+        }}
+      >
+        <h3 style={{ margin: 0, marginBottom: 20, fontSize: 20 }}>Billing History</h3>
+        {billingHistory.length === 0 ? (
+          <p style={{ color: colors.textMuted, margin: 0 }}>No invoices yet.</p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
+                  <th style={{ textAlign: 'left', padding: '12px 8px', color: colors.textMuted, fontWeight: 600 }}>Plan</th>
+                  <th style={{ textAlign: 'left', padding: '12px 8px', color: colors.textMuted, fontWeight: 600 }}>Amount</th>
+                  <th style={{ textAlign: 'left', padding: '12px 8px', color: colors.textMuted, fontWeight: 600 }}>Date</th>
+                  <th style={{ textAlign: 'left', padding: '12px 8px', color: colors.textMuted, fontWeight: 600 }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {billingHistory.map((bill) => (
+                  <tr key={bill.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                    <td style={{ padding: '12px 8px', color: colors.text }}>{bill.plan}</td>
+                    <td style={{ padding: '12px 8px', color: colors.text }}>{bill.amount}</td>
+                    <td style={{ padding: '12px 8px', color: colors.text }}>
+                      {new Date(bill.paidAt).toLocaleDateString()}
+                    </td>
+                    <td style={{ padding: '12px 8px', color: colors.accent, fontWeight: 600 }}>
+                      {bill.status}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default Subscription;

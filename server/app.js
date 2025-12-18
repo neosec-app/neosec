@@ -15,6 +15,7 @@ const Group = require('./models/Group');
 const GroupMember = require('./models/GroupMember');
 const Invitation = require('./models/Invitation');
 const Subscription = require('./models/Subscription');
+const BillingHistory = require('./models/BillingHistory');
 
 // NEW: Add Module 1 additional feature models
 const AuditLog = require('./models/AuditLog');
@@ -55,6 +56,7 @@ const roleTemplateRoutes = require('./routes/roleTemplateRoutes');
 const mfaRoutes = require('./routes/mfaRoutes');
 const impersonationRoutes = require('./routes/impersonationRoutes');
 const sharedProfileRoutes = require('./routes/sharedProfileRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
 
 // Initialize Express app
 const app = express();
@@ -65,6 +67,10 @@ connectDB().catch(err => {
     // In production, we might want to retry or handle this differently
     // For now, log the error and let the server start
 });
+app.use(
+  '/api/stripe',
+  require('./routes/stripeWebhook')
+);
 
 // CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS
@@ -116,6 +122,7 @@ app.use('/api/firewall', firewallRoutes);
 const dataTransferRoutes = require('./routes/dataTransferRoutes');
 app.use('/api/data-transfer', dataTransferRoutes);
 app.use('/api/auth/shared-profiles', sharedProfileRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 
 // New Module 1 additional features routes
 app.use('/api/audit', auditRoutes);

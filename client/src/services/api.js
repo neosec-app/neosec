@@ -109,6 +109,8 @@ export const dashboardAPI = {
     return response.data;
   }
 };
+export const API_BASE = process.env.REACT_APP_API_URL;
+
 
 // Admin API functions
 export const adminAPI = {

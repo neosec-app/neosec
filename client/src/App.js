@@ -380,21 +380,7 @@ if (isShareManagementPage) {
                         setSidebarOpen={setSidebarOpen}
                         handleLogout={handleLogout}
                     />
-
-                    {/* HIERARCHY RENDER */}
-                    {currentView === "subscription" && (
-                        <Subscription
-                            user={user}
-                            onUpgradeSuccess={(updatedUser) => {
-                                setUser(updatedUser);
-                                localStorage.setItem("user", JSON.stringify(updatedUser));
-                            }}
-                        />
-                    )}
-
-                    {currentView === "groups" && user.accountType === "leader" && <GroupManagement user={user} />}
-                    {currentView === "invitations" && <Invitations />}
-                    {currentView === "memberships" && <Memberships />}
+                    
 
                     {/* Main Content */}
                     <div style={{
@@ -479,6 +465,21 @@ if (isShareManagementPage) {
                         {currentView === 'scan' && (
                             <ScanDashboard theme={theme} palette={palette} />
                         )}
+
+                        {/* SUBCRIPTION View */}
+                        {currentView === "subscription" && (
+                        <Subscription
+                            user={user}
+                            onUpgradeSuccess={(updatedUser) => {
+                                setUser(updatedUser);
+                                localStorage.setItem("user", JSON.stringify(updatedUser));
+                            }}
+                        />
+                        )}
+
+                        {currentView === "groups" && user.accountType === "leader" && <GroupManagement user={user} />}
+                        {currentView === "invitations" && <Invitations />}
+                        {currentView === "memberships" && <Memberships />}
 
 
                         {/* Audit View */}
