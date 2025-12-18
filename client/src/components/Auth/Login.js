@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { authAPI } from '../../services/api';
+import AnimatedBackground from './AnimatedBackground';
 
-const Login = ({ onSwitchToRegister, onLoginSuccess }) => {
+const Login = ({ onSwitchToRegister, onLoginSuccess, theme }) => {
     const [formData, setFormData] = useState({
         email: '',
         password: ''
@@ -61,7 +62,12 @@ const Login = ({ onSwitchToRegister, onLoginSuccess }) => {
             justifyContent: 'center',
             padding: '20px',
             position: 'relative'
+            
         }}>
+
+            {/* Add the animated background */}
+            <AnimatedBackground theme={theme='dark'} />
+
             {/* Success Toast - Outside the box */}
             {showSuccessToast && (
                 <div style={{
