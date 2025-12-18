@@ -96,7 +96,6 @@ const Toast = ({ message, type, onClose, colors, theme = 'dark' }) => {
 };
 
 const SharedProfileViewer = ({ token: propToken, theme = 'dark', palette: propPalette }) => {
-  // Get token from props or URL
   const token = propToken || window.location.pathname.split('/shared-profiles/')[1]?.split('?')[0];
   const colors = propPalette || (theme === 'light' ? lightPalette : darkPalette);
 
@@ -107,6 +106,7 @@ const SharedProfileViewer = ({ token: propToken, theme = 'dark', palette: propPa
   const [shareInfo, setShareInfo] = useState(null);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
+  const [importing, setImporting] = useState(false);
 
   const showToast = (message, type = 'info') => {
     setToast({ message, type });
@@ -158,8 +158,38 @@ const SharedProfileViewer = ({ token: propToken, theme = 'dark', palette: propPa
     }
   };
 
+  const handleImport = async () => {
+    const authToken = localStorage.getItem('token');
+    if (!authToken) {
+      showToast('Please log in to import this profile', 'error');
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 2000);
+      return;
+    }
+
+    try {
+      setImporting(true);
+      const response = await api.post(`/auth/shared-profiles/${token}/import`, {
+        password: password || undefined
+      });
+      
+      if (response.data.success) {
+        showToast('Profile imported successfully!', 'success');
+        setTimeout(() => {
+          window.location.href = '/profiles';
+        }, 2000);
+      }
+    } catch (error) {
+      showToast(error.response?.data?.message || 'Failed to import profile', 'error');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const goToHome = () => {
-    window.location.href = '/';
+    const authToken = localStorage.getItem('token');
+    window.location.href = authToken ? '/dashboard' : '/login';
   };
 
   if (loading) {
@@ -350,7 +380,7 @@ const SharedProfileViewer = ({ token: propToken, theme = 'dark', palette: propPa
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            <span style={{ fontSize: 32 }}>🔗</span>
+            <span style={{ fontSize: 32 }}></span>
             <div>
               <h1 style={{ margin: 0, color: colors.text, fontSize: 24 }}>Shared Security Profile</h1>
               <p style={{ margin: '4px 0 0 0', color: colors.textMuted, fontSize: 14 }}>
@@ -375,7 +405,7 @@ const SharedProfileViewer = ({ token: propToken, theme = 'dark', palette: propPa
                 Permission Level
               </strong>
               <span style={{ color: colors.accent, fontWeight: 600 }}>
-                {shareInfo?.permissions === 'IMPORT' ? '📥 View & Import' : '👁️ View Only'}
+                {shareInfo?.permissions === 'IMPORT' ? 'View & Import' : 'View Only'}
               </span>
             </div>
             <div>
@@ -426,7 +456,7 @@ const SharedProfileViewer = ({ token: propToken, theme = 'dark', palette: propPa
                 VPN Configuration
               </h3>
               <p style={{ margin: 0, color: colors.textMuted, fontSize: 14 }}>
-                🔒 VPN credentials are not shared through links for security reasons.
+                VPN credentials are not shared through links for security reasons.
               </p>
             </div>
 
@@ -459,6 +489,31 @@ const SharedProfileViewer = ({ token: propToken, theme = 'dark', palette: propPa
             )}
           </div>
         </div>
+
+        {/* Import Button - only for IMPORT permission */}
+        {shareInfo?.permissions === 'IMPORT' && (
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            <button
+              onClick={handleImport}
+              disabled={importing}
+              style={{
+                padding: '12px 24px',
+                borderRadius: 8,
+                border: 'none',
+                backgroundColor: importing ? colors.textMuted : colors.accent,
+                color: theme === 'dark' ? '#121212' : '#ffffff',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: importing ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {importing ? 'Importing...' : 'Import Profile to My Account'}
+            </button>
+            <p style={{ marginTop: 8, fontSize: 12, color: colors.textMuted }}>
+              You must be logged in to import this profile
+            </p>
+          </div>
+        )}
 
         {/* Back to Home Button */}
         <div style={{ textAlign: 'center' }}>

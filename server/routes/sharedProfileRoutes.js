@@ -7,7 +7,8 @@ const {
   getMyShareLinks,
   revokeShareLink,
   getShareLinkLogs,
-  deleteShareLink
+  deleteShareLink,
+  debugSharedProfile
 } = require('../controllers/sharedProfileController');
 const { protect } = require('../middleware/auth');
 
@@ -19,7 +20,10 @@ router.put('/:id/revoke', protect, revokeShareLink);
 router.get('/:id/logs', protect, getShareLinkLogs);
 router.delete('/:id', protect, deleteShareLink);
 
-//  Public route LAST (most generic route)
+// Debug route (add this before the public route)
+router.get('/debug/:token', debugSharedProfile);
+
+// Public route LAST (most generic route)
 router.get('/:token', getSharedProfile);
 
 module.exports = router;

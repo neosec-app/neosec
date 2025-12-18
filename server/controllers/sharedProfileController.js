@@ -37,6 +37,7 @@ const logActivity = async (sharedProfileId, action, req, metadata = {}) => {
     });
   } catch (error) {
     console.error('Error logging shared profile activity:', error);
+    // Don't throw - logging failures shouldn't break the main flow
   }
 };
 
@@ -75,7 +76,7 @@ exports.createShareLink = async (req, res) => {
       expiresAt.setDate(expiresAt.getDate() + expiresInDays);
     }
 
-    //Sanitized snapshot of profile
+    // Sanitized snapshot of profile
     const profileSnapshot = sanitizeProfileData(profile);
 
     const sharedProfile = await SharedProfile.create({
@@ -89,13 +90,14 @@ exports.createShareLink = async (req, res) => {
       profileSnapshot 
     });
 
-    await logActivity(sharedProfile.id, 'CREATED', req, {
+    // Log activity asynchronously (fire-and-forget)
+    logActivity(sharedProfile.id, 'CREATED', req, {
       description: `Share link created for profile "${profile.name}"`,
       permissions,
       hasPassword: !!encryptedPassword,
       expiresAt,
       maxAccess: maxAccess || null
-    });
+    }).catch(err => console.error('Failed to log activity:', err));
 
     res.status(201).json({
       success: true,
@@ -136,7 +138,7 @@ exports.getSharedProfile = async (req, res) => {
         { 
           model: User, 
           as: 'owner', 
-          attributes: ['email', 'username'] 
+          attributes: ['email'] 
         }
       ]
     });
@@ -145,12 +147,28 @@ exports.getSharedProfile = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Share link not found' });
     }
 
+    // CRITICAL: Check profileSnapshot exists early
+    if (!sharedProfile.profileSnapshot || !sharedProfile.profileSnapshot.name) {
+      console.error('Corrupted profileSnapshot for shared profile:', {
+        id: sharedProfile.id,
+        shareToken: sharedProfile.shareToken,
+        hasProfileSnapshot: !!sharedProfile.profileSnapshot,
+        profileSnapshotKeys: sharedProfile.profileSnapshot ? Object.keys(sharedProfile.profileSnapshot) : 'null',
+        createdAt: sharedProfile.createdAt
+      });
+      return res.status(500).json({
+        success: false,
+        message: 'Shared profile data is corrupted or unavailable. Please create a new share link.'
+      });
+    }
+
     // Check if active
     if (!sharedProfile.isActive || sharedProfile.revokedAt) {
-      await logActivity(sharedProfile.id, 'ACCESS_DENIED', req, {
+      // Log asynchronously
+      logActivity(sharedProfile.id, 'ACCESS_DENIED', req, {
         description: 'Attempted to access revoked link',
         reason: 'REVOKED'
-      });
+      }).catch(err => console.error('Failed to log activity:', err));
 
       return res.status(403).json({
         success: false,
@@ -160,9 +178,10 @@ exports.getSharedProfile = async (req, res) => {
 
     // Check expired
     if (sharedProfile.expiresAt && new Date() > new Date(sharedProfile.expiresAt)) {
-      await logActivity(sharedProfile.id, 'EXPIRED', req, {
+      // Log asynchronously
+      logActivity(sharedProfile.id, 'EXPIRED', req, {
         description: 'Attempted to access expired link'
-      });
+      }).catch(err => console.error('Failed to log activity:', err));
 
       return res.status(403).json({
         success: false,
@@ -175,10 +194,11 @@ exports.getSharedProfile = async (req, res) => {
     const maxAccess = sharedProfile.maxAccess;
 
     if (maxAccess !== null && accessCount >= maxAccess) {
-      await logActivity(sharedProfile.id, 'ACCESS_DENIED', req, {
+      // Log asynchronously
+      logActivity(sharedProfile.id, 'ACCESS_DENIED', req, {
         description: 'Max access limit reached',
         reason: 'MAX_ACCESS_EXCEEDED'
-      });
+      }).catch(err => console.error('Failed to log activity:', err));
 
       return res.status(403).json({
         success: false,
@@ -198,9 +218,10 @@ exports.getSharedProfile = async (req, res) => {
 
       const isPasswordValid = await bcrypt.compare(password, sharedProfile.encryptedPassword);
       if (!isPasswordValid) {
-        await logActivity(sharedProfile.id, 'PASSWORD_FAILED', req, {
+        // Log asynchronously
+        logActivity(sharedProfile.id, 'PASSWORD_FAILED', req, {
           description: 'Invalid password attempt'
-        });
+        }).catch(err => console.error('Failed to log activity:', err));
 
         return res.status(401).json({ success: false, message: 'Invalid password' });
       }
@@ -212,27 +233,29 @@ exports.getSharedProfile = async (req, res) => {
       lastAccessedAt: new Date()
     });
 
-    // Use profileSnapshot instead of profile relation
+    // Use profileSnapshot
     const profileData = sharedProfile.profileSnapshot;
-      res.json({
-        success: true,
-        data: {
-          profile: profileData,
-          shareInfo: {
-            permissions: sharedProfile.permissions,
-            sharedBy: sharedProfile.owner?.email || 'Unknown',
-            createdAt: sharedProfile.createdAt,
-            expiresAt: sharedProfile.expiresAt,
-            accessCount: sharedProfile.accessCount,
-            maxAccess: sharedProfile.maxAccess
-          }
-        }
-      });
 
-// fire-and-forget logging (DO NOT await)
-logActivity(sharedProfile.id, 'VIEWED', req, {
-  description: `Profile "${profileData.name}" viewed via share link`
-});
+    // Log viewing activity asynchronously (fire-and-forget)
+    logActivity(sharedProfile.id, 'VIEWED', req, {
+      description: `Profile "${profileData.name}" viewed via share link`
+    }).catch(err => console.error('Failed to log activity:', err));
+
+    // Send response
+    res.json({
+      success: true,
+      data: {
+        profile: profileData,
+        shareInfo: {
+          permissions: sharedProfile.permissions,
+          sharedBy: sharedProfile.owner?.email || 'Unknown',
+          createdAt: sharedProfile.createdAt,
+          expiresAt: sharedProfile.expiresAt,
+          accessCount: sharedProfile.accessCount,
+          maxAccess: sharedProfile.maxAccess
+        }
+      }
+    });
 
   } catch (error) {
     console.error('Error fetching shared profile:', error);
@@ -243,7 +266,6 @@ logActivity(sharedProfile.id, 'VIEWED', req, {
     });
   }
 };
-
 
 exports.importSharedProfile = async (req, res) => {
   try {
@@ -257,12 +279,15 @@ exports.importSharedProfile = async (req, res) => {
     if (!sharedProfile) {
       return res.status(404).json({ success: false, message: 'Share link not found' });
     }
+
+    // Check profileSnapshot early
     if (!sharedProfile.profileSnapshot || !sharedProfile.profileSnapshot.name) {
       return res.status(500).json({
         success: false,
         message: 'Shared profile data is corrupted'
       });
     }
+
     if (sharedProfile.permissions !== 'IMPORT') {
       return res.status(403).json({
         success: false,
@@ -277,6 +302,7 @@ exports.importSharedProfile = async (req, res) => {
     if (sharedProfile.expiresAt && new Date() > new Date(sharedProfile.expiresAt)) {
       return res.status(403).json({ success: false, message: 'This share link has expired' });
     }
+
     const accessCount = sharedProfile.accessCount || 0;
     const maxAccess = sharedProfile.maxAccess;
 
@@ -291,18 +317,17 @@ exports.importSharedProfile = async (req, res) => {
       if (!ok) return res.status(401).json({ success: false, message: 'Invalid password' });    
     }
 
-
-    //profileSnapshot
+    // Use profileSnapshot
     const originalProfile = sharedProfile.profileSnapshot;
 
-    //Create new profile for importer
+    // Create new profile for importer
     const newProfile = await Profile.create({
       userId: req.user.id,
       name: customName || `${originalProfile.name} (Imported)`,
       description: (originalProfile.description || '') + '\n\n[Imported from shared profile]',
       profileType: originalProfile.profileType,
 
-      //  VPN NEVER imported
+      // VPN NEVER imported
       vpnEnabled: false,
       vpnServer: null,
       vpnProtocol: null,
@@ -334,17 +359,11 @@ exports.importSharedProfile = async (req, res) => {
       isActive: false
     });
 
-    if (!sharedProfile.profileSnapshot || !sharedProfile.profileSnapshot.name) {
-      return res.status(500).json({
-        success: false,
-        message: 'Shared profile data is corrupted'
-      });
-    }
-
-    await logActivity(sharedProfile.id, 'IMPORTED', req, {
+    // Log asynchronously
+    logActivity(sharedProfile.id, 'IMPORTED', req, {
       description: `Profile imported by ${req.user.email}`,
       newProfileId: newProfile.id
-    });
+    }).catch(err => console.error('Failed to log activity:', err));
 
     res.status(201).json({
       success: true,
@@ -360,7 +379,6 @@ exports.importSharedProfile = async (req, res) => {
     });
   }
 };
-
 
 exports.getMyShareLinks = async (req, res) => {
   try {
@@ -392,8 +410,6 @@ exports.getMyShareLinks = async (req, res) => {
   }
 };
 
-
-
 exports.revokeShareLink = async (req, res) => {
   try {
     const { id } = req.params;
@@ -406,6 +422,7 @@ exports.revokeShareLink = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Share link not found' });
     }
 
+    // Check profileSnapshot
     if (!sharedProfile.profileSnapshot || !sharedProfile.profileSnapshot.name) {
       return res.status(500).json({
         success: false,
@@ -413,11 +430,15 @@ exports.revokeShareLink = async (req, res) => {
       });
     }
 
-
-
-    await logActivity(sharedProfile.id, 'REVOKED', req, {
-      description: `Share link revoked by ${req.user.email}`
+    await sharedProfile.update({
+      isActive: false,
+      revokedAt: new Date()
     });
+
+    // Log asynchronously
+    logActivity(sharedProfile.id, 'REVOKED', req, {
+      description: `Share link revoked by ${req.user.email}`
+    }).catch(err => console.error('Failed to log activity:', err));
 
     res.json({ success: true, message: 'Share link revoked successfully' });
   } catch (error) {
@@ -429,7 +450,61 @@ exports.revokeShareLink = async (req, res) => {
     });
   }
 };
+exports.debugSharedProfile = async (req, res) => {
+  try {
+    const { token } = req.params;
+    
+    console.log('🔍 Debug request for token:', token);
 
+    const sharedProfile = await SharedProfile.findOne({
+      where: { shareToken: token },
+      include: [
+        { 
+          model: Profile, 
+          as: 'profile',
+          required: false 
+        },
+        { 
+          model: User, 
+          as: 'owner', 
+          attributes: ['email'] 
+        }
+      ]
+    });
+
+    if (!sharedProfile) {
+      return res.json({
+        found: false,
+        message: 'Share link not found'
+      });
+    }
+
+    const debug = {
+      found: true,
+      id: sharedProfile.id,
+      shareToken: sharedProfile.shareToken,
+      hasProfileSnapshot: !!sharedProfile.profileSnapshot,
+      profileSnapshotType: typeof sharedProfile.profileSnapshot,
+      profileSnapshotKeys: sharedProfile.profileSnapshot ? Object.keys(sharedProfile.profileSnapshot) : null,
+      hasName: sharedProfile.profileSnapshot?.name,
+      profileSnapshotData: sharedProfile.profileSnapshot,
+      isActive: sharedProfile.isActive,
+      revokedAt: sharedProfile.revokedAt,
+      permissions: sharedProfile.permissions,
+      ownerEmail: sharedProfile.owner?.email
+    };
+
+    console.log('Debug info:', JSON.stringify(debug, null, 2));
+
+    res.json(debug);
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({
+      error: error.message,
+      stack: error.stack
+    });
+  }
+};
 
 exports.getShareLinkLogs = async (req, res) => {
   try {
@@ -442,12 +517,15 @@ exports.getShareLinkLogs = async (req, res) => {
     if (!sharedProfile) {
       return res.status(404).json({ success: false, message: 'Share link not found' });
     }
+
+    // Check profileSnapshot
     if (!sharedProfile.profileSnapshot || !sharedProfile.profileSnapshot.name) {
       return res.status(500).json({
         success: false,
         message: 'Shared profile data is corrupted'
       });
     }
+
     const logs = await SharedProfileLog.findAll({
       where: { sharedProfileId: id },
       order: [['createdAt', 'DESC']]
@@ -463,7 +541,6 @@ exports.getShareLinkLogs = async (req, res) => {
     });
   }
 };
-
 
 exports.deleteShareLink = async (req, res) => {
   try {

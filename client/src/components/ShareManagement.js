@@ -582,7 +582,7 @@ useEffect(() => {
                           cursor: 'pointer',
                         }}
                       >
-                        📋 Copy Link
+                        Copy Link
                       </button>
 
                       <button
@@ -614,7 +614,7 @@ useEffect(() => {
                       cursor: 'pointer',
                     }}
                   >
-                    📊 Logs
+                    Logs
                   </button>
                   <button
                     onClick={() => handleDelete(link.id)}

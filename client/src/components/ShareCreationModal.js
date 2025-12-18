@@ -109,7 +109,7 @@ const ShareCreationModal = ({ profile, onClose, onSuccess, theme = 'dark', palet
               color: palette.textMuted
             }}
           >
-            <strong style={{ color: palette.warning }}>⚠️ Security Notice:</strong> VPN credentials will NOT be shared.
+            <strong style={{ color: palette.warning }}>Security Notice:</strong> VPN credentials will NOT be shared.
             Only firewall rules and non-sensitive settings will be included.
           </div>
 
@@ -133,7 +133,7 @@ const ShareCreationModal = ({ profile, onClose, onSuccess, theme = 'dark', palet
             // Success view
             <div>
               <h3 style={{ margin: '0 0 12px 0', color: palette.text, fontSize: 16 }}>
-                ✅ Share Link Created!
+                Share Link Created!
               </h3>
               <p style={{ margin: '0 0 16px 0', color: palette.textMuted, fontSize: 14 }}>
                 Share this link with others to give them access to your profile.
@@ -154,7 +154,7 @@ const ShareCreationModal = ({ profile, onClose, onSuccess, theme = 'dark', palet
                 {shareLink}
               </div>
               <div style={{ display: 'flex', gap: 12 }}>
-                <button
+                {/* <button
                   onClick={handleCopy}
                   style={{
                     flex: 1,
@@ -168,8 +168,8 @@ const ShareCreationModal = ({ profile, onClose, onSuccess, theme = 'dark', palet
                     fontSize: 14
                   }}
                 >
-                  📋 Copy Link
-                </button>
+                  Copy Link
+                </button> */}
                 <button
                   onClick={onClose}
                   style={{
