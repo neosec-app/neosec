@@ -4,15 +4,7 @@ import { hierarchyAPI } from '../../services/hierarchyAPI';
 const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
     const [groups, setGroups] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [showInviteModal, setShowInviteModal] = useState(false);
     const [selectedGroup, setSelectedGroup] = useState(null);
-    const [newGroup, setNewGroup] = useState({
-        name: '',
-        description: '',
-        maxMembers: 10
-    });
-    const [inviteEmail, setInviteEmail] = useState('');
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -36,50 +28,6 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
         }
     };
 
-    const handleCreateGroup = async (e) => {
-        e.preventDefault();
-        setError('');
-
-        if (!newGroup.name.trim()) {
-            setError('Group name is required');
-            return;
-        }
-
-        try {
-            const response = await hierarchyAPI.createGroup(newGroup);
-            if (response.success) {
-                setGroups([...groups, response.group]);
-                setShowCreateModal(false);
-                setNewGroup({ name: '', description: '', maxMembers: 10 });
-            }
-        } catch (error) {
-            console.error('Create group error:', error);
-            setError(error.message || 'Failed to create group');
-        }
-    };
-
-    const handleInviteMember = async (e) => {
-        e.preventDefault();
-        setError('');
-
-        if (!inviteEmail.trim()) {
-            setError('Email is required');
-            return;
-        }
-
-        try {
-            const response = await hierarchyAPI.inviteMember(selectedGroup.id, inviteEmail);
-            if (response.success) {
-                alert('Invitation sent successfully!');
-                setShowInviteModal(false);
-                setInviteEmail('');
-                setSelectedGroup(null);
-            }
-        } catch (error) {
-            console.error('Invite member error:', error);
-            setError(error.message || 'Failed to send invitation');
-        }
-    };
 
     const viewGroupDetails = async (group) => {
         try {
@@ -165,7 +113,10 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
                         </p>
                     </div>
                     <button
-                        onClick={() => setShowCreateModal(true)}
+                        onClick={() => {
+                            // TODO: Implement create group modal
+                            alert('Create group functionality coming soon');
+                        }}
                         style={{
                             padding: '12px 24px',
                             backgroundColor: palette.accent,
@@ -218,7 +169,10 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
                             Create your first group to start inviting members and managing configurations.
                         </p>
                         <button
-                            onClick={() => setShowCreateModal(true)}
+                            onClick={() => {
+                                // TODO: Implement create group modal
+                                alert('Create group functionality coming soon');
+                            }}
                             style={{
                                 padding: '12px 24px',
                                 backgroundColor: palette.accent,
@@ -284,8 +238,8 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            setSelectedGroup(group);
-                                            setShowInviteModal(true);
+                                            // TODO: Implement invite member modal
+                                            alert('Invite member functionality coming soon');
                                         }}
                                         style={{
                                             padding: '6px 12px',
