@@ -54,6 +54,7 @@ const featureToggleRoutes = require('./routes/featureToggleRoutes');
 const roleTemplateRoutes = require('./routes/roleTemplateRoutes');
 const mfaRoutes = require('./routes/mfaRoutes');
 const impersonationRoutes = require('./routes/impersonationRoutes');
+const sharedProfileRoutes = require('./routes/sharedProfileRoutes');
 
 // Initialize Express app
 const app = express();
@@ -114,6 +115,7 @@ app.use('/api/scan', scanRoutes);
 app.use('/api/firewall', firewallRoutes);
 const dataTransferRoutes = require('./routes/dataTransferRoutes');
 app.use('/api/data-transfer', dataTransferRoutes);
+app.use('/api/auth/shared-profiles', sharedProfileRoutes);
 
 // New Module 1 additional features routes
 app.use('/api/audit', auditRoutes);
