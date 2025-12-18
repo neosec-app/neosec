@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
+
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import { authAPI, dashboardAPI, adminAPI, getErrorMessage } from './services/api';
 import './index.css';
+
 
 // Custom Hooks
 import { useTheme } from './hooks/useTheme';
@@ -37,7 +39,12 @@ import GroupManagement from './components/Hierarchy/GroupManagement';
 import Invitations from './components/Hierarchy/Invitations';
 import Memberships from './components/Hierarchy/Memberships';
 
+// Share Profile Components
+import ShareManagement from './components/ShareManagement';
+import SharedProfileViewer from './components/SharedProfileViewer';
+
 function App() {
+    
     // Custom Hooks
     const { theme, setTheme, palette } = useTheme();
     const { toasts, showToast } = useToastManager();
@@ -70,6 +77,13 @@ function App() {
     const [userSearchQuery, setUserSearchQuery] = useState('');
     const [userRoleFilter, setUserRoleFilter] = useState('all');
     const [userStatusFilter, setUserStatusFilter] = useState('all');
+
+    //Share profile page
+    const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+    const isShareProfilePage = pathname.startsWith('/shared-profiles/');
+    const isShareManagementPage = pathname === '/share-management';
+
+
 
     // Close sidebar on mobile when clicking outside
     useEffect(() => {
@@ -258,6 +272,8 @@ function App() {
         showToast('Logged out', 'info');
     };
 
+    
+
     // Loading State
     if (loading) {
         return (
@@ -275,6 +291,72 @@ function App() {
         );
     }
 
+      // PUBLIC ROUTE: Shared Profile Viewer
+    if (isShareProfilePage) {
+        const token = pathname.split('/shared-profiles/')[1];
+        return <SharedProfileViewer token={token} theme={theme} palette={palette} />;
+    }
+
+    // PROTECTED ROUTE: Share Management
+if (isShareManagementPage) {
+    if (loading) {
+        return (
+            <div style={{
+                minHeight: '100vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: palette.bgMain,
+                color: palette.accent,
+                fontSize: '18px'
+            }}>
+                Loading...
+            </div>
+        );
+    }
+    
+    if (!user) {
+        window.location.href = '/';
+        return null;
+    }
+    
+    return (
+        <>
+            <div style={{
+                minHeight: '100vh',
+                backgroundColor: palette.bgMain,
+                display: 'flex'
+            }}>
+                <Sidebar
+                    user={user}
+                    theme={theme}
+                    palette={palette}
+                    currentView={currentView}
+                    setCurrentView={setCurrentView}
+                    setTheme={setTheme}
+                    isMobile={isMobile}
+                    isTablet={isTablet}
+                    sidebarOpen={sidebarOpen}
+                    setSidebarOpen={setSidebarOpen}
+                    handleLogout={handleLogout}
+                />
+                <div style={{
+                    flex: 1,
+                    padding: isMobile ? '16px' : isTablet ? '24px' : '40px',
+                    paddingTop: isMobile ? '64px' : (isTablet ? '24px' : '40px'),
+                    overflowY: 'auto',
+                    backgroundColor: palette.bgMain,
+                    marginLeft: isMobile ? (sidebarOpen ? '260px' : '0') : '260px',
+                    transition: 'all 0.3s ease',
+                    height: '100vh'
+                }}>
+                    <ShareManagement theme={theme} palette={palette} />
+                </div>
+            </div>
+            <Toast toasts={toasts} palette={palette} />
+        </>
+    );
+}
     // Authenticated UI
     if (user) {
         return (
@@ -398,6 +480,7 @@ function App() {
                             <ScanDashboard theme={theme} palette={palette} />
                         )}
 
+
                         {/* Audit View */}
                         {currentView === 'audit' && user.role === 'admin' && (
                             <AdminAuditTrail theme={theme} palette={palette} />
@@ -508,6 +591,7 @@ function App() {
         {/* Toast Component */}
         <Toast toasts={toasts} palette={palette} />
     </>
+    
 );
 }
 

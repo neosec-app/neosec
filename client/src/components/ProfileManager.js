@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
-
+import ShareCreationModal from './ShareCreationModal';
 
 const ConfirmModal = ({ message, onConfirm, onCancel, colors }) => {
   return (
@@ -118,7 +118,6 @@ const Toast = ({message, type, onClose, colors = {}, theme = 'dark' }) => {
     if (type === 'error') return colors.danger || '#e04848';
     return colors.warning || '#f0a500';
   };
-
 
   return (
     <div
@@ -347,7 +346,6 @@ const makeStyles = (c) => ({
 const ProfileManager = ({ theme = 'dark', palette }) => {
   const colors = palette || (theme === 'light' ? lightPalette : darkPalette);
   const styles = makeStyles(colors);
-
   const [profiles, setProfiles] = useState([]);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -357,9 +355,12 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
   const [toast, setToast] = useState(null);
   const [confirmModal, setConfirmModal] = useState(null);
   const [firewallRules, setFirewallRules] = useState([]);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [sharingProfile, setSharingProfile] = useState(null);
 
 
-  const showToast = (message, type = 'info') => {
+
+const showToast = (message, type = 'info') => {
     setToast({ message, type });
   };
 
@@ -736,10 +737,25 @@ useEffect(() => {
       >
         <h2 style={styles.headerTitle}>Security Profile Management</h2>
 
-        <div
-          className="header-actions"
-          style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}
-        >
+         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => {
+              window.location = '/share-management';
+            }} 
+            style={{
+              padding: '10px 18px',
+              borderRadius: 999,
+              border: `1px solid ${colors.accent}`,
+              backgroundColor: 'transparent',
+              color: colors.accent,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Manage All Shares
+          </button>
+          
           <button
             onClick={() => setShowLogs(!showLogs)}
             style={{
@@ -1765,6 +1781,7 @@ useEffect(() => {
                       >
                         Deactivate
                       </button>
+                      
                     )}
 
                     {/* Edit – subtle neutral outline */}
@@ -1799,6 +1816,37 @@ useEffect(() => {
                       Delete
                     </button>
                   </div>
+                  {/* Profile Share Button*/}
+                  <div
+                    style={{
+                      marginTop: 16,
+                      paddingTop: 16,
+                      borderTop: `1px solid ${colors.border}`,
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                    }}
+                  >
+                    <button
+                      onClick={() => {
+                        setSharingProfile(profile);
+                        setShowShareModal(true);
+                      }}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: palette.accent,
+                        color: theme === 'dark' ? '#121212' : '#ffffff',
+                        border: 'none',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                        fontSize: 14,
+                        fontWeight: 600
+                      }}
+                    >
+                      Share Profile
+                    </button>
+
+                  </div>
+
 
                 </div>
               </div>
@@ -1806,7 +1854,20 @@ useEffect(() => {
           </div>
         )}
       </div>
-
+        {showShareModal && (
+        <ShareCreationModal
+          profile={sharingProfile}
+          onClose={() => {
+            setShowShareModal(false);
+            setSharingProfile(null);
+          }}
+          onSuccess={() => {
+            showToast('Share link created successfully!', 'success');
+          }}
+          theme={theme}
+          palette={colors}
+        />
+      )}
     </div>
   );
 };
