@@ -28,6 +28,8 @@ const ImpersonationSession = require('./models/ImpersonationSession');
 // NEW: Add Module 3 models
 const BlocklistIP = require('./models/BlocklistIP');
 const ActivityLog = require('./models/ActivityLog');
+const path = require('path');
+
 
 // NEW: Set up associations
 require('./models/associations');
@@ -59,11 +61,10 @@ const impersonationRoutes = require('./routes/impersonationRoutes');
 // Initialize Express app
 const app = express();
 
-// Connect to database (async, but don't block server startup)
+// Connect to database
 connectDB().catch(err => {
     console.error('Failed to connect to database:', err);
-    // In production, we might want to retry or handle this differently
-    // For now, log the error and let the server start
+
 });
 
 // CORS configuration
@@ -131,6 +132,13 @@ const threatBlockerRoutes = require('./routes/threatBlockerRoutes');
 const activityLogRoutes = require('./routes/activityLogRoutes');
 app.use('/api/threat-blocker', threatBlockerRoutes);
 app.use('/api/activity-logs', activityLogRoutes);
+// Serve React build
+app.use(express.static(path.join(__dirname, '../client/build')));
+// React fallback
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/build/index.html'));
+});
+
 
 
 // Health check route with database status
