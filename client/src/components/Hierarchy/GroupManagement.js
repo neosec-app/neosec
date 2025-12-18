@@ -4,7 +4,6 @@ import { hierarchyAPI } from '../../services/hierarchyAPI';
 const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
     const [groups, setGroups] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [selectedGroup, setSelectedGroup] = useState(null);
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -33,7 +32,8 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
         try {
             const response = await hierarchyAPI.getGroupDetails(group.id);
             if (response.success) {
-                setSelectedGroup(response.group);
+                // TODO: Display group details in a modal or separate view
+                alert(`Group: ${response.group.name}\nMembers: ${response.group.members?.length || 0}`);
             }
         } catch (error) {
             console.error('Fetch group details error:', error);
