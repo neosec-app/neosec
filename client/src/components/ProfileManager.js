@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 import ShareCreationModal from './ShareCreationModal';
 
@@ -155,7 +154,7 @@ const Toast = ({message, type, onClose, colors = {}, theme = 'dark' }) => {
           lineHeight: 1,
         }}
       >
-        Ã—
+        ×
       </button>
 
       <style>
@@ -485,12 +484,7 @@ useEffect(() => {
             ? parseInt(formData.vpnPort)
             : null,
 
-        firewallRules: formData.firewallRules
-          ? formData.firewallRules
-            .split(',')
-            .map((r) => r.trim())
-            .filter((r) => r !== '')
-          : [],
+        firewallRules: formData.firewallRules,
 
         allowedIps: formData.allowedIps
           ? formData.allowedIps
@@ -540,7 +534,8 @@ useEffect(() => {
       console.error('Error saving profile:', error);
       showToast(
         'Error saving profile: ' +
-        (error.response?.data?.message || error.message)
+        (error.response?.data?.message || error.message),
+        'error'
       );
     }
   };
@@ -704,6 +699,7 @@ useEffect(() => {
     );
   }
 
+
   return (
     <div className="profile-manager" style={styles.container}>
       {/* Confirmation Modal */}
@@ -816,18 +812,16 @@ useEffect(() => {
                 <div key={log.id} className="log-card" style={styles.logCard}>
                   <div
                     className="log-card-header"
-                    style={{
+                     style={{
                       display: 'flex',
-                      justifyContent: 'space-between',
                       alignItems: 'center',
-                      marginBottom: 6,
+                      gap: 12,
                     }}
                   >
                     <span className="log-date" style={styles.logDate}>
                       {formatDate(log.createdAt)}
                     </span>
 
-                    {/* 👇 change only this span */}
                     <span
                       className={`action-badge ${getActionBadgeClass(log.action)}`}
                       style={{
@@ -839,12 +833,12 @@ useEffect(() => {
                         letterSpacing: 0.5,
                         backgroundColor:
                           log.action === 'DEACTIVATED'
-                            ? 'rgba(249,115,22,0.12)' // orange bg
-                            : colors.accentSoft,        // green-ish for others
+                            ? 'rgba(249,115,22,0.12)'
+                            : colors.accentSoft,
                         color:
                           log.action === 'DEACTIVATED'
-                            ? '#f97316'                // orange text
-                            : colors.accent,           // green text for others
+                            ? '#f97316'
+                            : colors.accent,
                       }}
                     >
                       {log.action}
@@ -1049,30 +1043,52 @@ useEffect(() => {
               >
                 Firewall Rules
               </h4>
-              <label
-                className="checkbox-label"
-                style={styles.checkboxLabel}
-              >
-                <input
-                  type="checkbox"
-                  name="firewallEnabled"
-                  checked={formData.firewallEnabled}
-                  onChange={handleInputChange}
-                />
-                <span>Enable Firewall</span>
-              </label>
 
-
-              {formData.firewallEnabled && (
-                <div className="nested-fields">
-                  <div className="form-group">
-                    <label>Default Action</label>
-                    <select
-                      name="defaultFirewallAction"
-                      value={formData.defaultFirewallAction}
-                      onChange={handleInputChange}
-                      className="form-select"
-                      style={styles.select}
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', marginBottom: 8, color: colors.text, fontWeight: 500 }}>
+                  Select Firewall Rule Set to Apply
+                </label>
+                <p style={{ fontSize: 12, color: colors.textMuted, marginBottom: 12 }}>
+                  Choose one firewall rule configuration for this profile
+                </p>
+                
+                {firewallRules.length === 0 ? (
+                  <p style={{ color: colors.textMuted, fontSize: 13 }}>
+                    No firewall rules available. Create rules in the Firewall Management section first.
+                  </p>
+                ) : (
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: 10,
+                    maxHeight: 300,
+                    overflowY: 'auto',
+                    padding: 4
+                  }}>
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 12,
+                        padding: 12,
+                        borderRadius: 8,
+                        border: `2px solid ${formData.firewallRules.length === 0 ? colors.accent : colors.border}`,
+                        backgroundColor: formData.firewallRules.length === 0
+                          ? (theme === 'dark' ? 'rgba(54,226,123,0.08)' : colors.accentSoft)
+                          : colors.bgPanel,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (formData.firewallRules.length !== 0) {
+                          e.currentTarget.style.borderColor = colors.textMuted;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (formData.firewallRules.length !== 0) {
+                          e.currentTarget.style.borderColor = colors.border;
+                        }
+                      }}
                     >
                       <input
                         type="radio"
@@ -1175,7 +1191,7 @@ useEffect(() => {
                                   opacity: 0.6
                                 }}
                               >
-                                (ID: {rule.id.substring(0, 8)}...)
+                                
                               </span>
                               
                               <span
@@ -1286,8 +1302,7 @@ useEffect(() => {
               )}
             </div>
 
-
-
+            
             {/* Scheduling */}
             <div className="form-section" style={styles.formSection}>
               <h4
@@ -1522,12 +1537,12 @@ useEffect(() => {
                   {/* LEFT: info */}
                   <div
                     className="profile-info"
-                    style={{ flex: 1, minWidth: 0 }}
+                    style={{ maxWidth: 520 }}
                   >
                     <div
                       className="profile-title"
                       style={{
-                        marginBottom: 10,
+                        marginBottom: 12,
                       }}
                     >
                       {/* Name on its own line */}
@@ -1550,7 +1565,6 @@ useEffect(() => {
                           display: 'flex',
                           gap: 6,
                           flexWrap: 'wrap',
-                          marginTop: 4,
                         }}
                       >
                         {profile.isActive && (
@@ -1572,11 +1586,12 @@ useEffect(() => {
                           className="badge badge-type"
                           style={{
                             padding: '3px 8px',
-                            borderRadius: 999,
+                            borderRadius: 4,
                             fontSize: 11,
-                            backgroundColor: colors.accentSoft,
+                            backgroundColor: 'transparent',
                             color: colors.accent,
                             fontWeight: 500,
+                            border: `1px solid ${colors.accent}`,
                           }}
                         >
                           {profile.profileType}
@@ -1589,7 +1604,8 @@ useEffect(() => {
                       <p
                         style={{
                           color: colors.textMuted,
-                          marginBottom: 12,
+                          marginBottom: 16,
+                          margin: 0,
                         }}
                       >
                         {profile.description}
@@ -1597,9 +1613,38 @@ useEffect(() => {
                     )}
 
                     {/* Settings Summary */}
-                    <div className="settings-summary">
-                      <div className="setting-item">
-                        <strong>VPN:</strong>{' '}
+                    <div
+                      className="settings-summary"
+                      style={{
+                        marginTop: 14,
+                        paddingLeft: 12,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8,
+                        maxWidth: 420,
+                      }}
+
+
+                    >
+                      <div 
+                        className="setting-item" 
+                        style={{ 
+                          display: 'grid',
+                          gridTemplateColumns: '100px auto',
+                          alignItems: 'center',
+                          gap: '8px',
+                        }}
+
+                      >
+                        <strong
+                          style={{
+                            color: colors.textMuted,
+                            fontWeight: 600,
+                          }}
+                        >
+                          VPN:
+                        </strong>
+
                         {profile.vpnEnabled ? (
                           <span
                             style={{ color: colors.accent, fontWeight: 500 }}
@@ -1615,8 +1660,20 @@ useEffect(() => {
                         )}
                       </div>
 
-                      <div className="setting-item">
-                        <strong>Firewall:</strong>{' '}
+                      <div 
+                        className="setting-item" 
+                        style={{ 
+                          display: 'grid',
+                          gridTemplateColumns: '120px auto',
+                          alignItems: 'center',
+                          gap: '8px',
+                        }}
+
+                      >
+                        <strong style={{ color: colors.textMuted, fontWeight: 600 }}>
+                          Firewall:
+                        </strong>
+
                         {profile.firewallEnabled ? (
                           <span
                             style={{ color: colors.accent, fontWeight: 500 }}
@@ -1632,8 +1689,20 @@ useEffect(() => {
                         )}
                       </div>
 
-                      <div className="setting-item">
-                        <strong>Scheduling:</strong>{' '}
+                      <div 
+                        className="setting-item"
+                        style={{ 
+                          display: 'grid',
+                          gridTemplateColumns: '120px auto',
+                          alignItems: 'center',
+                          gap: '8px',
+                        }}
+
+                      >
+                        <strong style={{ color: colors.textMuted, fontWeight: 600 }}>
+                          Scheduling:
+                        </strong>
+
                         {profile.isScheduled ? (
                           <span
                             style={{ color: colors.accent, fontWeight: 500 }}
@@ -1656,10 +1725,10 @@ useEffect(() => {
                       style={{
                         fontSize: 12,
                         color: colors.textMuted,
-                        marginTop: 12,
+                        marginTop: 16,
                       }}
                     >
-                      <p>Created: {formatDate(profile.createdAt)}</p>
+                      <p style={{ margin: '4px 0' }}>Created: {formatDate(profile.createdAt)}</p>
                       {profile.lastActivatedAt && (
                         <p style={{ margin: '4px 0' }}>
                           Last Activated:{' '}
@@ -1806,4 +1875,4 @@ useEffect(() => {
 };
 
 
-export default ProfileManager
+export default ProfileManager;

@@ -199,7 +199,7 @@ const connectDB = async () => {
         if (!isProd) {
             // Development: auto-update schema safely
             console.log('Syncing database schema (alter mode)...');
-            await sequelize.sync({ alter: true });
+            await sequelize.sync();
             console.log('Database schema updated (new columns added if any).');
         } else {
             // Production: columns are now handled above
