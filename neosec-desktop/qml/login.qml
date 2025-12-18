@@ -220,9 +220,7 @@ Page {
                 anchors.topMargin: 30
                 anchors.horizontalCenter: parent.horizontalCenter
                 textFormat: Text.RichText
-                text: "<span style='color: " + text_muted + ";'>Don't have an account?</span> " +
-                      "<a href='https://ns.org/signup' style='text-decoration: none; color: " + text_light + ";'>" +
-                      "<b>Sign up</b></a>"
+		text: "<span style='color: " + text_muted + ";'>Don't have an account?</span> " + "<a href='https://neosec-mauve.vercel.app/' style='text-decoration: none; color: " + text_light + ";'>" + "<b>Sign up</b></a>"
                 onLinkActivated: (link) => {
                                      Qt.openUrlExternally(link)
                                  }

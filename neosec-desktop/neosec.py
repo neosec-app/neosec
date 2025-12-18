@@ -6,9 +6,10 @@ import requests
 import os
 import json
 
+base_dir = os.path.dirname(os.path.abspath(__file__))
 auth_url = "https://neosec.onrender.com/api/auth/login"
 dashboard_url = "https://neosec.onrender.com/api/dashboard"
-auth_file = "auth.json"
+auth_file = f"{base_dir}/data/auth.json"
 
 class AuthWorker(QRunnable):
     def __init__(self, user, password, backend_signals, parent=None):
@@ -78,11 +79,13 @@ class Backend(QObject):
         if os.path.exists(auth_file):
             os.remove(auth_file)
         self.logout.emit()
+        self.authenticationFinished.emit()
 
-app = QApplication(sys.argv)
-backend = Backend()
-engine = QQmlApplicationEngine()
-engine.rootContext().setContextProperty("backend", backend)
-engine.load("qml/main.qml")
-backend.checkSavedAuth()
-sys.exit(app.exec())
+def neosec():
+    app = QApplication(sys.argv)
+    backend = Backend()
+    engine = QQmlApplicationEngine()
+    engine.rootContext().setContextProperty("backend", backend)
+    engine.load(f"{base_dir}/qml/main.qml")
+    backend.checkSavedAuth()
+    sys.exit(app.exec())

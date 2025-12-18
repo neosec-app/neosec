@@ -10,7 +10,7 @@ const LoginHistory = sequelize.define('LoginHistory', {
   },
   userId: {
     type: DataTypes.UUID,
-    allowNull: false,
+    allowNull: true,
     references: {
       model: 'users',
       key: 'id'
