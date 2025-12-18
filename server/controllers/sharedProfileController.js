@@ -546,6 +546,12 @@ exports.deleteShareLink = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Share link not found' });
     }
 
+    // Delete associated logs first
+    await SharedProfileLog.destroy({
+      where: { sharedProfileId: id }
+    });
+
+    // Then delete the shared profile
     await sharedProfile.destroy();
 
     res.json({ success: true, message: 'Share link deleted successfully' });

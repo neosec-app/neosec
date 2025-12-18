@@ -387,19 +387,18 @@ useEffect(() => {
       message: 'Are you sure you want to delete this share link? This action cannot be undone.',
       onConfirm: async () => {
         try {
-          await api.delete(`/auth/shared-profiles/${id}`);
+          await api.delete(`/auth/shared-profiles/${id}`);  // Fixed path
           showToast('Share link deleted successfully', 'success');
           fetchShareLinks();
         } catch (error) {
           console.error('Error deleting link:', error);
-          showToast('Error deleting link', 'error');
+          showToast(error.response?.data?.message || 'Error deleting link', 'error');
         }
         setConfirmModal(null);
       },
       onCancel: () => setConfirmModal(null),
     });
   };
-
   const handleViewLogs = (shareLink) => {
     setLogsModal(shareLink);
   };
