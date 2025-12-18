@@ -66,7 +66,7 @@ Page {
             }
 
             Text {
-                id: usernameLable
+                id: usernameLabel
                 text: username
                 color: text_muted
                 font.pixelSize: 12
