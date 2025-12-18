@@ -8,7 +8,7 @@ import json
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 auth_url = "https://neosec.onrender.com/api/auth/login"
-dashboard_url = "https://neosec.onrender.com/api/dashboard"
+verification_url = "https://neosec.onrender.com/api/auth/verify"
 auth_file = f"{base_dir}/data/auth.json"
 
 class AuthWorker(QRunnable):
@@ -21,17 +21,18 @@ class AuthWorker(QRunnable):
     def run(self):
         if self.user and self.password:
             try: 
-                os.remove(auth_file)
+                if os.path.exists(auth_file):
+                    os.remove(auth_file)
                 authenticationResponse = requests.post(auth_url, data={"email": self.user, "password": self.password}, timeout=10).json()
                 message = authenticationResponse.get("message")
                 if authenticationResponse.get('success'):
                     with open(auth_file, 'w') as file:
                         json.dump(authenticationResponse, file, indent=4)
-                    username = authenticationResponse.get("user").get("email")
-                    self.signals.loginSuccess.emit(username)
+                        self.signals.loginFileSaved.emit()
                 else:
                     self.signals.loginFailed.emit(message)
-            except:
+            except Exception as e:
+                print(e)
                 self.signals.loginFailed.emit("Timed out trying to reach server.")
         else:
             self.signals.loginFailed.emit("Please enter valid email and password")
@@ -47,29 +48,34 @@ class AuthFileWorker(QRunnable):
             with open(auth_file, "r") as file:
                 authenticationResponse = json.load(file)
             token = authenticationResponse.get("token")
-            username = authenticationResponse.get("user", {}).get("email")
-            if token and username:
+            if token:
                 try:
-                    response = requests.get(dashboard_url, headers={"Authorization": f"Bearer {token}"}, timeout=10).json()
+                    response = requests.get(verification_url, headers={"Authorization": f"Bearer {token}"}, timeout=10).json()
                     if response.get("success"):
+                        email = response.get('email')
+                        role = response.get('role')
+                        username = f"{email} ({role})"
                         self.signals.loginSuccess.emit(username)
                     else:
                         self.signals.loginFailed.emit("Authentication token expired")
                         os.remove(auth_file)
-                except:
-                        self.signals.loginFailed.emit("Timed out trying to reach server.")
+                except Exception as e:
+                    print(e)
+                    self.signals.loginFailed.emit("Timed out trying to reach server.")
 
         self.signals.authenticationFinished.emit()
 
 class Backend(QObject):
     loginSuccess = Signal(str)
     loginFailed = Signal(str)
+    loginFileSaved = Signal()
     logout = Signal()
     authenticationFinished = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.thread_pool = QThreadPool.globalInstance()
+        self.loginFileSaved.connect(self.checkSavedAuth)
 
     @Slot()
     def checkSavedAuth(self):
