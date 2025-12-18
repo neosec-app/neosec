@@ -1,8 +1,7 @@
-// src/components/Hierarchy/Memberships.js
 import React, { useState, useEffect } from 'react';
 import { hierarchyAPI } from '../../services/hierarchyAPI';
 
-const Memberships = () => {
+const Memberships = ({ theme, palette, isMobile, isTablet }) => {
     const [memberships, setMemberships] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -44,153 +43,251 @@ const Memberships = () => {
     };
 
     return (
-        <div className="min-h-screen bg-background-dark text-text-light p-8">
-            <div className="max-w-6xl mx-auto">
+        <div style={{
+            flex: 1,
+            padding: isMobile ? '16px' : isTablet ? '24px' : '40px',
+            backgroundColor: palette.bgMain,
+            color: palette.text,
+            minHeight: '100vh'
+        }}>
+            <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
                 {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold mb-2">My Memberships</h1>
-                    <p className="text-text-muted">
+                <div style={{ marginBottom: '32px' }}>
+                    <h1 style={{ fontSize: isMobile ? '24px' : '32px', fontWeight: '600', margin: '0 0 8px 0', color: palette.text }}>
+                        My Memberships
+                    </h1>
+                    <p style={{ color: palette.textMuted, margin: 0 }}>
                         Groups you're a member of
                     </p>
                 </div>
 
                 {/* Error Message */}
                 {error && (
-                    <div className="mb-6 p-4 bg-error-red bg-opacity-10 border border-error-red rounded-lg text-error-red">
+                    <div style={{
+                        marginBottom: '24px',
+                        padding: '16px',
+                        backgroundColor: `${palette.danger}20`,
+                        border: `1px solid ${palette.danger}`,
+                        borderRadius: '8px',
+                        color: palette.danger
+                    }}>
                         {error}
                     </div>
                 )}
 
                 {/* Loading State */}
                 {loading ? (
-                    <div className="text-center py-12 text-text-muted">
-                        <div className="text-4xl mb-4">⏳</div>
+                    <div style={{ textAlign: 'center', padding: '48px 0', color: palette.textMuted }}>
+                        <div style={{ fontSize: '32px', marginBottom: '16px' }}>⏳</div>
                         <p>Loading memberships...</p>
                     </div>
                 ) : memberships.length === 0 ? (
                     /* Empty State */
-                    <div className="text-center py-12 p-8 bg-form-background-dark rounded-lg border border-input-background-dark">
-                        <div className="text-6xl mb-4">👥</div>
-                        <h3 className="text-xl font-bold mb-2">No Memberships</h3>
-                        <p className="text-text-muted mb-6">
+                    <div style={{
+                        textAlign: 'center',
+                        padding: isMobile ? '32px 16px' : '48px 32px',
+                        backgroundColor: palette.bgCard,
+                        borderRadius: '12px',
+                        border: `1px solid ${palette.border}`
+                    }}>
+                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>👥</div>
+                        <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px', color: palette.text }}>
+                            No Memberships
+                        </h3>
+                        <p style={{ color: palette.textMuted }}>
                             You're not a member of any groups yet. Wait for an invitation from a group leader.
                         </p>
                     </div>
                 ) : (
-                    /* Memberships Grid */
-                    <div className="grid md:grid-cols-2 gap-6">
-                        {memberships.map((membership) => (
-                            <div
-                                key={membership.id}
-                                className="p-6 bg-form-background-dark rounded-lg border border-input-background-dark hover:border-primary transition-all"
-                            >
-                                {/* Group Header */}
-                                <div className="flex items-start justify-between mb-4">
-                                    <div className="flex-1">
-                                        <h3 className="text-xl font-bold mb-2">{membership.group?.name}</h3>
-                                        <p className="text-text-muted text-sm line-clamp-2 mb-3">
-                                            {membership.group?.description || 'No description'}
-                                        </p>
+                    <>
+                        {/* Memberships Grid */}
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
+                            gap: '24px',
+                            marginBottom: '32px'
+                        }}>
+                            {memberships.map((membership) => (
+                                <div
+                                    key={membership.id}
+                                    style={{
+                                        padding: '24px',
+                                        backgroundColor: palette.bgCard,
+                                        borderRadius: '12px',
+                                        border: `1px solid ${palette.border}`,
+                                        transition: 'border-color 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.borderColor = palette.accent}
+                                    onMouseLeave={(e) => e.currentTarget.style.borderColor = palette.border}
+                                >
+                                    {/* Group Header */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'flex-start' }}>
+                                        <div style={{ flex: 1 }}>
+                                            <h3 style={{ fontSize: '20px', fontWeight: '600', margin: '0 0 8px 0', color: palette.text }}>
+                                                {membership.group?.name}
+                                            </h3>
+                                            <p style={{ color: palette.textMuted, fontSize: '14px', margin: 0 }}>
+                                                {membership.group?.description || 'No description'}
+                                            </p>
+                                        </div>
+                                        <span style={{
+                                            padding: '4px 12px',
+                                            backgroundColor: theme === 'light' ? 'rgba(34, 197, 94, 0.1)' : palette.accentSoft,
+                                            color: palette.accent,
+                                            fontSize: '11px',
+                                            fontWeight: '600',
+                                            borderRadius: '12px',
+                                            border: `1px solid ${palette.accent}`,
+                                            whiteSpace: 'nowrap'
+                                        }}>
+                                            Member
+                                        </span>
                                     </div>
-                                    <span className="px-3 py-1 bg-primary bg-opacity-20 text-primary text-xs font-semibold rounded-full">
-                    Member
-                  </span>
-                                </div>
 
-                                {/* Group Info */}
-                                <div className="space-y-3 mb-4 text-sm">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-text-muted">Leader:</span>
-                                        <span className="text-text-light font-semibold">
-                      {membership.group?.leader?.email}
-                    </span>
+                                    {/* Group Info */}
+                                    <div style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '14px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span style={{ color: palette.textMuted }}>Leader:</span>
+                                            <span style={{ color: palette.text, fontWeight: '600' }}>
+                                                {membership.group?.leader?.email}
+                                            </span>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span style={{ color: palette.textMuted }}>Members:</span>
+                                            <span style={{ color: palette.text, fontWeight: '600' }}>
+                                                {membership.group?.members?.length || 0} / {membership.group?.maxMembers}
+                                            </span>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span style={{ color: palette.textMuted }}>Joined:</span>
+                                            <span style={{ color: palette.text }}>
+                                                {new Date(membership.joinedAt).toLocaleDateString()}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-text-muted">Members:</span>
-                                        <span className="text-text-light font-semibold">
-                      {membership.group?.members?.length || 0} / {membership.group?.maxMembers}
-                    </span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-text-muted">Joined:</span>
-                                        <span className="text-text-light">
-                      {new Date(membership.joinedAt).toLocaleDateString()}
-                    </span>
-                                    </div>
-                                </div>
 
-                                {/* Permissions Notice */}
-                                {membership.canLeaderManageConfigs && (
-                                    <div className="mb-4 p-3 bg-input-background-dark rounded-lg border border-input-background-dark">
-                                        <div className="flex items-start gap-2">
-                                            <span className="text-primary text-sm">ℹ️</span>
-                                            <p className="text-text-muted text-xs">
+                                    {/* Permissions Notice */}
+                                    {membership.canLeaderManageConfigs && (
+                                        <div style={{
+                                            marginBottom: '16px',
+                                            padding: '12px',
+                                            backgroundColor: theme === 'light' ? '#f3f4f6' : palette.bgPanel,
+                                            borderRadius: '8px',
+                                            border: `1px solid ${palette.border}`,
+                                            display: 'flex',
+                                            gap: '8px'
+                                        }}>
+                                            <span style={{ color: palette.accent }}>ℹ️</span>
+                                            <p style={{ color: palette.textMuted, fontSize: '12px', margin: 0 }}>
                                                 The group leader can manage your security configurations.
                                             </p>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {/* Action Button */}
-                                <button
-                                    onClick={() => handleLeaveGroup(membership.id, membership.group?.name)}
-                                    className="w-full py-2 bg-error-red bg-opacity-10 text-error-red rounded-lg font-semibold hover:bg-opacity-20 transition-all border border-error-red"
-                                >
-                                    Leave Group
-                                </button>
+                                    {/* Leave Button */}
+                                    <button
+                                        onClick={() => handleLeaveGroup(membership.id, membership.group?.name)}
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px',
+                                            backgroundColor: `${palette.danger}10`,
+                                            color: palette.danger,
+                                            border: `1px solid ${palette.danger}`,
+                                            borderRadius: '8px',
+                                            fontWeight: '600',
+                                            cursor: 'pointer',
+                                            fontSize: '14px'
+                                        }}
+                                    >
+                                        Leave Group
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Stats Cards */}
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+                            gap: '16px',
+                            marginBottom: '32px'
+                        }}>
+                            <div style={{
+                                padding: '16px',
+                                backgroundColor: palette.bgCard,
+                                borderRadius: '8px',
+                                border: `1px solid ${palette.border}`
+                            }}>
+                                <p style={{ color: palette.textMuted, fontSize: '12px', margin: '0 0 4px 0' }}>Total Memberships</p>
+                                <p style={{ fontSize: '24px', fontWeight: 'bold', color: palette.accent, margin: 0 }}>
+                                    {memberships.length}
+                                </p>
                             </div>
-                        ))}
-                    </div>
+                            <div style={{
+                                padding: '16px',
+                                backgroundColor: palette.bgCard,
+                                borderRadius: '8px',
+                                border: `1px solid ${palette.border}`
+                            }}>
+                                <p style={{ color: palette.textMuted, fontSize: '12px', margin: '0 0 4px 0' }}>Active Groups</p>
+                                <p style={{ fontSize: '24px', fontWeight: 'bold', color: palette.accent, margin: 0 }}>
+                                    {memberships.filter(m => m.group?.isActive).length}
+                                </p>
+                            </div>
+                            <div style={{
+                                padding: '16px',
+                                backgroundColor: palette.bgCard,
+                                borderRadius: '8px',
+                                border: `1px solid ${palette.border}`
+                            }}>
+                                <p style={{ color: palette.textMuted, fontSize: '12px', margin: '0 0 4px 0' }}>Oldest Membership</p>
+                                <p style={{ fontSize: '24px', fontWeight: 'bold', color: palette.accent, margin: 0 }}>
+                                    {memberships.length > 0
+                                        ? Math.floor((new Date() - new Date(Math.min(...memberships.map(m => new Date(m.joinedAt))))) / (1000 * 60 * 60 * 24))
+                                        : 0}d
+                                </p>
+                            </div>
+                        </div>
+                    </>
                 )}
 
                 {/* Info Section */}
-                <div className="mt-8 p-6 bg-form-background-dark rounded-lg border border-input-background-dark">
-                    <h3 className="text-lg font-semibold mb-3">About Group Memberships</h3>
-                    <div className="grid md:grid-cols-2 gap-6 text-sm text-text-muted">
+                <div style={{
+                    padding: isMobile ? '20px' : '24px',
+                    backgroundColor: palette.bgCard,
+                    borderRadius: '12px',
+                    border: `1px solid ${palette.border}`
+                }}>
+                    <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: palette.text }}>
+                        About Group Memberships
+                    </h3>
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
+                        gap: '24px',
+                        fontSize: '14px',
+                        color: palette.textMuted
+                    }}>
                         <div>
-                            <h4 className="text-text-light font-semibold mb-2">Benefits</h4>
-                            <ul className="space-y-1">
-                                <li>• Shared security configurations</li>
-                                <li>• Managed VPN and firewall rules</li>
-                                <li>• Team collaboration features</li>
-                                <li>• Centralized management</li>
+                            <h4 style={{ color: palette.text, fontWeight: '600', marginBottom: '8px' }}>Benefits</h4>
+                            <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                                <li>Shared security configurations</li>
+                                <li>Managed VPN and firewall rules</li>
+                                <li>Team collaboration features</li>
+                                <li>Centralized management</li>
                             </ul>
                         </div>
                         <div>
-                            <h4 className="text-text-light font-semibold mb-2">Permissions</h4>
-                            <ul className="space-y-1">
-                                <li>• Leaders can update your configs</li>
-                                <li>• You can still manage your own settings</li>
-                                <li>• You can leave a group anytime</li>
-                                <li>• View group activity logs</li>
+                            <h4 style={{ color: palette.text, fontWeight: '600', marginBottom: '8px' }}>Permissions</h4>
+                            <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                                <li>Leaders can update your configs</li>
+                                <li>You can still manage your own settings</li>
+                                <li>You can leave a group anytime</li>
+                                <li>View group activity logs</li>
                             </ul>
                         </div>
                     </div>
                 </div>
-
-                {/* Stats Card */}
-                {memberships.length > 0 && (
-                    <div className="mt-6 grid md:grid-cols-3 gap-4">
-                        <div className="p-4 bg-form-background-dark rounded-lg border border-input-background-dark">
-                            <p className="text-text-muted text-sm mb-1">Total Memberships</p>
-                            <p className="text-2xl font-bold text-primary">{memberships.length}</p>
-                        </div>
-                        <div className="p-4 bg-form-background-dark rounded-lg border border-input-background-dark">
-                            <p className="text-text-muted text-sm mb-1">Active Groups</p>
-                            <p className="text-2xl font-bold text-primary">
-                                {memberships.filter(m => m.group?.isActive).length}
-                            </p>
-                        </div>
-                        <div className="p-4 bg-form-background-dark rounded-lg border border-input-background-dark">
-                            <p className="text-text-muted text-sm mb-1">Oldest Membership</p>
-                            <p className="text-2xl font-bold text-primary">
-                                {memberships.length > 0
-                                    ? Math.floor((new Date() - new Date(Math.min(...memberships.map(m => new Date(m.joinedAt))))) / (1000 * 60 * 60 * 24))
-                                    : 0}d
-                            </p>
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );

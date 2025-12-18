@@ -54,6 +54,7 @@ const featureToggleRoutes = require('./routes/featureToggleRoutes');
 const roleTemplateRoutes = require('./routes/roleTemplateRoutes');
 const mfaRoutes = require('./routes/mfaRoutes');
 const impersonationRoutes = require('./routes/impersonationRoutes');
+//const authRoutes = require('./routes/authRoutes');
 
 // Initialize Express app
 const app = express();
@@ -104,7 +105,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', authRoutes);
 const profileRoutes = require('./routes/profileRoutes');
 app.use('/api/profiles', profileRoutes);
-
+app.use('/api/auth', authRoutes);
 app.use('/api/vpn', VpnRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);

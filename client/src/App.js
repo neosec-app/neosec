@@ -280,11 +280,13 @@ function App() {
         return (
             <>
                 <div style={{
-                    minHeight: '100vh',
-                    backgroundColor: palette.bgMain,
-                    color: palette.text,
-                    display: 'flex'
-                }}>
+                minHeight: '100vh',
+                backgroundColor: palette.bgMain,
+                color: palette.text,
+                display: 'flex', 
+            }}>
+                    
+
                     <Sidebar
                         user={user}
                         theme={theme}
@@ -299,20 +301,6 @@ function App() {
                         handleLogout={handleLogout}
                     />
 
-                    {/* HIERARCHY RENDER */}
-                    {currentView === "subscription" && (
-                        <Subscription
-                            user={user}
-                            onUpgradeSuccess={(updatedUser) => {
-                                setUser(updatedUser);
-                                localStorage.setItem("user", JSON.stringify(updatedUser));
-                            }}
-                        />
-                    )}
-
-                    {currentView === "groups" && user.accountType === "leader" && <GroupManagement user={user} />}
-                    {currentView === "invitations" && <Invitations />}
-                    {currentView === "memberships" && <Memberships />}
 
                     {/* Main Content */}
                     <div style={{
@@ -322,7 +310,7 @@ function App() {
                         overflowY: 'auto',
                         backgroundColor: palette.bgMain,
                         color: palette.text,
-                        marginLeft: isMobile ? (sidebarOpen ? '260px' : '0') : '260px',  
+                        marginLeft: isMobile ? (sidebarOpen ? '260px' : '0') : '260px', 
                         transition: 'background-color 0.3s ease, color 0.3s ease, padding 0.3s ease, margin-left 0.3s ease, padding-top 0.3s ease',
                         height: '100vh'  
                     }}>
@@ -339,6 +327,32 @@ function App() {
                                 isTablet={isTablet}
                                 setCurrentView={setCurrentView}
                             />
+                        )}
+
+                        {currentView === 'subscription' && (
+                            <Subscription
+                                user={user}
+                                theme={theme}
+                                palette={palette}
+                                isMobile={isMobile}
+                                isTablet={isTablet}
+                                onUpgradeSuccess={(updatedUser) => {
+                                    setUser(updatedUser);
+                                    localStorage.setItem("user", JSON.stringify(updatedUser));
+                                }}
+                            />
+                        )}
+
+                        {currentView === 'groups' && user.accountType === "leader" && (
+                            <GroupManagement user={user} theme={theme} palette={palette} isMobile={isMobile} isTablet={isTablet} />
+                        )}
+                        
+                        {currentView === 'invitations' && (
+                            <Invitations theme={theme} palette={palette} isMobile={isMobile} isTablet={isTablet} />
+                        )}
+                        
+                        {currentView === 'memberships' && (
+                            <Memberships theme={theme} palette={palette} isMobile={isMobile} isTablet={isTablet} />
                         )}
 
                         {/* VPN View */}
