@@ -2,6 +2,86 @@
 import React, { useState, useEffect } from 'react';
 import { scanAPI, getErrorMessage } from '../services/api';
 
+// Toast component
+const Toast = ({ message, type, onClose, colors, theme }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 5000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const getBgColor = () => {
+    if (type === 'success') return theme === 'dark' ? '#1a3a2a' : 'rgba(31,164,90,0.1)';
+    if (type === 'error') return theme === 'dark' ? '#2A1515' : 'rgba(212,24,61,0.08)';
+    return theme === 'dark' ? '#2a2a1a' : 'rgba(240,165,0,0.1)';
+  };
+
+  const getTextColor = () => {
+    if (type === 'success') return theme === 'dark' ? '#7fdf9f' : colors.accent;
+    if (type === 'error') return theme === 'dark' ? '#FFB3B3' : colors.danger;
+    return colors.warning;
+  };
+
+  const getBorderColor = () => {
+    if (type === 'success') return colors.accent;
+    if (type === 'error') return colors.danger;
+    return colors.warning;
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        padding: '16px 20px',
+        backgroundColor: getBgColor(),
+        border: `1px solid ${getBorderColor()}`,
+        borderRadius: '8px',
+        color: getTextColor(),
+        fontSize: '14px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        zIndex: 1000,
+        maxWidth: '400px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: '12px',
+        animation: 'slideIn 0.3s ease-out',
+      }}
+    >
+      <span>{message}</span>
+      <button
+        onClick={onClose}
+        style={{
+          background: 'none',
+          border: 'none',
+          color: getTextColor(),
+          cursor: 'pointer',
+          fontSize: '18px',
+          padding: '0',
+          lineHeight: '1',
+        }}
+      >
+        ×
+      </button>
+      <style>
+        {`
+          @keyframes slideIn {
+            from {
+              transform: translateX(100%);
+              opacity: 0;
+            }
+            to {
+              transform: translateX(0);
+              opacity: 1;
+            }
+          }
+        `}
+      </style>
+    </div>
+  );
+};
+
 const darkPalette = {
   bgMain: '#121212',
   bgCard: '#181818',
@@ -33,7 +113,7 @@ const lightPalette = {
 };
 
 function ScanDashboard({ theme = 'dark', palette }) {
-  // fall back to local palettes if App.js didn’t pass one
+  // fall back to local palettes if App.js didn't pass one
   const colors =
     palette || (theme === 'light' ? lightPalette : darkPalette);
 
@@ -45,6 +125,11 @@ function ScanDashboard({ theme = 'dark', palette }) {
   const [error, setError] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyError, setHistoryError] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type });
+  };
 
   // Poll scan status when we have a scanId
   useEffect(() => {
@@ -58,10 +143,16 @@ function ScanDashboard({ theme = 'dark', palette }) {
 
         if (data.status === 'COMPLETED' || data.status === 'ERROR') {
           clearInterval(interval);
+          if (data.status === 'COMPLETED') {
+            showToast(`Scan completed: ${data.positives || 0} detections found`, 'success');
+          } else {
+            showToast('Scan failed', 'error');
+          }
         }
       } catch (err) {
         console.error('Status check error:', err);
         clearInterval(interval);
+        showToast('Error checking scan status', 'error');
       }
     }, 5000);
 
@@ -104,9 +195,11 @@ function ScanDashboard({ theme = 'dark', palette }) {
       const data = await scanAPI.scanUrl(url.trim());
       setScanId(data.scanId);
       setStatus('PENDING');
+      showToast('Scan submitted successfully', 'success');
     } catch (err) {
       console.error('Scan error:', err);
       setError(getErrorMessage(err, 'Failed to submit URL'));
+      showToast(getErrorMessage(err, 'Failed to submit URL'), 'error');
     } finally {
       setLoading(false);
     }
@@ -120,6 +213,16 @@ function ScanDashboard({ theme = 'dark', palette }) {
 
   return (
     <div style={{ color: colors.text }}>
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+          colors={colors}
+          theme={theme}
+        />
+      )}
+      
       <h1 style={{ fontSize: '32px', marginBottom: '10px' }}>URL Scanner</h1>
       <p style={{ color: colors.textMuted, marginBottom: '30px' }}>
         Scan URLs with VirusTotal and see threat results.

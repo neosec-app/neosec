@@ -15,5 +15,14 @@ router.post('/login', validateLogin, login);
 // Protected routes
 router.get('/me', protect, getMe);
 
+// Token validation endpoint for desktop app
+router.get('/verify', protect, (req, res) => {
+    res.json({
+        success: true,
+        email: req.user.email,
+        role: req.user.accountType
+    });
+});
+
 module.exports = router;
 

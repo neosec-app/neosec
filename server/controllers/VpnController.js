@@ -7,7 +7,8 @@ exports.getVpnConfigs = async (req, res) => {
     try {
         const vpnConfigs = await VpnConfig.findAll({
             where: { userId: req.user.id },
-            order: [['createdAt', 'DESC']]
+            order: [['createdAt', 'DESC']],
+            attributes: ['id', 'name', 'protocol', 'configFileName', 'description', 'isActive', 'createdAt', 'updatedAt']
         });
 
         res.status(200).json({
@@ -24,7 +25,7 @@ exports.getVpnConfigs = async (req, res) => {
     }
 };
 
-// Get single VPN config
+// Get single VPN config (including file content)
 exports.getVpnConfig = async (req, res) => {
     try {
         const vpnConfig = await VpnConfig.findOne({
@@ -54,26 +55,77 @@ exports.getVpnConfig = async (req, res) => {
     }
 };
 
-// Create new VPN config
+// Create new VPN config with file upload
 exports.createVpnConfig = async (req, res) => {
     try {
-        const { name, serverAddress, port, protocol, username, password, description } = req.body;
+        const { name, protocol, description, configFileContent, configFileName } = req.body;
+
+        // Validation
+        if (!name || !protocol || !configFileContent || !configFileName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Name, protocol, and configuration file are required'
+            });
+        }
+
+        // Validate protocol
+        if (!['OpenVPN', 'WireGuard'].includes(protocol)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Protocol must be either OpenVPN or WireGuard'
+            });
+        }
+
+        // Validate file extension
+        const expectedExtension = protocol === 'OpenVPN' ? '.ovpn' : '.conf';
+        if (!configFileName.endsWith(expectedExtension)) {
+            return res.status(400).json({
+                success: false,
+                message: `For ${protocol}, file must have ${expectedExtension} extension`
+            });
+        }
+
+        // Check if name already exists for this user
+        const existingConfig = await VpnConfig.findOne({
+            where: {
+                name,
+                userId: req.user.id
+            }
+        });
+
+        if (existingConfig) {
+            return res.status(409).json({
+                success: false,
+                message: 'A VPN configuration with this name already exists'
+            });
+        }
 
         const vpnConfig = await VpnConfig.create({
             name,
-            serverAddress,
-            port,
             protocol,
-            username,
-            password,
-            description,
-            userId: req.user.id
+            configFileName,
+            configFileContent,
+            description: description || null,
+            userId: req.user.id,
+            isActive: false
         });
+
+        // Return without file content
+        const response = {
+            id: vpnConfig.id,
+            name: vpnConfig.name,
+            protocol: vpnConfig.protocol,
+            configFileName: vpnConfig.configFileName,
+            description: vpnConfig.description,
+            isActive: vpnConfig.isActive,
+            createdAt: vpnConfig.createdAt,
+            updatedAt: vpnConfig.updatedAt
+        };
 
         res.status(201).json({
             success: true,
             message: 'VPN configuration created successfully',
-            data: vpnConfig
+            data: response
         });
     } catch (error) {
         console.error('Create VPN config error:', error);
@@ -101,23 +153,71 @@ exports.updateVpnConfig = async (req, res) => {
             });
         }
 
-        const { name, serverAddress, port, protocol, username, password, description, isActive } = req.body;
+        const { name, protocol, description, configFileContent, configFileName } = req.body;
+
+        // Check if name is being changed and if it already exists
+        if (name && name !== vpnConfig.name) {
+            const existingConfig = await VpnConfig.findOne({
+                where: {
+                    name,
+                    userId: req.user.id,
+                    id: { [Op.ne]: vpnConfig.id }
+                }
+            });
+
+            if (existingConfig) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'A VPN configuration with this name already exists'
+                });
+            }
+        }
+
+        // Validate protocol if provided
+        if (protocol && !['OpenVPN', 'WireGuard'].includes(protocol)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Protocol must be either OpenVPN or WireGuard'
+            });
+        }
+
+        // If file is being updated, validate extension
+        if (configFileName && configFileContent) {
+            const targetProtocol = protocol || vpnConfig.protocol;
+            const expectedExtension = targetProtocol === 'OpenVPN' ? '.ovpn' : '.conf';
+            
+            if (!configFileName.endsWith(expectedExtension)) {
+                return res.status(400).json({
+                    success: false,
+                    message: `For ${targetProtocol}, file must have ${expectedExtension} extension`
+                });
+            }
+        }
 
         await vpnConfig.update({
-            name: name !== undefined ? name : vpnConfig.name,
-            serverAddress: serverAddress !== undefined ? serverAddress : vpnConfig.serverAddress,
-            port: port !== undefined ? port : vpnConfig.port,
-            protocol: protocol !== undefined ? protocol : vpnConfig.protocol,
-            username: username !== undefined ? username : vpnConfig.username,
-            password: password !== undefined ? password : vpnConfig.password,
-            description: description !== undefined ? description : vpnConfig.description,
-            isActive: isActive !== undefined ? isActive : vpnConfig.isActive
+            name: name || vpnConfig.name,
+            protocol: protocol || vpnConfig.protocol,
+            configFileName: configFileName || vpnConfig.configFileName,
+            configFileContent: configFileContent || vpnConfig.configFileContent,
+            description: description !== undefined ? description : vpnConfig.description
         });
+
+        // Return without file content
+        const response = {
+            id: vpnConfig.id,
+            name: vpnConfig.name,
+            protocol: vpnConfig.protocol,
+            configFileName: vpnConfig.configFileName,
+            description: vpnConfig.description,
+            isActive: vpnConfig.isActive,
+            createdAt: vpnConfig.createdAt,
+            updatedAt: vpnConfig.updatedAt
+        };
 
         res.status(200).json({
             success: true,
             message: 'VPN configuration updated successfully',
-            data: vpnConfig
+            data: response
         });
     } catch (error) {
         console.error('Update VPN config error:', error);
@@ -192,38 +292,46 @@ exports.toggleVpnConfig = async (req, res) => {
                 }
             );
             
-            // End any active data transfer sessions
-            await DataTransfer.update(
-                { isActive: false, sessionEnd: new Date() },
-                {
-                    where: {
-                        userId: req.user.id,
-                        isActive: true
+            // End any active data transfer sessions if DataTransfer model exists
+            try {
+                await DataTransfer.update(
+                    { isActive: false, sessionEnd: new Date() },
+                    {
+                        where: {
+                            userId: req.user.id,
+                            isActive: true
+                        }
                     }
-                }
-            );
-            
-            // Create new data transfer session
-            await DataTransfer.create({
-                userId: req.user.id,
-                vpnConfigId: vpnConfig.id,
-                bytesSent: 0,
-                bytesReceived: 0,
-                sessionStart: new Date(),
-                isActive: true
-            });
+                );
+                
+                // Create new data transfer session
+                await DataTransfer.create({
+                    userId: req.user.id,
+                    vpnConfigId: vpnConfig.id,
+                    bytesSent: 0,
+                    bytesReceived: 0,
+                    sessionStart: new Date(),
+                    isActive: true
+                });
+            } catch (err) {
+                console.log('DataTransfer model not available, skipping session management');
+            }
         } else {
             // If deactivating, end the current data transfer session
-            await DataTransfer.update(
-                { isActive: false, sessionEnd: new Date() },
-                {
-                    where: {
-                        userId: req.user.id,
-                        vpnConfigId: vpnConfig.id,
-                        isActive: true
+            try {
+                await DataTransfer.update(
+                    { isActive: false, sessionEnd: new Date() },
+                    {
+                        where: {
+                            userId: req.user.id,
+                            vpnConfigId: vpnConfig.id,
+                            isActive: true
+                        }
                     }
-                }
-            );
+                );
+            } catch (err) {
+                console.log('DataTransfer model not available, skipping session management');
+            }
         }
 
         await vpnConfig.update({
@@ -233,7 +341,16 @@ exports.toggleVpnConfig = async (req, res) => {
         res.status(200).json({
             success: true,
             message: `VPN configuration ${willBeActive ? 'activated' : 'deactivated'} successfully`,
-            data: vpnConfig
+            data: {
+                id: vpnConfig.id,
+                name: vpnConfig.name,
+                protocol: vpnConfig.protocol,
+                configFileName: vpnConfig.configFileName,
+                description: vpnConfig.description,
+                isActive: vpnConfig.isActive,
+                createdAt: vpnConfig.createdAt,
+                updatedAt: vpnConfig.updatedAt
+            }
         });
     } catch (error) {
         console.error('Toggle VPN config error:', error);
@@ -244,7 +361,7 @@ exports.toggleVpnConfig = async (req, res) => {
     }
 };
 
-// Clone VPN Configuration (for Validation & Versioning)
+// Clone VPN Configuration
 exports.cloneVpnConfig = async (req, res) => {
     try {
         const original = await VpnConfig.findOne({
@@ -261,14 +378,21 @@ exports.cloneVpnConfig = async (req, res) => {
             });
         }
 
+        // Generate unique name for clone
+        let cloneName = `${original.name} - Copy`;
+        let counter = 1;
+        
+        while (await VpnConfig.findOne({ where: { name: cloneName, userId: req.user.id } })) {
+            cloneName = `${original.name} - Copy (${counter})`;
+            counter++;
+        }
+
         // Create clone
         const clone = await VpnConfig.create({
-            name: `${original.name} - Copy`,
-            serverAddress: original.serverAddress,
-            port: original.port,
+            name: cloneName,
             protocol: original.protocol,
-            username: original.username,
-            password: original.password,
+            configFileName: original.configFileName,
+            configFileContent: original.configFileContent,
             description: original.description,
             isActive: false,
             userId: req.user.id
@@ -277,7 +401,16 @@ exports.cloneVpnConfig = async (req, res) => {
         res.status(201).json({
             success: true,
             message: 'VPN configuration cloned successfully',
-            data: clone
+            data: {
+                id: clone.id,
+                name: clone.name,
+                protocol: clone.protocol,
+                configFileName: clone.configFileName,
+                description: clone.description,
+                isActive: clone.isActive,
+                createdAt: clone.createdAt,
+                updatedAt: clone.updatedAt
+            }
         });
     } catch (error) {
         console.error('Clone VPN config error:', error);
@@ -288,11 +421,9 @@ exports.cloneVpnConfig = async (req, res) => {
     }
 };
 
-// Assign VPN Task (for Task Assignment feature)
-exports.assignVpnTask = async (req, res) => {
+// Download VPN config file
+exports.downloadVpnConfig = async (req, res) => {
     try {
-        const { deviceId, userId } = req.body;
-
         const vpnConfig = await VpnConfig.findOne({
             where: {
                 id: req.params.id,
@@ -307,22 +438,14 @@ exports.assignVpnTask = async (req, res) => {
             });
         }
 
-        res.status(200).json({
-            success: true,
-            message: 'VPN task assigned successfully',
-            data: {
-                taskId: Date.now().toString(),
-                vpnConfigId: vpnConfig.id,
-                deviceId,
-                userId,
-                status: 'pending'
-            }
-        });
+        res.setHeader('Content-Type', 'text/plain');
+        res.setHeader('Content-Disposition', `attachment; filename="${vpnConfig.configFileName}"`);
+        res.send(vpnConfig.configFileContent);
     } catch (error) {
-        console.error('Assign VPN task error:', error);
+        console.error('Download VPN config error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to assign VPN task'
+            message: 'Failed to download VPN configuration'
         });
     }
 };

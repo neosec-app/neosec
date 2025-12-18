@@ -7,8 +7,8 @@ const {
     updateVpnConfig,
     deleteVpnConfig,
     cloneVpnConfig,
-    assignVpnTask,
-    toggleVpnConfig
+    toggleVpnConfig,
+    downloadVpnConfig
 } = require('../controllers/VpnController');
 const { protect } = require('../middleware/auth');
 
@@ -18,11 +18,11 @@ router.use(protect);
 // VPN config routes
 router.get('/', getVpnConfigs);
 router.get('/:id', getVpnConfig);
+router.get('/:id/download', downloadVpnConfig);
 router.post('/', createVpnConfig);
 router.put('/:id', updateVpnConfig);
 router.delete('/:id', deleteVpnConfig);
 router.patch('/:id/toggle', toggleVpnConfig);
 router.post('/:id/clone', cloneVpnConfig);
-router.post('/:id/assign', assignVpnTask);
 
 module.exports = router;
