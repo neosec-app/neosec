@@ -1,5 +1,5 @@
 const { DataTypes } = require('sequelize');
-const {sequelize} = require('../config/db');
+const { sequelize } = require('../config/db');
 const User = require('./User');
 
 const VpnConfig = sequelize.define('VpnConfig', {
@@ -11,37 +11,25 @@ const VpnConfig = sequelize.define('VpnConfig', {
     name: {
         type: DataTypes.STRING,
         allowNull: false,
+        unique: true,
         validate: {
             notEmpty: true
-        }
-    },
-    serverAddress: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        validate: {
-            notEmpty: true
-        }
-    },
-    port: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        validate: {
-            min: 1,
-            max: 65535
         }
     },
     protocol: {
-        type: DataTypes.ENUM('OpenVPN', 'WireGuard', 'IKEv2', 'L2TP'),
+        type: DataTypes.ENUM('OpenVPN', 'WireGuard'),
         allowNull: false,
         defaultValue: 'OpenVPN'
     },
-    username: {
+    configFileName: {
         type: DataTypes.STRING,
-        allowNull: true
+        allowNull: false,
+        comment: 'Original filename (.ovpn or .conf)'
     },
-    password: {
-        type: DataTypes.STRING,
-        allowNull: true
+    configFileContent: {
+        type: DataTypes.TEXT('long'),
+        allowNull: false,
+        comment: 'Content of the configuration file'
     },
     description: {
         type: DataTypes.TEXT,
@@ -66,6 +54,5 @@ const VpnConfig = sequelize.define('VpnConfig', {
 
 // Define association
 VpnConfig.belongsTo(User, { foreignKey: 'userId', as: 'user' });
-//User.hasMany(VpnConfig, { foreignKey: 'userId', as: 'vpnConfigs' });
 
 module.exports = VpnConfig;
