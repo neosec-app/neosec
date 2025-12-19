@@ -214,26 +214,46 @@ Page {
                 }
             }
 
-            Text {
-                id: signupButton
+            Row {
+                id: signupContainer
                 anchors.top: orDevider.bottom
                 anchors.topMargin: 30
                 anchors.horizontalCenter: parent.horizontalCenter
-                textFormat: Text.RichText
-		text: "<span style='color: " + text_muted + ";'>Don't have an account?</span> " + "<a href='https://neosec-mauve.vercel.app/' style='text-decoration: none; color: " + text_light + ";'>" + "<b>Sign up</b></a>"
-                onLinkActivated: (link) => {
-                                     Qt.openUrlExternally(link)
-                                 }
-                HoverHandler {
-                    cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+                spacing: 5
+                Text {
+                    text: "Don't have an account?"
+                    color: text_muted
+                    font.pixelSize: 14
                 }
-                property color linkHoverColor: Qt.lighter(text_light, 1.2)
+                Text {
+                    id: signupLink
+                    text: "Sign up"
+                    color: linkArea.containsMouse ? text_light : primary
+                    font.pixelSize: 14
+                    font.bold: true
+                    Rectangle {
+                        anchors.bottom: parent.bottom
+                        width: parent.width
+                        height: 1
+                        color: parent.color
+                        visible: linkArea.containsMouse
+                    }
+                    MouseArea {
+                        id: linkArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: Qt.openUrlExternally(signup_url)
+                    }
+                    Behavior on color {
+                        ColorAnimation { duration: 150 }
+                    }
+                }
             }
-
             Label {
                 id: errorLabel
                 color: error_red
-                anchors.top: signupButton.bottom
+                anchors.top: signupContainer.bottom
                 anchors.topMargin: 20
                 font.pointSize: 10
                 font.bold: true

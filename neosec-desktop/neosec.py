@@ -7,6 +7,7 @@ import os
 import json
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
+signup_url = "https://neosec-mauve.vercel.app/"
 auth_url = "https://neosec.onrender.com/api/auth/login"
 verification_url = "https://neosec.onrender.com/api/auth/verify"
 auth_file = f"{base_dir}/data/auth.json"
@@ -98,6 +99,7 @@ app = QApplication(sys.argv)
 backend = Backend()
 engine = QQmlApplicationEngine()
 engine.rootContext().setContextProperty("backend", backend)
+engine.rootContext().setContextProperty("signup_url", signup_url)
 engine.load(f"{base_dir}/qml/main.qml")
 if not engine.rootObjects():
     sys.exit(-1)
