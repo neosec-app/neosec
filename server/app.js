@@ -15,6 +15,7 @@ const Group = require('./models/Group');
 const GroupMember = require('./models/GroupMember');
 const Invitation = require('./models/Invitation');
 const Subscription = require('./models/Subscription');
+const BillingHistory = require('./models/BillingHistory');
 
 // NEW: Add Module 1 additional feature models
 const AuditLog = require('./models/AuditLog');
@@ -28,8 +29,6 @@ const ImpersonationSession = require('./models/ImpersonationSession');
 // NEW: Add Module 3 models
 const BlocklistIP = require('./models/BlocklistIP');
 const ActivityLog = require('./models/ActivityLog');
-const path = require('path');
-
 
 // NEW: Set up associations
 require('./models/associations');
@@ -56,16 +55,22 @@ const featureToggleRoutes = require('./routes/featureToggleRoutes');
 const roleTemplateRoutes = require('./routes/roleTemplateRoutes');
 const mfaRoutes = require('./routes/mfaRoutes');
 const impersonationRoutes = require('./routes/impersonationRoutes');
-//const authRoutes = require('./routes/authRoutes');
+const sharedProfileRoutes = require('./routes/sharedProfileRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
 
 // Initialize Express app
 const app = express();
 
-// Connect to database
+// Connect to database (async, but don't block server startup)
 connectDB().catch(err => {
     console.error('Failed to connect to database:', err);
-
+    // In production, we might want to retry or handle this differently
+    // For now, log the error and let the server start
 });
+app.use(
+  '/api/stripe',
+  require('./routes/stripeWebhook')
+);
 
 // CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS
@@ -106,7 +111,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', authRoutes);
 const profileRoutes = require('./routes/profileRoutes');
 app.use('/api/profiles', profileRoutes);
-app.use('/api/auth', authRoutes);
+
 app.use('/api/vpn', VpnRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
@@ -116,6 +121,8 @@ app.use('/api/scan', scanRoutes);
 app.use('/api/firewall', firewallRoutes);
 const dataTransferRoutes = require('./routes/dataTransferRoutes');
 app.use('/api/data-transfer', dataTransferRoutes);
+app.use('/api/auth/shared-profiles', sharedProfileRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 
 // New Module 1 additional features routes
 app.use('/api/audit', auditRoutes);
@@ -132,13 +139,6 @@ const threatBlockerRoutes = require('./routes/threatBlockerRoutes');
 const activityLogRoutes = require('./routes/activityLogRoutes');
 app.use('/api/threat-blocker', threatBlockerRoutes);
 app.use('/api/activity-logs', activityLogRoutes);
-// Serve React build
-app.use(express.static(path.join(__dirname, '../client/build')));
-// React fallback
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/build/index.html'));
-});
-
 
 
 // Health check route with database status

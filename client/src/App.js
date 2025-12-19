@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
+
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import { authAPI, dashboardAPI, adminAPI, getErrorMessage } from './services/api';
 import './index.css';
+
 
 // Custom Hooks
 import { useTheme } from './hooks/useTheme';
@@ -30,7 +32,6 @@ import UserImpersonation from './components/UserImpersonation';
 import AdminNotifications from './components/AdminNotifications';
 import ThreatBlocker from './components/ThreatBlocker';
 import LogsAndReporting from './components/LogsAndReporting';
-import VpnManagement from './components/VpnManagement';
 
 // Hierarchy Components
 import Subscription from './components/Hierarchy/Subscription';
@@ -38,7 +39,12 @@ import GroupManagement from './components/Hierarchy/GroupManagement';
 import Invitations from './components/Hierarchy/Invitations';
 import Memberships from './components/Hierarchy/Memberships';
 
+// Share Profile Components
+import ShareManagement from './components/ShareManagement';
+import SharedProfileViewer from './components/SharedProfileViewer';
+
 function App() {
+    
     // Custom Hooks
     const { theme, setTheme, palette } = useTheme();
     const { toasts, showToast } = useToastManager();
@@ -71,6 +77,13 @@ function App() {
     const [userSearchQuery, setUserSearchQuery] = useState('');
     const [userRoleFilter, setUserRoleFilter] = useState('all');
     const [userStatusFilter, setUserStatusFilter] = useState('all');
+
+    //Share profile page
+    const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+    const isShareProfilePage = pathname.startsWith('/shared-profiles/');
+    const isShareManagementPage = pathname === '/share-management';
+
+
 
     // Close sidebar on mobile when clicking outside
     useEffect(() => {
@@ -259,6 +272,8 @@ function App() {
         showToast('Logged out', 'info');
     };
 
+    
+
     // Loading State
     if (loading) {
         return (
@@ -276,18 +291,82 @@ function App() {
         );
     }
 
+      // PUBLIC ROUTE: Shared Profile Viewer
+    if (isShareProfilePage) {
+        const token = pathname.split('/shared-profiles/')[1];
+        return <SharedProfileViewer token={token} theme={theme} palette={palette} />;
+    }
+
+    // PROTECTED ROUTE: Share Management
+if (isShareManagementPage) {
+    if (loading) {
+        return (
+            <div style={{
+                minHeight: '100vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: palette.bgMain,
+                color: palette.accent,
+                fontSize: '18px'
+            }}>
+                Loading...
+            </div>
+        );
+    }
+    
+    if (!user) {
+        window.location.href = '/';
+        return null;
+    }
+    
+    return (
+        <>
+            <div style={{
+                minHeight: '100vh',
+                backgroundColor: palette.bgMain,
+                display: 'flex'
+            }}>
+                <Sidebar
+                    user={user}
+                    theme={theme}
+                    palette={palette}
+                    currentView={currentView}
+                    setCurrentView={setCurrentView}
+                    setTheme={setTheme}
+                    isMobile={isMobile}
+                    isTablet={isTablet}
+                    sidebarOpen={sidebarOpen}
+                    setSidebarOpen={setSidebarOpen}
+                    handleLogout={handleLogout}
+                />
+                <div style={{
+                    flex: 1,
+                    padding: isMobile ? '16px' : isTablet ? '24px' : '40px',
+                    paddingTop: isMobile ? '64px' : (isTablet ? '24px' : '40px'),
+                    overflowY: 'auto',
+                    backgroundColor: palette.bgMain,
+                    marginLeft: isMobile ? (sidebarOpen ? '260px' : '0') : '260px',
+                    transition: 'all 0.3s ease',
+                    height: '100vh'
+                }}>
+                    <ShareManagement theme={theme} palette={palette} />
+                </div>
+            </div>
+            <Toast toasts={toasts} palette={palette} />
+        </>
+    );
+}
     // Authenticated UI
     if (user) {
         return (
             <>
                 <div style={{
-                minHeight: '100vh',
-                backgroundColor: palette.bgMain,
-                color: palette.text,
-                display: 'flex', 
-            }}>
-                    
-
+                    minHeight: '100vh',
+                    backgroundColor: palette.bgMain,
+                    color: palette.text,
+                    display: 'flex'
+                }}>
                     <Sidebar
                         user={user}
                         theme={theme}
@@ -301,8 +380,7 @@ function App() {
                         setSidebarOpen={setSidebarOpen}
                         handleLogout={handleLogout}
                     />
-
-
+                    
 
                     {/* Main Content */}
                     <div style={{
@@ -312,7 +390,7 @@ function App() {
                         overflowY: 'auto',
                         backgroundColor: palette.bgMain,
                         color: palette.text,
-                        marginLeft: isMobile ? (sidebarOpen ? '260px' : '0') : '260px', 
+                        marginLeft: isMobile ? (sidebarOpen ? '260px' : '0') : '260px',  
                         transition: 'background-color 0.3s ease, color 0.3s ease, padding 0.3s ease, margin-left 0.3s ease, padding-top 0.3s ease',
                         height: '100vh'  
                     }}>
@@ -331,40 +409,51 @@ function App() {
                             />
                         )}
 
-                        {currentView === 'subscription' && (
-                            <Subscription
-                                user={user}
-                                theme={theme}
-                                palette={palette}
-                                isMobile={isMobile}
-                                isTablet={isTablet}
-                                onUpgradeSuccess={(updatedUser) => {
-                                    setUser(updatedUser);
-                                    localStorage.setItem("user", JSON.stringify(updatedUser));
-                                }}
-                            />
-                        )}
-
-                        {currentView === 'groups' && user.accountType === "leader" && (
-                            <GroupManagement user={user} theme={theme} palette={palette} isMobile={isMobile} isTablet={isTablet} />
-                        )}
-                        
-                        {currentView === 'invitations' && (
-                            <Invitations theme={theme} palette={palette} isMobile={isMobile} isTablet={isTablet} />
-                        )}
-                        
-                        {currentView === 'memberships' && (
-                            <Memberships theme={theme} palette={palette} isMobile={isMobile} isTablet={isTablet} />
+                        {/* VPN View */}
+                        {currentView === 'vpn' && (
+                            <div>
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    marginBottom: '30px'
+                                }}>
+                                    <h1 style={{
+                                        fontSize: isMobile ? '22px' : isTablet ? '28px' : '32px',
+                                        margin: 0,
+                                        paddingLeft: isMobile ? '48px' : '0',
+                                        transition: 'padding-left 0.3s ease',
+                                        flex: isMobile ? '1 1 100%' : 'none'
+                                    }}>VPN Configurations</h1>
+                                    <button style={{
+                                        padding: '12px 24px',
+                                        backgroundColor: '#36E27B',
+                                        color: '#121212',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer',
+                                        fontSize: '14px'
+                                    }}>
+                                        + Add VPN Config
+                                    </button>
+                                </div>
+                                <div style={{
+                                    padding: '25px',
+                                    backgroundColor: palette.bgCard,
+                                    border: '1px solid #282828',
+                                    borderRadius: '10px',
+                                    textAlign: 'center',
+                                    color: '#888'
+                                }}>
+                                    <p>No VPN configurations yet. Click "Add VPN Config" to create your first configuration.</p>
+                                </div>
+                            </div>
                         )}
 
                         {/* Firewall View */}
                         {currentView === 'firewall' && (
                             <FirewallRuleManagement theme={theme} palette={palette} />
-                        )}
-
-                        {/* VPN View - UPDATED */}
-                        {currentView === 'vpn' && (
-                            <VpnManagement theme={theme} palette={palette} isMobile={isMobile} isTablet={isTablet} />
                         )}
 
                         {/* Profiles View */}
@@ -376,6 +465,22 @@ function App() {
                         {currentView === 'scan' && (
                             <ScanDashboard theme={theme} palette={palette} />
                         )}
+
+                        {/* SUBCRIPTION View */}
+                        {currentView === "subscription" && (
+                        <Subscription
+                            user={user}
+                            onUpgradeSuccess={(updatedUser) => {
+                                setUser(updatedUser);
+                                localStorage.setItem("user", JSON.stringify(updatedUser));
+                            }}
+                        />
+                        )}
+
+                        {currentView === "groups" && user.accountType === "leader" && <GroupManagement user={user} />}
+                        {currentView === "invitations" && <Invitations />}
+                        {currentView === "memberships" && <Memberships />}
+
 
                         {/* Audit View */}
                         {currentView === 'audit' && user.role === 'admin' && (
@@ -487,6 +592,7 @@ function App() {
         {/* Toast Component */}
         <Toast toasts={toasts} palette={palette} />
     </>
+    
 );
 }
 

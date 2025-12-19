@@ -6,7 +6,12 @@ const Group = require('./Group');
 const GroupMember = require('./GroupMember');
 const Invitation = require('./Invitation');
 const Subscription = require('./Subscription');
+const BillingHistory = require('./BillingHistory');
 const VpnConfig = require('./VpnConfig');
+const Profile = require('./Profile');
+const SharedProfile = require('./SharedProfile');
+const SharedProfileLog = require('./SharedProfileLog');
+
 
 // User <-> Group (Leader relationship)
 User.hasMany(Group, {
@@ -66,14 +71,37 @@ Invitation.belongsTo(Group, {
     as: 'group'
 });
 
-// User <-> Subscription
+// User <-> Subscription (One-to-One)
 User.hasOne(Subscription, {
     foreignKey: 'userId',
-    as: 'subscription'
+    as: 'subscription',
+    onDelete: 'CASCADE'
 });
 Subscription.belongsTo(User, {
     foreignKey: 'userId',
     as: 'user'
+});
+
+// User <-> BillingHistory (One-to-Many)
+User.hasMany(BillingHistory, {
+    foreignKey: 'userId',
+    as: 'billingHistory',
+    onDelete: 'CASCADE'
+});
+BillingHistory.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user'
+});
+
+// Subscription <-> BillingHistory (One-to-Many)
+Subscription.hasMany(BillingHistory, {
+    foreignKey: 'subscriptionId',
+    as: 'billingHistory',
+    onDelete: 'SET NULL'
+});
+BillingHistory.belongsTo(Subscription, {
+    foreignKey: 'subscriptionId',
+    as: 'subscription'
 });
 
 // User <-> VpnConfig (if not already defined)
@@ -151,12 +179,49 @@ Device.hasMany(ActivityLog, {
     as: 'activityLogs'
 });
 
+
+
+// Profile associations
+Profile.hasMany(SharedProfile, {
+  foreignKey: 'profileId',
+  as: 'sharedLinks'
+});
+
+// SharedProfile associations
+SharedProfile.belongsTo(Profile, {
+  foreignKey: 'profileId',
+  as: 'profile'
+});
+
+SharedProfile.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'owner'
+});
+
+SharedProfile.belongsTo(User, {
+  foreignKey: 'revokedBy',
+  as: 'revoker'
+});
+
+// SharedProfileLog associations
+SharedProfileLog.belongsTo(SharedProfile, {
+  foreignKey: 'sharedProfileId',
+  as: 'sharedProfile'
+});
+
+//  Profile associations
+Profile.hasMany(SharedProfile, {
+  foreignKey: 'profileId',
+  as: 'sharedProfiles'
+});
+
 module.exports = {
     User,
     Group,
     GroupMember,
     Invitation,
     Subscription,
+    BillingHistory,
     VpnConfig,
     AuditLog,
     Device,
@@ -166,7 +231,10 @@ module.exports = {
     MFASettings,
     ImpersonationSession,
     BlocklistIP,
-    ActivityLog
+    ActivityLog,
+    Profile,
+    SharedProfile,
+    SharedProfileLog,
 };
 
 
