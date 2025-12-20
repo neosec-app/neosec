@@ -741,7 +741,13 @@ useEffect(() => {
          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <button
             onClick={() => {
-              window.location = '/share-management';
+              // Navigate to share management view
+              if (window.setCurrentView) {
+                window.setCurrentView('share-management');
+              } else {
+                // Fallback: open in new window
+                window.location.href = '/share-management';
+              }
             }} 
             style={{
               padding: '10px 18px',
@@ -756,7 +762,7 @@ useEffect(() => {
           >
             Manage All Shares
           </button>
-          
+                    
           <button
             onClick={() => setShowLogs(!showLogs)}
             style={{

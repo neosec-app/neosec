@@ -38,11 +38,11 @@ const ShareCreationModal = ({ profile, onClose, onSuccess, theme = 'dark', palet
     }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(shareLink);
-    setShowCopyToast(true);
-    setTimeout(() => setShowCopyToast(false), 2000);
-  };
+  // const handleCopy = () => {
+  //   navigator.clipboard.writeText(shareLink);
+  //   setShowCopyToast(true);
+  //   setTimeout(() => setShowCopyToast(false), 2000);
+  // };
 
   return (
     <>
