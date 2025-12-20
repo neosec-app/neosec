@@ -4,6 +4,7 @@ import axios from 'axios';
 // For production, use Render backend URL
 // For development, use localhost
 const getApiUrl = () => {
+  // Priority 1: Use environment variable if set
   if (process.env.REACT_APP_API_URL) {
     // Ensure it ends with /api
     let url = process.env.REACT_APP_API_URL.trim();
@@ -13,11 +14,16 @@ const getApiUrl = () => {
     return url;
   }
 
-  if (process.env.NODE_ENV === 'production') {
+  // Priority 2: Check if we're on Vercel (production deployment)
+  const isVercel = window.location.hostname.includes('vercel.app');
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  if (isVercel || isProduction) {
     // Default production URL - update this with your actual Render backend URL
     return 'https://neosec.onrender.com/api';
   }
 
+  // Priority 3: Development - use localhost
   return 'http://localhost:5000/api';
 };
 

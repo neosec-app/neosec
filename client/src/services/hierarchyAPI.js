@@ -1,7 +1,27 @@
 // src/services/hierarchyAPI.js
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// Get API URL with smart fallback
+const getApiUrl = () => {
+  if (process.env.REACT_APP_API_URL) {
+    let url = process.env.REACT_APP_API_URL.trim();
+    if (!url.endsWith('/api')) {
+      url = url.endsWith('/') ? url + 'api' : url + '/api';
+    }
+    return url;
+  }
+  
+  const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  if (isVercel || isProduction) {
+    return 'https://neosec.onrender.com/api';
+  }
+  
+  return 'http://localhost:5000/api';
+};
+
+const API_URL = getApiUrl();
 
 // Get auth token
 const getAuthHeader = () => {

@@ -27,6 +27,7 @@ const getTimeAgo = (date) => {
 const getDashboard = async (req, res) => {
   try {
     const userId = req.user.id;
+    console.log('dashboard: userId=', userId);
 
     // Get user's active VPN config
     const activeVpn = await VpnConfig.findOne({
@@ -35,6 +36,7 @@ const getDashboard = async (req, res) => {
         isActive: true
       }
     });
+    console.log('dashboard: activeVpn=', !!activeVpn);
 
     // Calculate connection time if VPN is active
     let connectionTime = null;
@@ -46,6 +48,7 @@ const getDashboard = async (req, res) => {
       const minutes = Math.floor((diffMs % 3600000) / 60000);
       connectionTime = `${hours}h ${minutes}m`;
     }
+    console.log('dashboard: connectionTime=', connectionTime);
 
     // Get threats blocked count for this week
     const oneWeekAgo = new Date();
@@ -156,6 +159,7 @@ const getDashboard = async (req, res) => {
       ],
       raw: true
     });
+    console.log('dashboard: dataTransferStats=', dataTransferStats);
 
     const sentValue = dataTransferStats[0]?.totalBytesSent ?? null;
     const receivedValue = dataTransferStats[0]?.totalBytesReceived ?? null;
@@ -228,10 +232,11 @@ const getDashboard = async (req, res) => {
     });
   } catch (error) {
     console.error('Dashboard error:', error);
+    console.error(error && error.stack);
     res.status(500).json({
       success: false,
       message: 'Server error',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? (error.message || String(error)) : undefined
     });
   }
 };
