@@ -1387,29 +1387,60 @@ const handleRemoveCountry = (countryToRemove) => {
               </label>
 
 
-              {formData.isScheduled && (
-                <div className="nested-fields">
-                  <div className="form-group">
-                    <label>Schedule Type</label>
-                    <select
-                      name="scheduleType"
-                      value={formData.scheduleType}
-                      onChange={handleInputChange}
-                      className="form-select"
-                      style={styles.select}
-                    >
-                      <option value="NONE">None</option>
-                      <option value="TIME">Time-Based</option>
-                      <option value="CONDITION">Country Based</option>
-                      <option value="BOTH">Both</option>
-                    </select>
-                  </div>
+              {/* Scheduling Section */}
+                {formData.isScheduled && (
+                  <div className="nested-fields" style={{ marginTop: 16 }}>
+                    <div className="form-group" style={{ marginBottom: 16 }}>
+                      <label style={{ 
+                        display: 'block', 
+                        marginBottom: 8, 
+                        color: colors.text,
+                        fontSize: 14,
+                        fontWeight: 500
+                      }}>
+                        Schedule Type
+                      </label>
+                      <select
+                        name="scheduleType"
+                        value={formData.scheduleType}
+                        onChange={handleInputChange}
+                        className="form-select"
+                        style={styles.select}
+                      >
+                        <option value="NONE">None</option>
+                        <option value="TIME">Time-Based</option>
+                        <option value="CONDITION">Condition-Based (Geolocation)</option>
+                        <option value="BOTH">Time + Geolocation</option>
+                      </select>
+                    </div>
 
-                  {(formData.scheduleType === 'TIME' ||
-                    formData.scheduleType === 'BOTH') && (
-                      <>
-                        <div className="form-group">
-                          <label>Start Time</label>
+                    {/* Time-Based Settings */}
+                    {(formData.scheduleType === 'TIME' || formData.scheduleType === 'BOTH') && (
+                      <div style={{ 
+                        backgroundColor: colors.bgPanel,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: 8,
+                        padding: 16,
+                        marginBottom: 16
+                      }}>
+                        <h5 style={{ 
+                          margin: '0 0 16px 0', 
+                          color: colors.text,
+                          fontSize: 15,
+                          fontWeight: 600
+                        }}>
+                          Time-Based Settings
+                        </h5>
+
+                        <div className="form-group" style={{ marginBottom: 16 }}>
+                          <label style={{ 
+                            display: 'block', 
+                            marginBottom: 6, 
+                            color: colors.text,
+                            fontSize: 13
+                          }}>
+                            Start Time
+                          </label>
                           <input
                             type="time"
                             name="scheduleStartTime"
@@ -1420,8 +1451,15 @@ const handleRemoveCountry = (countryToRemove) => {
                           />
                         </div>
 
-                        <div className="form-group">
-                          <label>End Time</label>
+                        <div className="form-group" style={{ marginBottom: 16 }}>
+                          <label style={{ 
+                            display: 'block', 
+                            marginBottom: 6, 
+                            color: colors.text,
+                            fontSize: 13
+                          }}>
+                            End Time
+                          </label>
                           <input
                             type="time"
                             name="scheduleEndTime"
@@ -1433,30 +1471,55 @@ const handleRemoveCountry = (countryToRemove) => {
                         </div>
 
                         <div className="form-group">
-                          <label>Active Days</label>
-                          <div className="days-selector">
-                            {[
-                              'Monday',
-                              'Tuesday',
-                              'Wednesday',
-                              'Thursday',
-                              'Friday',
-                              'Saturday',
-                              'Sunday',
-                            ].map((day) => (
-                              <label key={day} className="day-checkbox">
+                          <label style={{ 
+                            display: 'block', 
+                            marginBottom: 10, 
+                            color: colors.text,
+                            fontSize: 13,
+                            fontWeight: 500
+                          }}>
+                            Active Days
+                          </label>
+                          <div style={{ 
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+                            gap: 8
+                          }}>
+                            {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                              <label 
+                                key={day} 
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  padding: '8px 10px',
+                                  backgroundColor: formData.scheduleDays?.includes(day) 
+                                    ? colors.accentSoft 
+                                    : 'transparent',
+                                  border: `1px solid ${formData.scheduleDays?.includes(day) 
+                                    ? colors.accent 
+                                    : colors.border}`,
+                                  borderRadius: 6,
+                                  cursor: 'pointer',
+                                  fontSize: 13,
+                                  color: colors.text,
+                                  transition: 'all 0.2s'
+                                }}
+                              >
                                 <input
                                   type="checkbox"
-                                  checked={formData.scheduleDays.includes(day)}
+                                  checked={formData.scheduleDays?.includes(day)}
                                   onChange={() => handleDayToggle(day)}
+                                  style={{ cursor: 'pointer' }}
                                 />
-                                <span>{day}</span>
+                                <span>{day.slice(0, 3)}</span>
                               </label>
                             ))}
                           </div>
                         </div>
-                      </>
+                      </div>
                     )}
+
 
                     {/* Geolocation-Based Activation - COMPLETE SECTION */}
                     {(formData.scheduleType === 'CONDITION' || formData.scheduleType === 'BOTH') && (
@@ -1661,7 +1724,7 @@ const handleRemoveCountry = (countryToRemove) => {
                       checked={formData.autoActivate}
                       onChange={handleInputChange}
                     />
-                    <span>Auto-activate when conditions are met</span>
+                    <span>  Auto-activate when conditions are met</span>
                   </label>
                 </div>
               )}

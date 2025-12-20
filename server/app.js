@@ -38,7 +38,6 @@ const { connectDB } = require('./config/db');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
-require("./scheduler");
 
 const VpnRoutes = require('./routes/VpnRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
