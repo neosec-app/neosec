@@ -82,6 +82,7 @@ const Toast = ({ message, type, onClose, colors, theme }) => {
   );
 };
 
+
 const darkPalette = {
   bgMain: '#121212',
   bgCard: '#181818',
