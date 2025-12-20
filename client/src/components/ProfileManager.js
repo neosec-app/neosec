@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 import ShareCreationModal from './ShareCreationModal';
+import countries from "i18n-iso-countries";
+import enLocale from "i18n-iso-countries/langs/en.json";
+countries.registerLocale(enLocale);
 
 const ConfirmModal = ({ message, onConfirm, onCancel, colors }) => {
   return (
@@ -375,6 +378,13 @@ useEffect(() => {
   fetchProfiles();
   fetchLogs();
   fetchFirewallRules();
+  const handleClickOutside = (e) => {
+    if (!e.target.closest('.country-input-container')) {
+      setShowCountrySuggestions(false);
+    }
+  };
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
 }, [fetchFirewallRules]);
 
 
@@ -420,6 +430,8 @@ useEffect(() => {
     scheduleDays: [],
     scheduleCondition: '',
     autoActivate: false,
+
+    geoLocationCountries: [], 
   });
     const selectedFirewallRules = firewallRules.filter(rule =>
       formData.firewallRules.includes(rule.id)
@@ -587,6 +599,8 @@ useEffect(() => {
       scheduleDays: profile.scheduleDays || [],
       scheduleCondition: profile.scheduleCondition || '',
       autoActivate: profile.autoActivate,
+
+      geoLocationCountries: profile.geoLocationCountries || [],
     });
     setShowForm(true);
   };
@@ -633,6 +647,41 @@ useEffect(() => {
     }
   };
 
+const [countryInputValue, setCountryInputValue] = useState('');
+const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
+
+const getAllCountryNames = () => {
+  const countryObj = countries.getNames("en", { select: "official" });
+  return Object.values(countryObj).sort();
+};
+
+const getFilteredCountries = () => {
+  if (!countryInputValue) return [];
+  const allCountries = getAllCountryNames();
+  return allCountries.filter(country =>
+    country.toLowerCase().includes(countryInputValue.toLowerCase())
+  ).slice(0, 10);
+};
+
+const handleAddCountry = (country) => {
+  const trimmedCountry = country.trim();
+  if (trimmedCountry && !formData.geoLocationCountries.includes(trimmedCountry)) {
+    setFormData({
+      ...formData,
+      geoLocationCountries: [...formData.geoLocationCountries, trimmedCountry],
+    });
+    setCountryInputValue('');
+    setShowCountrySuggestions(false);
+  }
+};
+
+const handleRemoveCountry = (countryToRemove) => {
+  setFormData({
+    ...formData,
+    geoLocationCountries: formData.geoLocationCountries.filter(c => c !== countryToRemove),
+  });
+};
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -660,6 +709,7 @@ useEffect(() => {
       scheduleDays: [],
       scheduleCondition: '',
       autoActivate: false,
+      geoLocationCountries: [],
     });
   };
 
@@ -1337,29 +1387,60 @@ useEffect(() => {
               </label>
 
 
-              {formData.isScheduled && (
-                <div className="nested-fields">
-                  <div className="form-group">
-                    <label>Schedule Type</label>
-                    <select
-                      name="scheduleType"
-                      value={formData.scheduleType}
-                      onChange={handleInputChange}
-                      className="form-select"
-                      style={styles.select}
-                    >
-                      <option value="NONE">None</option>
-                      <option value="TIME">Time-Based</option>
-                      <option value="CONDITION">Condition-Based</option>
-                      <option value="BOTH">Both</option>
-                    </select>
-                  </div>
+              {/* Scheduling Section */}
+                {formData.isScheduled && (
+                  <div className="nested-fields" style={{ marginTop: 16 }}>
+                    <div className="form-group" style={{ marginBottom: 16 }}>
+                      <label style={{ 
+                        display: 'block', 
+                        marginBottom: 8, 
+                        color: colors.text,
+                        fontSize: 14,
+                        fontWeight: 500
+                      }}>
+                        Schedule Type
+                      </label>
+                      <select
+                        name="scheduleType"
+                        value={formData.scheduleType}
+                        onChange={handleInputChange}
+                        className="form-select"
+                        style={styles.select}
+                      >
+                        <option value="NONE">None</option>
+                        <option value="TIME">Time-Based</option>
+                        <option value="CONDITION">Condition-Based (Geolocation)</option>
+                        <option value="BOTH">Time + Geolocation</option>
+                      </select>
+                    </div>
 
-                  {(formData.scheduleType === 'TIME' ||
-                    formData.scheduleType === 'BOTH') && (
-                      <>
-                        <div className="form-group">
-                          <label>Start Time</label>
+                    {/* Time-Based Settings */}
+                    {(formData.scheduleType === 'TIME' || formData.scheduleType === 'BOTH') && (
+                      <div style={{ 
+                        backgroundColor: colors.bgPanel,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: 8,
+                        padding: 16,
+                        marginBottom: 16
+                      }}>
+                        <h5 style={{ 
+                          margin: '0 0 16px 0', 
+                          color: colors.text,
+                          fontSize: 15,
+                          fontWeight: 600
+                        }}>
+                          Time-Based Settings
+                        </h5>
+
+                        <div className="form-group" style={{ marginBottom: 16 }}>
+                          <label style={{ 
+                            display: 'block', 
+                            marginBottom: 6, 
+                            color: colors.text,
+                            fontSize: 13
+                          }}>
+                            Start Time
+                          </label>
                           <input
                             type="time"
                             name="scheduleStartTime"
@@ -1370,8 +1451,15 @@ useEffect(() => {
                           />
                         </div>
 
-                        <div className="form-group">
-                          <label>End Time</label>
+                        <div className="form-group" style={{ marginBottom: 16 }}>
+                          <label style={{ 
+                            display: 'block', 
+                            marginBottom: 6, 
+                            color: colors.text,
+                            fontSize: 13
+                          }}>
+                            End Time
+                          </label>
                           <input
                             type="time"
                             name="scheduleEndTime"
@@ -1383,51 +1471,249 @@ useEffect(() => {
                         </div>
 
                         <div className="form-group">
-                          <label>Active Days</label>
-                          <div className="days-selector">
-                            {[
-                              'Monday',
-                              'Tuesday',
-                              'Wednesday',
-                              'Thursday',
-                              'Friday',
-                              'Saturday',
-                              'Sunday',
-                            ].map((day) => (
-                              <label key={day} className="day-checkbox">
+                          <label style={{ 
+                            display: 'block', 
+                            marginBottom: 10, 
+                            color: colors.text,
+                            fontSize: 13,
+                            fontWeight: 500
+                          }}>
+                            Active Days
+                          </label>
+                          <div style={{ 
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+                            gap: 8
+                          }}>
+                            {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                              <label 
+                                key={day} 
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  padding: '8px 10px',
+                                  backgroundColor: formData.scheduleDays?.includes(day) 
+                                    ? colors.accentSoft 
+                                    : 'transparent',
+                                  border: `1px solid ${formData.scheduleDays?.includes(day) 
+                                    ? colors.accent 
+                                    : colors.border}`,
+                                  borderRadius: 6,
+                                  cursor: 'pointer',
+                                  fontSize: 13,
+                                  color: colors.text,
+                                  transition: 'all 0.2s'
+                                }}
+                              >
                                 <input
                                   type="checkbox"
-                                  checked={formData.scheduleDays.includes(day)}
+                                  checked={formData.scheduleDays?.includes(day)}
                                   onChange={() => handleDayToggle(day)}
+                                  style={{ cursor: 'pointer' }}
                                 />
-                                <span>{day}</span>
+                                <span>{day.slice(0, 3)}</span>
                               </label>
                             ))}
                           </div>
                         </div>
-                      </>
+                      </div>
                     )}
 
-                  {(formData.scheduleType === 'CONDITION' ||
-                    formData.scheduleType === 'BOTH') && (
-                      <div className="form-group">
-                        <label>Activation Condition</label>
-                        <input
-                          type="text"
-                          name="scheduleCondition"
-                          placeholder="e.g., WiFi network name, IP range"
-                          value={formData.scheduleCondition}
-                          onChange={handleInputChange}
-                          className="form-input"
-                          style={styles.formInput}
-                        />
-                        <small
-                          className="field-hint"
-                          style={styles.fieldHint}
-                        >
-                          Example: "Public WiFi", "192.168.1.x",
-                          "Outside office hours"
-                        </small>
+
+                    {/* Geolocation-Based Activation - COMPLETE SECTION */}
+                    {(formData.scheduleType === 'CONDITION' || formData.scheduleType === 'BOTH') && (
+                      <div style={{ marginTop: 20 }}>
+                        <h4 style={{
+                          marginTop: 0,
+                          marginBottom: 12,
+                          color: colors.text,
+                          fontSize: 16,
+                          fontWeight: 600
+                        }}>
+                          Geolocation-Based Activation
+                        </h4>
+                        
+                        {/* Country Input with Autocomplete */}
+                        <div className="country-input-container" style={{ 
+                          position: 'relative', 
+                          marginBottom: 16 
+                        }}>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                            <div style={{ flex: 1, position: 'relative' }}>
+                              <input
+                                type="text"
+                                value={countryInputValue}
+                                onChange={(e) => {
+                                  setCountryInputValue(e.target.value);
+                                  setShowCountrySuggestions(true);
+                                }}
+                                onFocus={() => setShowCountrySuggestions(true)}
+                                placeholder="Type country name (e.g., United States, Bangladesh)"
+                                style={{
+                                  width: '100%',
+                                  padding: '10px 12px',
+                                  backgroundColor: colors.inputBg,
+                                  border: `1px solid ${colors.inputBorder}`,
+                                  borderRadius: 8,
+                                  fontSize: 14,
+                                  color: colors.text,
+                                  outline: 'none'
+                                }}
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    if (countryInputValue.trim()) {
+                                      handleAddCountry(countryInputValue);
+                                    }
+                                  }
+                                }}
+                              />
+                              
+                              {/* Autocomplete Dropdown */}
+                              {showCountrySuggestions && countryInputValue && getFilteredCountries().length > 0 && (
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '100%',
+                                  left: 0,
+                                  right: 0,
+                                  maxHeight: 250,
+                                  overflowY: 'auto',
+                                  backgroundColor: colors.bgCard,
+                                  border: `1px solid ${colors.border}`,
+                                  borderRadius: 8,
+                                  marginTop: 4,
+                                  zIndex: 1000,
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                                }}>
+                                  {getFilteredCountries().map((country, index) => (
+                                    <div
+                                      key={index}
+                                      onClick={() => handleAddCountry(country)}
+                                      style={{
+                                        padding: '12px 14px',
+                                        cursor: 'pointer',
+                                        fontSize: 14,
+                                        color: colors.text,
+                                        borderBottom: index < getFilteredCountries().length - 1 ? `1px solid ${colors.border}` : 'none',
+                                        transition: 'background-color 0.15s',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 8
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        e.currentTarget.style.backgroundColor = colors.accentSoft;
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.currentTarget.style.backgroundColor = 'transparent';
+                                      }}
+                                    >
+                                      <span style={{ fontSize: 16 }}></span>
+                                      <span>{country}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (countryInputValue.trim()) {
+                                  handleAddCountry(countryInputValue);
+                                }
+                              }}
+                              style={{
+                                padding: '10px 18px',
+                                borderRadius: 8,
+                                border: 'none',
+                                backgroundColor: colors.accent,
+                                color: theme === 'dark' ? '#121212' : '#ffffff',
+                                fontSize: 14,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                                transition: 'opacity 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+                              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                            >
+                              Add Country
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {/* Selected Countries Display */}
+                        {formData.geoLocationCountries && formData.geoLocationCountries.length > 0 && (
+                          <div style={{
+                            backgroundColor: colors.bgPanel,
+                            border: `1px solid ${colors.border}`,
+                            borderRadius: 8,
+                            padding: 16,
+                            marginTop: 12
+                          }}>
+                            <div style={{ 
+                              fontSize: 13, 
+                              color: colors.textMuted, 
+                              marginBottom: 12,
+                              fontWeight: 600,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6
+                            }}>
+                              <span>✓</span>
+                              <span>Active in these countries ({formData.geoLocationCountries.length}):</span>
+                            </div>
+                            
+                            <div style={{ 
+                              display: 'flex', 
+                              flexWrap: 'wrap', 
+                              gap: 10 
+                            }}>
+                              {formData.geoLocationCountries.map((country, index) => (
+                                <div
+                                  key={index}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    padding: '8px 14px',
+                                    backgroundColor: colors.accentSoft,
+                                    border: `1px solid ${colors.accent}`,
+                                    borderRadius: 20,
+                                    fontSize: 14,
+                                    color: colors.text,
+                                    fontWeight: 500
+                                  }}
+                                >
+                                  <span>{country}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveCountry(country)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: colors.danger,
+                                      cursor: 'pointer',
+                                      fontSize: 18,
+                                      lineHeight: 1,
+                                      padding: '0 2px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      fontWeight: 'bold',
+                                      transition: 'transform 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.2)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                    title={`Remove ${country}`}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -1438,7 +1724,7 @@ useEffect(() => {
                       checked={formData.autoActivate}
                       onChange={handleInputChange}
                     />
-                    <span>Auto-activate when conditions are met</span>
+                    <span>  Auto-activate when conditions are met</span>
                   </label>
                 </div>
               )}
