@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 import ShareCreationModal from './ShareCreationModal';
+import countries from "i18n-iso-countries";
+import enLocale from "i18n-iso-countries/langs/en.json";
+countries.registerLocale(enLocale);
 
 const ConfirmModal = ({ message, onConfirm, onCancel, colors }) => {
   return (
@@ -375,6 +378,13 @@ useEffect(() => {
   fetchProfiles();
   fetchLogs();
   fetchFirewallRules();
+  const handleClickOutside = (e) => {
+    if (!e.target.closest('.country-input-container')) {
+      setShowCountrySuggestions(false);
+    }
+  };
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
 }, [fetchFirewallRules]);
 
 
@@ -420,6 +430,8 @@ useEffect(() => {
     scheduleDays: [],
     scheduleCondition: '',
     autoActivate: false,
+
+    geoLocationCountries: [], 
   });
     const selectedFirewallRules = firewallRules.filter(rule =>
       formData.firewallRules.includes(rule.id)
@@ -587,6 +599,8 @@ useEffect(() => {
       scheduleDays: profile.scheduleDays || [],
       scheduleCondition: profile.scheduleCondition || '',
       autoActivate: profile.autoActivate,
+
+      geoLocationCountries: profile.geoLocationCountries || [],
     });
     setShowForm(true);
   };
@@ -633,6 +647,41 @@ useEffect(() => {
     }
   };
 
+const [countryInputValue, setCountryInputValue] = useState('');
+const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
+
+const getAllCountryNames = () => {
+  const countryObj = countries.getNames("en", { select: "official" });
+  return Object.values(countryObj).sort();
+};
+
+const getFilteredCountries = () => {
+  if (!countryInputValue) return [];
+  const allCountries = getAllCountryNames();
+  return allCountries.filter(country =>
+    country.toLowerCase().includes(countryInputValue.toLowerCase())
+  ).slice(0, 10);
+};
+
+const handleAddCountry = (country) => {
+  const trimmedCountry = country.trim();
+  if (trimmedCountry && !formData.geoLocationCountries.includes(trimmedCountry)) {
+    setFormData({
+      ...formData,
+      geoLocationCountries: [...formData.geoLocationCountries, trimmedCountry],
+    });
+    setCountryInputValue('');
+    setShowCountrySuggestions(false);
+  }
+};
+
+const handleRemoveCountry = (countryToRemove) => {
+  setFormData({
+    ...formData,
+    geoLocationCountries: formData.geoLocationCountries.filter(c => c !== countryToRemove),
+  });
+};
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -660,6 +709,7 @@ useEffect(() => {
       scheduleDays: [],
       scheduleCondition: '',
       autoActivate: false,
+      geoLocationCountries: [],
     });
   };
 
@@ -1350,7 +1400,7 @@ useEffect(() => {
                     >
                       <option value="NONE">None</option>
                       <option value="TIME">Time-Based</option>
-                      <option value="CONDITION">Condition-Based</option>
+                      <option value="CONDITION">Country Based</option>
                       <option value="BOTH">Both</option>
                     </select>
                   </div>
@@ -1408,26 +1458,199 @@ useEffect(() => {
                       </>
                     )}
 
-                  {(formData.scheduleType === 'CONDITION' ||
-                    formData.scheduleType === 'BOTH') && (
-                      <div className="form-group">
-                        <label>Activation Condition</label>
-                        <input
-                          type="text"
-                          name="scheduleCondition"
-                          placeholder="e.g., WiFi network name, IP range"
-                          value={formData.scheduleCondition}
-                          onChange={handleInputChange}
-                          className="form-input"
-                          style={styles.formInput}
-                        />
-                        <small
-                          className="field-hint"
-                          style={styles.fieldHint}
-                        >
-                          Example: "Public WiFi", "192.168.1.x",
-                          "Outside office hours"
-                        </small>
+                    {/* Geolocation-Based Activation - COMPLETE SECTION */}
+                    {(formData.scheduleType === 'CONDITION' || formData.scheduleType === 'BOTH') && (
+                      <div style={{ marginTop: 20 }}>
+                        <h4 style={{
+                          marginTop: 0,
+                          marginBottom: 12,
+                          color: colors.text,
+                          fontSize: 16,
+                          fontWeight: 600
+                        }}>
+                          Geolocation-Based Activation
+                        </h4>
+                        
+                        {/* Country Input with Autocomplete */}
+                        <div className="country-input-container" style={{ 
+                          position: 'relative', 
+                          marginBottom: 16 
+                        }}>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                            <div style={{ flex: 1, position: 'relative' }}>
+                              <input
+                                type="text"
+                                value={countryInputValue}
+                                onChange={(e) => {
+                                  setCountryInputValue(e.target.value);
+                                  setShowCountrySuggestions(true);
+                                }}
+                                onFocus={() => setShowCountrySuggestions(true)}
+                                placeholder="Type country name (e.g., United States, Bangladesh)"
+                                style={{
+                                  width: '100%',
+                                  padding: '10px 12px',
+                                  backgroundColor: colors.inputBg,
+                                  border: `1px solid ${colors.inputBorder}`,
+                                  borderRadius: 8,
+                                  fontSize: 14,
+                                  color: colors.text,
+                                  outline: 'none'
+                                }}
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    if (countryInputValue.trim()) {
+                                      handleAddCountry(countryInputValue);
+                                    }
+                                  }
+                                }}
+                              />
+                              
+                              {/* Autocomplete Dropdown */}
+                              {showCountrySuggestions && countryInputValue && getFilteredCountries().length > 0 && (
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '100%',
+                                  left: 0,
+                                  right: 0,
+                                  maxHeight: 250,
+                                  overflowY: 'auto',
+                                  backgroundColor: colors.bgCard,
+                                  border: `1px solid ${colors.border}`,
+                                  borderRadius: 8,
+                                  marginTop: 4,
+                                  zIndex: 1000,
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                                }}>
+                                  {getFilteredCountries().map((country, index) => (
+                                    <div
+                                      key={index}
+                                      onClick={() => handleAddCountry(country)}
+                                      style={{
+                                        padding: '12px 14px',
+                                        cursor: 'pointer',
+                                        fontSize: 14,
+                                        color: colors.text,
+                                        borderBottom: index < getFilteredCountries().length - 1 ? `1px solid ${colors.border}` : 'none',
+                                        transition: 'background-color 0.15s',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 8
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        e.currentTarget.style.backgroundColor = colors.accentSoft;
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.currentTarget.style.backgroundColor = 'transparent';
+                                      }}
+                                    >
+                                      <span style={{ fontSize: 16 }}></span>
+                                      <span>{country}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (countryInputValue.trim()) {
+                                  handleAddCountry(countryInputValue);
+                                }
+                              }}
+                              style={{
+                                padding: '10px 18px',
+                                borderRadius: 8,
+                                border: 'none',
+                                backgroundColor: colors.accent,
+                                color: theme === 'dark' ? '#121212' : '#ffffff',
+                                fontSize: 14,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                                transition: 'opacity 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+                              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                            >
+                              Add Country
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {/* Selected Countries Display */}
+                        {formData.geoLocationCountries && formData.geoLocationCountries.length > 0 && (
+                          <div style={{
+                            backgroundColor: colors.bgPanel,
+                            border: `1px solid ${colors.border}`,
+                            borderRadius: 8,
+                            padding: 16,
+                            marginTop: 12
+                          }}>
+                            <div style={{ 
+                              fontSize: 13, 
+                              color: colors.textMuted, 
+                              marginBottom: 12,
+                              fontWeight: 600,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6
+                            }}>
+                              <span>✓</span>
+                              <span>Active in these countries ({formData.geoLocationCountries.length}):</span>
+                            </div>
+                            
+                            <div style={{ 
+                              display: 'flex', 
+                              flexWrap: 'wrap', 
+                              gap: 10 
+                            }}>
+                              {formData.geoLocationCountries.map((country, index) => (
+                                <div
+                                  key={index}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    padding: '8px 14px',
+                                    backgroundColor: colors.accentSoft,
+                                    border: `1px solid ${colors.accent}`,
+                                    borderRadius: 20,
+                                    fontSize: 14,
+                                    color: colors.text,
+                                    fontWeight: 500
+                                  }}
+                                >
+                                  <span>{country}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveCountry(country)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: colors.danger,
+                                      cursor: 'pointer',
+                                      fontSize: 18,
+                                      lineHeight: 1,
+                                      padding: '0 2px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      fontWeight: 'bold',
+                                      transition: 'transform 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.2)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                    title={`Remove ${country}`}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 
