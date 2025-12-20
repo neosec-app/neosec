@@ -11,7 +11,6 @@ const ShareCreationModal = ({ profile, onClose, onSuccess, theme = 'dark', palet
   const [loading, setLoading] = useState(false);
   const [shareLink, setShareLink] = useState(null);
   const [error, setError] = useState(null);
-  const [showCopyToast, setShowCopyToast] = useState(false);
 
   const handleCreate = async () => {
     try {
@@ -38,12 +37,15 @@ const ShareCreationModal = ({ profile, onClose, onSuccess, theme = 'dark', palet
     }
   };
 
+<<<<<<< HEAD
   // const handleCopy = () => {
   //   navigator.clipboard.writeText(shareLink);
   //   setShowCopyToast(true);
   //   setTimeout(() => setShowCopyToast(false), 2000);
   // };
 
+=======
+>>>>>>> bcfa9169adac610798393c7c41a44f0cee45df5c
   return (
     <>
       <div
@@ -363,28 +365,6 @@ const ShareCreationModal = ({ profile, onClose, onSuccess, theme = 'dark', palet
           )}
         </div>
       </div>
-
-      {/* Copy Toast */}
-      {showCopyToast && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '20px',
-            right: '20px',
-            padding: '12px 20px',
-            backgroundColor: theme === 'dark' ? '#1a3a2a' : 'rgba(31,164,90,0.1)',
-            border: `1px solid ${palette.accent}`,
-            borderRadius: '8px',
-            color: theme === 'dark' ? '#7fdf9f' : palette.accent,
-            fontSize: '14px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            zIndex: 10002,
-            animation: 'slideIn 0.3s ease-out'
-          }}
-        >
-          ✓ Link copied to clipboard!
-        </div>
-      )}
 
       <style>
         {`
