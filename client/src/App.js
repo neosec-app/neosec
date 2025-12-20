@@ -142,6 +142,13 @@ function App() {
         };
         checkAuth();
     }, []);
+    
+    useEffect(() => {
+    window.setCurrentView = setCurrentView;
+    return () => {
+        delete window.setCurrentView;
+    };
+    }, []);
 
     // Persist currentView and validate for role
     useEffect(() => {
@@ -464,6 +471,11 @@ if (isShareManagementPage) {
                         {/* Scan View */}
                         {currentView === 'scan' && (
                             <ScanDashboard theme={theme} palette={palette} />
+                        )}
+
+                        {/* Share Management View */}
+                        {currentView === 'share-management' && (
+                        <ShareManagement theme={theme} palette={palette} />
                         )}
 
                         {/* SUBCRIPTION View */}
