@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { threatBlockerAPI, getErrorMessage } from '../services/api';
 import { FiShield, FiRefreshCw, FiClock, FiDatabase, FiTrendingUp, FiGlobe, FiAlertTriangle, FiDownload, FiSearch } from 'react-icons/fi';
-import './ThreatBlocker.css';
+import './ThreatBlocker.css'; 
 
 const ThreatBlocker = ({ theme = 'dark', palette }) => {
   const darkPalette = {

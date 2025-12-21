@@ -1,5 +1,6 @@
 // server/scripts/addVpnColumns.js
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 const { sequelize } = require('../config/db');
 
 (async () => {
