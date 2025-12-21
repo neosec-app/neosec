@@ -55,6 +55,14 @@ const { sequelize } = require('../config/db');
     await sequelize.query('ALTER TABLE public.vpn_configs ADD COLUMN IF NOT EXISTS "configFileContent" TEXT;');
     console.log('[runDbSetup] Ensured configFileName and configFileContent columns exist');
 
+    // Ensure profile geoLocationCountries column exists as JSONB with default []
+    try {
+      await sequelize.query("ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS \"geoLocationCountries\" JSONB DEFAULT '[]'::jsonb;");
+      console.log('[runDbSetup] Ensured profiles.geoLocationCountries JSONB column exists');
+    } catch (profileErr) {
+      console.warn('[runDbSetup] Could not ensure profiles.geoLocationCountries column:', profileErr.message || profileErr);
+    }
+
     console.log('[runDbSetup] DB setup complete');
   } catch (e) {
     console.error('[runDbSetup] Error during DB setup (logged but will not fail deploy):', e);
