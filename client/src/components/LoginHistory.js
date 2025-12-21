@@ -18,6 +18,7 @@ const LoginHistory = ({ theme = 'dark', palette = null, userId = null }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('history');
+  const [lastRefresh, setLastRefresh] = useState(new Date());
 
   const fetchData = useCallback(async () => {
     try {
@@ -26,11 +27,13 @@ const LoginHistory = ({ theme = 'dark', palette = null, userId = null }) => {
         const response = await loginHistoryAPI.getLoginHistory({ userId });
         if (response.success) {
           setHistory(response.data || []);
+          setLastRefresh(new Date());
         }
       } else {
         const response = await loginHistoryAPI.getSecurityEvents(7);
         if (response.success) {
           setSecurityEvents(response.data || []);
+          setLastRefresh(new Date());
         }
       }
     } catch (err) {
@@ -42,6 +45,14 @@ const LoginHistory = ({ theme = 'dark', palette = null, userId = null }) => {
 
   useEffect(() => {
     fetchData();
+    
+    // Auto-refresh every 60 seconds
+    const interval = setInterval(() => {
+      fetchData();
+    }, 60000); // 60 seconds
+    
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
   }, [fetchData]);
 
   const handleLockUser = async (targetUserId, locked) => {
@@ -57,7 +68,12 @@ const LoginHistory = ({ theme = 'dark', palette = null, userId = null }) => {
 
   return (
     <div style={{ padding: '24px', backgroundColor: colors.bgMain, minHeight: '100vh', color: colors.text }}>
-      <h1 style={{ marginBottom: '24px', fontSize: '28px', fontWeight: 700 }}>Login History & Security</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: 700, margin: 0 }}>Login History & Security</h1>
+        <div style={{ fontSize: '12px', color: colors.textMuted }}>
+          Auto-refreshes every 60s • Last updated: {lastRefresh.toLocaleTimeString()}
+        </div>
+      </div>
       
       <div style={{
         display: 'flex',

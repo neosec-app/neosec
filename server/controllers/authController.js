@@ -1,6 +1,8 @@
 const User = require('../models/User');
 const LoginHistory = require('../models/LoginHistory');
 const jwt = require('jsonwebtoken');
+const { getLocationFromIP } = require('../services/ipGeolocationService');
+const { getClientIP } = require('../utils/ipUtils');
 
 // Generate JWT Token
 const generateToken = (userId) => {
@@ -167,9 +169,28 @@ const login = async (req, res) => {
       });
     }
 
-    // Log failed login attempt
-    const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
+    // Log failed login attempt - use proper IP extraction
+    const ipAddress = getClientIP(req);
     const userAgent = req.headers['user-agent'] || 'unknown';
+    
+    // Debug logging in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Login attempt - Extracted IP:', ipAddress, 'From headers:', {
+        'x-forwarded-for': req.headers['x-forwarded-for'],
+        'x-real-ip': req.headers['x-real-ip'],
+        'req.ip': req.ip,
+        'remoteAddress': req.connection?.remoteAddress
+      });
+    }
+    
+    // Get location from IP (async, don't block login)
+    let location = 'Unknown';
+    try {
+      location = await getLocationFromIP(ipAddress);
+    } catch (err) {
+      console.error('Error getting location:', err);
+      // Continue with 'Unknown' if location fetch fails
+    }
     
     if (!user) {
       // Log failed login attempt (user not found)
@@ -178,6 +199,7 @@ const login = async (req, res) => {
           userId: null, // User not found
           ipAddress,
           userAgent,
+          location,
           success: false,
           failureReason: 'User not found',
           suspiciousActivity: true
@@ -223,6 +245,7 @@ const login = async (req, res) => {
           userId: user.id,
           ipAddress,
           userAgent,
+          location,
           success: false,
           failureReason: 'Invalid password',
           suspiciousActivity: recentFailures >= 3 // Mark as suspicious if 3+ failures in 15 min
@@ -267,6 +290,7 @@ const login = async (req, res) => {
         userId: user.id,
         ipAddress,
         userAgent,
+        location,
         success: true,
         suspiciousActivity: false
       });

@@ -60,6 +60,9 @@ const subscriptionRoutes = require('./routes/subscriptionRoutes');
 // Initialize Express app
 const app = express();
 
+// Trust proxy - important for getting real client IP when behind reverse proxy (Render, etc.)
+app.set('trust proxy', true);
+
 // Connect to database (async, but don't block server startup)
 connectDB().catch(err => {
     console.error('Failed to connect to database:', err);
