@@ -7,6 +7,17 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
 
     return (
         <>
+            {/* Hide scrollbar styles */}
+            <style>{`
+                .sidebar-container::-webkit-scrollbar {
+                    width: 0px;
+                    background: transparent;
+                }
+                .sidebar-container {
+                    -ms-overflow-style: none;  /* IE and Edge */
+                    scrollbar-width: none;  /* Firefox */
+                }
+            `}</style>
             {/* Mobile Menu Button */}
             {isMobile && !sidebarOpen && (
                 <button
