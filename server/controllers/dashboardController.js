@@ -26,17 +26,29 @@ const getTimeAgo = (date) => {
 // @access  Private
 const getDashboard = async (req, res) => {
   try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+    
     const userId = req.user.id;
     console.log('dashboard: userId=', userId);
 
     // Get user's active VPN config
-    const activeVpn = await VpnConfig.findOne({
-      where: {
-        userId: userId,
-        isActive: true
-      }
-    });
-    console.log('dashboard: activeVpn=', !!activeVpn);
+    let activeVpn = null;
+    try {
+      activeVpn = await VpnConfig.findOne({
+        where: {
+          userId: userId,
+          isActive: true
+        }
+      });
+      console.log('dashboard: activeVpn=', !!activeVpn);
+    } catch (vpnError) {
+      console.error('Error getting active VPN:', vpnError);
+    }
 
     // Calculate connection time if VPN is active
     let connectionTime = null;
@@ -56,26 +68,34 @@ const getDashboard = async (req, res) => {
     const lastWeekAgo = new Date();
     lastWeekAgo.setDate(lastWeekAgo.getDate() - 14);
 
-    const threatsThisWeek = await Threat.count({
-      where: {
-        userId: userId,
-        blocked: true,
-        createdAt: {
-          [Op.gte]: oneWeekAgo
+    let threatsThisWeek = 0;
+    let threatsLastWeek = 0;
+    
+    try {
+      threatsThisWeek = await Threat.count({
+        where: {
+          userId: userId,
+          blocked: true,
+          createdAt: {
+            [Op.gte]: oneWeekAgo
+          }
         }
-      }
-    });
+      });
 
-    const threatsLastWeek = await Threat.count({
-      where: {
-        userId: userId,
-        blocked: true,
-        createdAt: {
-          [Op.gte]: lastWeekAgo,
-          [Op.lt]: oneWeekAgo
+      threatsLastWeek = await Threat.count({
+        where: {
+          userId: userId,
+          blocked: true,
+          createdAt: {
+            [Op.gte]: lastWeekAgo,
+            [Op.lt]: oneWeekAgo
+          }
         }
-      }
-    });
+      });
+    } catch (threatError) {
+      console.error('Error counting threats:', threatError);
+      // Continue with zero values
+    }
 
     // Calculate percentage change
     const percentageChange = threatsLastWeek > 0 
@@ -83,52 +103,73 @@ const getDashboard = async (req, res) => {
       : threatsThisWeek > 0 ? 100 : 0;
 
     // Get total unique blocked IPs
-    const uniqueBlockedIPs = await Threat.findAll({
-      where: {
-        userId: userId,
-        blocked: true,
-        sourceIp: { [Op.ne]: null }
-      },
-      attributes: ['sourceIp'],
-      group: ['sourceIp']
-    });
+    let uniqueBlockedIPs = [];
+    try {
+      uniqueBlockedIPs = await Threat.findAll({
+        where: {
+          userId: userId,
+          blocked: true,
+          sourceIp: { [Op.ne]: null }
+        },
+        attributes: ['sourceIp'],
+        group: ['sourceIp']
+      });
+    } catch (uniqueIPsError) {
+      console.error('Error getting unique blocked IPs:', uniqueIPsError);
+      // Continue with empty array
+    }
 
     // Get active profile
-    const activeProfile = await Profile.findOne({
-      where: {
-        userId: userId,
-        isActive: true
-      }
-    });
+    let activeProfile = null;
+    try {
+      activeProfile = await Profile.findOne({
+        where: {
+          userId: userId,
+          isActive: true
+        }
+      });
+    } catch (profileError) {
+      console.error('Error getting active profile:', profileError);
+    }
 
     // Get recent activity logs (combine threats and notifications)
     const oneWeekAgoForLogs = new Date();
     oneWeekAgoForLogs.setDate(oneWeekAgoForLogs.getDate() - 7);
 
-    const recentThreats = await Threat.findAll({
-      where: {
-        userId: userId,
-        blocked: true,
-        createdAt: {
-          [Op.gte]: oneWeekAgoForLogs
-        }
-      },
-      order: [['createdAt', 'DESC']],
-      limit: 10,
-      attributes: ['id', 'sourceIp', 'description', 'threatType', 'createdAt']
-    });
+    let recentThreats = [];
+    try {
+      recentThreats = await Threat.findAll({
+        where: {
+          userId: userId,
+          blocked: true,
+          createdAt: {
+            [Op.gte]: oneWeekAgoForLogs
+          }
+        },
+        order: [['createdAt', 'DESC']],
+        limit: 10,
+        attributes: ['id', 'sourceIp', 'description', 'threatType', 'createdAt']
+      });
+    } catch (recentThreatsError) {
+      console.error('Error getting recent threats:', recentThreatsError);
+    }
 
-    const recentNotifications = await Notification.findAll({
-      where: {
-        userId: userId,
-        createdAt: {
-          [Op.gte]: oneWeekAgoForLogs
-        }
-      },
-      order: [['createdAt', 'DESC']],
-      limit: 10,
-      attributes: ['id', 'title', 'message', 'eventType', 'createdAt']
-    });
+    let recentNotifications = [];
+    try {
+      recentNotifications = await Notification.findAll({
+        where: {
+          userId: userId,
+          createdAt: {
+            [Op.gte]: oneWeekAgoForLogs
+          }
+        },
+        order: [['createdAt', 'DESC']],
+        limit: 10,
+        attributes: ['id', 'title', 'message', 'eventType', 'createdAt']
+      });
+    } catch (notificationsError) {
+      console.error('Error getting recent notifications:', notificationsError);
+    }
 
     // Combine and sort activities
     const activities = [
@@ -149,22 +190,35 @@ const getDashboard = async (req, res) => {
     ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 10);
 
     // Calculate data transfer totals
-    const dataTransferStats = await DataTransfer.findAll({
-      where: {
-        userId: userId
-      },
-      attributes: [
-        [sequelize.fn('SUM', sequelize.col('bytesSent')), 'totalBytesSent'],
-        [sequelize.fn('SUM', sequelize.col('bytesReceived')), 'totalBytesReceived']
-      ],
-      raw: true
-    });
-    console.log('dashboard: dataTransferStats=', dataTransferStats);
+    let totalBytesSent = BigInt(0);
+    let totalBytesReceived = BigInt(0);
+    
+    try {
+      const dataTransferStats = await DataTransfer.findAll({
+        where: {
+          userId: userId
+        },
+        attributes: [
+          [sequelize.fn('SUM', sequelize.col('bytesSent')), 'totalBytesSent'],
+          [sequelize.fn('SUM', sequelize.col('bytesReceived')), 'totalBytesReceived']
+        ],
+        raw: true
+      });
+      console.log('dashboard: dataTransferStats=', dataTransferStats);
 
-    const sentValue = dataTransferStats[0]?.totalBytesSent ?? null;
-    const receivedValue = dataTransferStats[0]?.totalBytesReceived ?? null;
-    const totalBytesSent = BigInt(sentValue ? String(sentValue) : '0');
-    const totalBytesReceived = BigInt(receivedValue ? String(receivedValue) : '0');
+      const sentValue = dataTransferStats[0]?.totalBytesSent ?? null;
+      const receivedValue = dataTransferStats[0]?.totalBytesReceived ?? null;
+      
+      if (sentValue !== null && sentValue !== undefined) {
+        totalBytesSent = BigInt(String(sentValue));
+      }
+      if (receivedValue !== null && receivedValue !== undefined) {
+        totalBytesReceived = BigInt(String(receivedValue));
+      }
+    } catch (dataTransferError) {
+      console.error('Error calculating data transfer stats:', dataTransferError);
+      // Continue with zero values if query fails
+    }
     
     // Convert bytes to GB (1 GB = 1,073,741,824 bytes)
     const bytesPerGB = 1073741824;
@@ -175,6 +229,35 @@ const getDashboard = async (req, res) => {
     const maxGB = 10; // Maximum for progress bar visualization
     const sentPercentage = Math.min((gbSent / maxGB) * 100, 100);
     const receivedPercentage = Math.min((gbReceived / maxGB) * 100, 100);
+
+    // Calculate additional threat counts
+    let last24HoursThreats = 0;
+    let totalThreats = 0;
+    
+    try {
+      last24HoursThreats = await Threat.count({
+        where: {
+          userId: userId,
+          blocked: true,
+          createdAt: {
+            [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000)
+          }
+        }
+      });
+    } catch (err) {
+      console.error('Error counting last24Hours threats:', err);
+    }
+    
+    try {
+      totalThreats = await Threat.count({
+        where: {
+          userId: userId,
+          blocked: true
+        }
+      });
+    } catch (err) {
+      console.error('Error counting total threats:', err);
+    }
 
     res.status(200).json({
       success: true,
@@ -192,21 +275,8 @@ const getDashboard = async (req, res) => {
           thisWeek: threatsThisWeek,
           percentageChange: percentageChange,
           totalBlockedIPs: uniqueBlockedIPs.length || 0,
-          last24Hours: await Threat.count({
-            where: {
-              userId: userId,
-              blocked: true,
-              createdAt: {
-                [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000)
-              }
-            }
-          }),
-          total: await Threat.count({
-            where: {
-              userId: userId,
-              blocked: true
-            }
-          })
+          last24Hours: last24HoursThreats,
+          total: totalThreats
         },
         activeProfile: activeProfile ? {
           name: activeProfile.name,
@@ -232,11 +302,15 @@ const getDashboard = async (req, res) => {
     });
   } catch (error) {
     console.error('Dashboard error:', error);
-    console.error(error && error.stack);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Server error',
-      error: process.env.NODE_ENV === 'development' ? (error.message || String(error)) : undefined
+      error: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      } : undefined
     });
   }
 };

@@ -58,10 +58,10 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                 padding: isMobile && !sidebarOpen ? '0' : '20px',
                 borderRight: `1px solid ${palette.border}`,
                 transition: 'all 0.3s ease',
-                overflow: isMobile && !sidebarOpen ? 'hidden' : 'auto',  // Changed to 'auto'
                 position: 'fixed',  // Changed from 'relative' to 'fixed'
                 height: '100vh',
-                overflowY: 'auto',
+                overflowY: isMobile && !sidebarOpen ? 'hidden' : 'auto',
+                overflowX: 'hidden',
                 zIndex: isMobile ? 1000 : 'auto',
                 left: isMobile && !sidebarOpen ? '-260px' : '0',
                 top: 0,  // Always start from top

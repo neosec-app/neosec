@@ -1,8 +1,16 @@
 // server/config/db.js
 const { Sequelize } = require('sequelize');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const isProd = process.env.NODE_ENV === 'production';
+
+// Validate DATABASE_URL before creating Sequelize instance
+if (!process.env.DATABASE_URL) {
+    console.error('ERROR: DATABASE_URL is not set in environment variables!');
+    console.error('Please check your .env file in the server directory.');
+    throw new Error('DATABASE_URL environment variable is required');
+}
 
 // ---- Sequelize instance ----
 const sequelize = new Sequelize(process.env.DATABASE_URL, {
