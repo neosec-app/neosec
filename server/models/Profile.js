@@ -69,45 +69,6 @@ const Profile = sequelize.define('Profile', {
     defaultValue: 'DENY'
   },
   
-  // DNS Settings
-  dnsEnabled: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
-  },
-  primaryDns: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  secondaryDns: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  dnsSecurity: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: true
-  },
-  
-  // Access Controls
-  allowedIps: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: []
-  },
-  blockedIps: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: []
-  },
-  allowedPorts: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: []
-  },
-  blockedPorts: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: []
-  },
   
   // Scheduling
   isScheduled: {
@@ -139,6 +100,13 @@ const Profile = sequelize.define('Profile', {
     type: DataTypes.BOOLEAN,
     defaultValue: false
   },
+
+  geoLocationCountries: {
+    type: DataTypes.JSON,
+    defaultValue: [],
+    comment: 'Array of country names where profile should auto-activate'
+  },
+  
   
   // Status
   isActive: {
