@@ -18,6 +18,7 @@ exports.getLogs = async (req, res) => {
       startDate,
       endDate,
       userId,
+      userRole,
       sortBy = 'createdAt',
       sortOrder = 'DESC'
     } = req.query;
@@ -29,7 +30,24 @@ exports.getLogs = async (req, res) => {
     if (req.user.role !== 'admin') {
       whereClause.userId = req.user.id;
     } else if (userId) {
+      // If specific userId is provided, use that (takes priority over role filter)
       whereClause.userId = userId;
+    } else if (userRole && userRole !== 'all') {
+      // Filter by user role if specified (admin only, and no specific userId)
+      // Get all user IDs with the specified role
+      const usersWithRole = await User.findAll({
+        where: { role: userRole },
+        attributes: ['id']
+      });
+      const userIds = usersWithRole.map(u => u.id);
+      
+      // Filter activity logs by user IDs
+      if (userIds.length > 0) {
+        whereClause.userId = { [Op.in]: userIds };
+      } else {
+        // No users with this role, return empty result
+        whereClause.userId = { [Op.in]: [] };
+      }
     }
 
     // Date range filter
@@ -72,7 +90,7 @@ exports.getLogs = async (req, res) => {
         {
           model: User,
           as: 'user',
-          attributes: ['id', 'email'],
+          attributes: ['id', 'email', 'role'],
           required: false
         },
         {

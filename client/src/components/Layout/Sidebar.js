@@ -553,27 +553,6 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                             >
                                 Threat Blocker
                             </button>
-                            <button
-                                onMouseEnter={() => setNavHover('activity-logs')}
-                                onMouseLeave={() => setNavHover(null)}
-                                onClick={() => setCurrentView('activity-logs')}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 15px',
-                                    marginBottom: '10px',
-                                    backgroundColor: currentView === 'activity-logs' || navHover === 'activity-logs' ? palette.accentSoft : 'transparent',
-                                    color: currentView === 'activity-logs' || navHover === 'activity-logs' ? palette.accent : palette.text,
-                                    border: currentView === 'activity-logs' || navHover === 'activity-logs' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                    borderRadius: '10px',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: navHover === 'activity-logs' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                }}
-                            >
-                                Activity Logs
-                            </button>
                         </>
                     )}
                 </nav>
