@@ -82,6 +82,15 @@ const updateUser = async (req, res) => {
     const { email, role, isApproved } = req.body;
     const userId = req.params.id;
 
+    const user = await User.findByPk(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
     // Don't allow updating the current admin user's role
     if (userId === req.user.id && role && role !== 'admin') {
       return res.status(400).json({
@@ -90,13 +99,28 @@ const updateUser = async (req, res) => {
       });
     }
 
-    const user = await User.findByPk(userId);
+    // Check if current user is the main admin (first admin - admin@test.com)
+    const isMainAdmin = req.user.email === 'admin@test.com';
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+    // Prevent admins from demoting other admins (same level protection)
+    // Only the main admin (admin@test.com) can demote other admins
+    if (role !== undefined && role !== 'admin') {
+      // If trying to change role to non-admin
+      if (user.role === 'admin') {
+        if (!isMainAdmin) {
+          return res.status(403).json({
+            success: false,
+            message: 'You cannot demote another admin. Only the main admin can demote other admins.'
+          });
+        }
+        // Main admin can demote other admins, but not themselves
+        if (userId === req.user.id) {
+          return res.status(400).json({
+            success: false,
+            message: 'You cannot demote yourself, even as the main admin'
+          });
+        }
+      }
     }
 
     // Update fields

@@ -2,6 +2,9 @@ import React from 'react';
 
 function EditUserModal({ editingUser, setEditingUser, setShowEditModal, handleSaveUser, currentUser, theme, palette, closeEditModal }) {
     if (!editingUser) return null;
+    
+    // Check if current user is the main admin (admin@test.com)
+    const isMainAdmin = currentUser?.email === 'admin@test.com';
 
     const handleClose = () => {
         if (closeEditModal) {
@@ -124,13 +127,34 @@ function EditUserModal({ editingUser, setEditingUser, setShowEditModal, handleSa
                             boxSizing: 'border-box'
                         }}
                     />
-                    <p style={{
-                        color: palette.textMuted,
-                        margin: '6px 0 0 0',
-                        fontSize: '12px'
-                    }}>
-                        Email cannot be changed
-                    </p>
+                    {editingUser.id === currentUser.id && (
+                        <p style={{
+                            color: palette.textMuted,
+                            margin: '6px 0 0 0',
+                            fontSize: '12px'
+                        }}>
+                            You cannot change your own role
+                        </p>
+                    )}
+                    {editingUser.role === 'admin' && editingUser.id !== currentUser.id && !isMainAdmin && (
+                        <p style={{
+                            color: palette.textMuted,
+                            margin: '6px 0 0 0',
+                            fontSize: '12px'
+                        }}>
+                            Admins cannot be demoted by other admins. Only the main admin can demote other admins.
+                        </p>
+                    )}
+                    {editingUser.role === 'admin' && editingUser.id !== currentUser.id && isMainAdmin && (
+                        <p style={{
+                            color: palette.accent,
+                            margin: '6px 0 0 0',
+                            fontSize: '12px',
+                            fontWeight: 500
+                        }}>
+                            Main Admin: You can demote other admins
+                        </p>
+                    )}
                 </div>
 
                 {/* Role Dropdown */}
@@ -147,7 +171,7 @@ function EditUserModal({ editingUser, setEditingUser, setShowEditModal, handleSa
                     <select
                         value={editingUser.role}
                         onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
-                        disabled={editingUser.id === currentUser.id}
+                        disabled={editingUser.id === currentUser.id || (editingUser.role === 'admin' && editingUser.id !== currentUser.id && !isMainAdmin)}
                         style={{
                             width: '100%',
                             padding: '12px 14px',
@@ -157,7 +181,7 @@ function EditUserModal({ editingUser, setEditingUser, setShowEditModal, handleSa
                             borderRadius: '8px',
                             color: palette.text,
                             fontSize: '14px',
-                            cursor: editingUser.id === currentUser.id ? 'not-allowed' : 'pointer',
+                            cursor: (editingUser.id === currentUser.id || (editingUser.role === 'admin' && editingUser.id !== currentUser.id && !isMainAdmin)) ? 'not-allowed' : 'pointer',
                             outline: 'none',
                             appearance: 'none',
                             backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='${theme === 'light' ? '%231a1a1a' : '%23ffffff'}' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
@@ -168,7 +192,8 @@ function EditUserModal({ editingUser, setEditingUser, setShowEditModal, handleSa
                             boxSizing: 'border-box'
                         }}
                         onFocus={(e) => {
-                            if (editingUser.id !== currentUser.id) {
+                            const isDisabled = editingUser.id === currentUser.id || (editingUser.role === 'admin' && editingUser.id !== currentUser.id && !isMainAdmin);
+                            if (!isDisabled) {
                                 e.target.style.borderColor = palette.accent;
                                 e.target.style.boxShadow = `0 0 0 3px ${theme === 'light' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.2)'}`;
                             }
@@ -181,6 +206,34 @@ function EditUserModal({ editingUser, setEditingUser, setShowEditModal, handleSa
                         <option value="user">User</option>
                         <option value="admin">Admin</option>
                     </select>
+                    {editingUser.id === currentUser.id && (
+                        <p style={{
+                            color: palette.textMuted,
+                            margin: '6px 0 0 0',
+                            fontSize: '12px'
+                        }}>
+                            You cannot change your own role
+                        </p>
+                    )}
+                    {editingUser.role === 'admin' && editingUser.id !== currentUser.id && !isMainAdmin && (
+                        <p style={{
+                            color: palette.textMuted,
+                            margin: '6px 0 0 0',
+                            fontSize: '12px'
+                        }}>
+                            Admins cannot be demoted by other admins. Only the main admin can demote other admins.
+                        </p>
+                    )}
+                    {editingUser.role === 'admin' && editingUser.id !== currentUser.id && isMainAdmin && (
+                        <p style={{
+                            color: palette.accent,
+                            margin: '6px 0 0 0',
+                            fontSize: '12px',
+                            fontWeight: 500
+                        }}>
+                            Main Admin: You can demote other admins
+                        </p>
+                    )}
                 </div>
 
                 {/* Status Toggle */}

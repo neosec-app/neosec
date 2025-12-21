@@ -135,6 +135,7 @@ const LoginHistory = ({ theme = 'dark', palette = null, userId = null }) => {
             <thead>
               <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
                 <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', color: colors.textMuted }}>Date/Time</th>
+                <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', color: colors.textMuted }}>User</th>
                 <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', color: colors.textMuted }}>IP Address</th>
                 <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', color: colors.textMuted }}>Status</th>
                 <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', color: colors.textMuted }}>Location</th>
@@ -148,6 +149,9 @@ const LoginHistory = ({ theme = 'dark', palette = null, userId = null }) => {
                 <tr key={entry.id || index} style={{ borderBottom: `1px solid ${colors.border}` }}>
                   <td style={{ padding: '12px', fontSize: '14px' }}>
                     {new Date(entry.createdAt).toLocaleString()}
+                  </td>
+                  <td style={{ padding: '12px', fontSize: '14px', color: colors.text }}>
+                    {entry.user?.email || 'Unknown User'}
                   </td>
                   <td style={{ padding: '12px', fontFamily: 'monospace', fontSize: '12px', color: colors.textMuted }}>
                     {entry.ipAddress}

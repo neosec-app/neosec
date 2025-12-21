@@ -9,10 +9,17 @@ const getLoginHistory = async (req, res) => {
 
     const where = {};
     
-    // Admin can view any user's history, regular users can only view their own
-    if (req.user.role === 'admin' && userId) {
-      where.userId = userId;
+    // Admin can view any user's history or all users' history
+    // Regular users can only view their own
+    if (req.user.role === 'admin') {
+      // If specific userId is provided, filter by that user
+      // Otherwise, show all users' login history
+      if (userId) {
+        where.userId = userId;
+      }
+      // If no userId specified, don't filter by userId (show all)
     } else {
+      // Non-admin users can only see their own history
       where.userId = req.user.id;
     }
 
@@ -68,16 +75,23 @@ const getSecurityEvents = async (req, res) => {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - parseInt(days));
 
+    const whereClause = {
+      [Op.or]: [
+        { success: false },
+        { suspiciousActivity: true }
+      ],
+      createdAt: {
+        [Op.gte]: startDate
+      }
+    };
+
+    // Non-admin users can only see their own security events
+    if (req.user.role !== 'admin') {
+      whereClause.userId = req.user.id;
+    }
+
     const events = await LoginHistory.findAll({
-      where: {
-        [Op.or]: [
-          { success: false },
-          { suspiciousActivity: true }
-        ],
-        createdAt: {
-          [Op.gte]: startDate
-        }
-      },
+      where: whereClause,
       include: [
         {
           model: User,
