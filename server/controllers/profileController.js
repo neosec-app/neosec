@@ -241,6 +241,26 @@ const activateProfile = async (req, res) => {
       activationCount: profile.activationCount + 1
     });
 
+    // Log profile activation to activity log
+    try {
+      const ipAddress = getClientIP(req);
+      await ActivityLog.create({
+        eventType: 'Profile Activation',
+        description: `Profile activated: ${profile.name}`,
+        status: 'Success',
+        severity: 'info',
+        userId: req.user.id,
+        ipAddress: ipAddress,
+        metadata: {
+          profileId: profile.id,
+          profileName: profile.name,
+          profileType: profile.profileType
+        }
+      });
+    } catch (logError) {
+      console.error('Error logging profile activation:', logError);
+    }
+
     await createLog(
       profile.id,
       req.user.id,
@@ -355,6 +375,27 @@ const deactivateProfile = async (req, res) => {
     await profile.update({
       isActive: false
     });
+
+    // Log profile deactivation to activity log
+    try {
+      const ipAddress = getClientIP(req);
+      await ActivityLog.create({
+        eventType: 'Profile Deactivation',
+        description: `Profile deactivated: ${profile.name}`,
+        status: 'Success',
+        severity: 'info',
+        userId: req.user.id,
+        ipAddress: ipAddress,
+        metadata: {
+          profileId: profile.id,
+          profileName: profile.name,
+          profileType: profile.profileType
+        }
+      });
+    } catch (logError) {
+      console.error('Error logging profile deactivation:', logError);
+    }
+
     await createLog(
       profile.id,
       req.user.id,

@@ -1,6 +1,8 @@
 const VpnConfig = require('../models/VpnConfig');
 const DataTransfer = require('../models/DataTransfer');
+const ActivityLog = require('../models/ActivityLog');
 const { Op } = require('sequelize');
+const { getClientIP } = require('../utils/ipUtils');
 
 // Get all VPN configs for current user
 exports.getVpnConfigs = async (req, res) => {
@@ -316,6 +318,26 @@ exports.toggleVpnConfig = async (req, res) => {
             } catch (err) {
                 console.log('DataTransfer model not available, skipping session management');
             }
+            
+            // Log VPN connection activity
+            try {
+                const ipAddress = getClientIP(req);
+                await ActivityLog.create({
+                    eventType: 'VPN Connection',
+                    description: `VPN connected: ${vpnConfig.name} (${vpnConfig.protocol})`,
+                    status: 'Success',
+                    severity: 'info',
+                    userId: req.user.id,
+                    ipAddress: ipAddress,
+                    metadata: {
+                        vpnConfigId: vpnConfig.id,
+                        protocol: vpnConfig.protocol,
+                        serverAddress: vpnConfig.serverAddress
+                    }
+                });
+            } catch (logError) {
+                console.error('Error logging VPN connection:', logError);
+            }
         } else {
             // If deactivating, end the current data transfer session
             try {
@@ -331,6 +353,25 @@ exports.toggleVpnConfig = async (req, res) => {
                 );
             } catch (err) {
                 console.log('DataTransfer model not available, skipping session management');
+            }
+            
+            // Log VPN disconnection activity
+            try {
+                const ipAddress = getClientIP(req);
+                await ActivityLog.create({
+                    eventType: 'VPN Disconnection',
+                    description: `VPN disconnected: ${vpnConfig.name}`,
+                    status: 'Disconnected',
+                    severity: 'info',
+                    userId: req.user.id,
+                    ipAddress: ipAddress,
+                    metadata: {
+                        vpnConfigId: vpnConfig.id,
+                        protocol: vpnConfig.protocol
+                    }
+                });
+            } catch (logError) {
+                console.error('Error logging VPN disconnection:', logError);
             }
         }
 

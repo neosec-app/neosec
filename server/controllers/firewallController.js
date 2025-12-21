@@ -1,4 +1,6 @@
 const FirewallRule = require('../models/FirewallRule');
+const ActivityLog = require('../models/ActivityLog');
+const { getClientIP } = require('../utils/ipUtils');
 
 // Helper to validate payload
 const validateRulePayload = (payload) => {
@@ -82,6 +84,27 @@ const createRule = async (req, res) => {
       userId: req.user.id
     });
 
+    // Log firewall rule creation
+    try {
+      const ipAddress = getClientIP(req);
+      await ActivityLog.create({
+        eventType: 'Firewall Rule Update',
+        description: `Firewall rule created: ${action} ${direction} ${protocol || 'any'}`,
+        status: 'Success',
+        severity: 'info',
+        userId: req.user.id,
+        ipAddress: ipAddress,
+        metadata: {
+          ruleId: rule.id,
+          action,
+          direction,
+          protocol: protocol || 'any'
+        }
+      });
+    } catch (logError) {
+      console.error('Error logging firewall rule creation:', logError);
+    }
+
     res.status(201).json({
       success: true,
       data: rule
@@ -138,6 +161,27 @@ const updateRule = async (req, res) => {
 
     await rule.save();
 
+    // Log firewall rule update
+    try {
+      const ipAddress = getClientIP(req);
+      await ActivityLog.create({
+        eventType: 'Firewall Rule Update',
+        description: `Firewall rule updated: ${rule.action} ${rule.direction} ${rule.protocol}`,
+        status: 'Success',
+        severity: 'info',
+        userId: req.user.id,
+        ipAddress: ipAddress,
+        metadata: {
+          ruleId: rule.id,
+          action: rule.action,
+          direction: rule.direction,
+          protocol: rule.protocol
+        }
+      });
+    } catch (logError) {
+      console.error('Error logging firewall rule update:', logError);
+    }
+
     res.status(200).json({
       success: true,
       data: rule
@@ -167,7 +211,34 @@ const deleteRule = async (req, res) => {
       });
     }
 
+    const ruleData = {
+      action: rule.action,
+      direction: rule.direction,
+      protocol: rule.protocol
+    };
+
     await rule.destroy();
+
+    // Log firewall rule deletion
+    try {
+      const ipAddress = getClientIP(req);
+      await ActivityLog.create({
+        eventType: 'Firewall Rule Update',
+        description: `Firewall rule deleted: ${ruleData.action} ${ruleData.direction} ${ruleData.protocol}`,
+        status: 'Success',
+        severity: 'info',
+        userId: req.user.id,
+        ipAddress: ipAddress,
+        metadata: {
+          ruleId: id,
+          action: ruleData.action,
+          direction: ruleData.direction,
+          protocol: ruleData.protocol
+        }
+      });
+    } catch (logError) {
+      console.error('Error logging firewall rule deletion:', logError);
+    }
 
     res.status(200).json({
       success: true,

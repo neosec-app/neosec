@@ -398,6 +398,7 @@ const LogsAndReporting = ({ theme = 'dark', palette }) => {
                     <tr style={{ borderBottomColor: colors.border }}>
                       <th>Timestamp</th>
                       <th>Event Type</th>
+                      <th>User</th>
                       <th>Description</th>
                       <th>IP Address</th>
                       <th>Status</th>
@@ -408,7 +409,7 @@ const LogsAndReporting = ({ theme = 'dark', palette }) => {
                   <tbody>
                     {loading ? (
                       <tr>
-                        <td colSpan={7} className="loading-cell" style={{ color: colors.textMuted }}>
+                        <td colSpan={8} className="loading-cell" style={{ color: colors.textMuted }}>
                           Loading logs...
                         </td>
                       </tr>
@@ -426,6 +427,9 @@ const LogsAndReporting = ({ theme = 'dark', palette }) => {
                               }}>
                                 {log.eventType}
                               </span>
+                            </td>
+                            <td className="user-cell" style={{ color: colors.textMuted }}>
+                              {log.user?.email || 'System'}
                             </td>
                             <td className="description-cell">{log.description}</td>
                             <td className="ip-cell" style={{ color: colors.textMuted }}>
@@ -466,7 +470,7 @@ const LogsAndReporting = ({ theme = 'dark', palette }) => {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={7} className="empty-cell" style={{ color: colors.textMuted }}>
+                        <td colSpan={8} className="empty-cell" style={{ color: colors.textMuted }}>
                           No logs found matching your filters
                         </td>
                       </tr>
@@ -672,12 +676,10 @@ const LogsAndReporting = ({ theme = 'dark', palette }) => {
                     <span className="detail-label" style={{ color: colors.textMuted }}>Status</span>
                     <span className="detail-value">{selectedLog.status}</span>
                   </div>
-                  {selectedLog.user && (
-                    <div className="detail-item">
-                      <span className="detail-label" style={{ color: colors.textMuted }}>User</span>
-                      <span className="detail-value">{selectedLog.user.email}</span>
-                    </div>
-                  )}
+                  <div className="detail-item">
+                    <span className="detail-label" style={{ color: colors.textMuted }}>User</span>
+                    <span className="detail-value">{selectedLog.user?.email || 'System'}</span>
+                  </div>
                   {selectedLog.device && (
                     <div className="detail-item">
                       <span className="detail-label" style={{ color: colors.textMuted }}>Device</span>
