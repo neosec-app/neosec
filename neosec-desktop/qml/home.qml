@@ -117,7 +117,7 @@ Page {
                     }
                 }
                 background: Rectangle {
-                    color: page.currentSelection === "dashboardBtn" ? background_dark : form_background_dark
+                    color: page.currentSelection === "dashboardBtn" ? input_background_dark : (parent.hovered ? background_dark : form_background_dark)
                     radius: 5
                 }
             }
@@ -156,7 +156,7 @@ Page {
                     }
                 }
                 background: Rectangle {
-                    color: page.currentSelection === "vpnBtn" ? background_dark : form_background_dark
+                    color: page.currentSelection === "vpnBtn" ? input_background_dark : (parent.hovered ? background_dark : form_background_dark)
                     radius: 5
                 }
             }
@@ -195,7 +195,8 @@ Page {
                     }
                 }
                 background: Rectangle {
-                    color: page.currentSelection === "firewallBtn" ? background_dark : form_background_dark
+                    color: page.currentSelection === "firewallBtn" ? input_background_dark : (parent.hovered ? background_dark : form_background_dark)
+
                     radius: 5
                 }
             }
@@ -241,13 +242,11 @@ Page {
 
         Component {
                 id: dashboardView
-                // Loads the QML file named DashboardView.qml
                 Loader { source: "dashboard.qml" }
             }
 
             Component {
                 id: vpnView
-                // Loads the QML file named VpnView.qml
                 Loader { source: "vpn.qml" }
             }
 
