@@ -33,6 +33,7 @@ import UserImpersonation from './components/UserImpersonation';
 import AdminNotifications from './components/AdminNotifications';
 import ThreatBlocker from './components/ThreatBlocker';
 import LogsAndReporting from './components/LogsAndReporting';
+import VpnManagement from './components/VpnManagement';
 
 // Hierarchy Components
 import Subscription from './components/Hierarchy/Subscription';
@@ -419,44 +420,7 @@ if (isShareManagementPage) {
 
                         {/* VPN View */}
                         {currentView === 'vpn' && (
-                            <div>
-                                <div style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    marginBottom: '30px'
-                                }}>
-                                    <h1 style={{
-                                        fontSize: isMobile ? '22px' : isTablet ? '28px' : '32px',
-                                        margin: 0,
-                                        paddingLeft: isMobile ? '48px' : '0',
-                                        transition: 'padding-left 0.3s ease',
-                                        flex: isMobile ? '1 1 100%' : 'none'
-                                    }}>VPN Configurations</h1>
-                                    <button style={{
-                                        padding: '12px 24px',
-                                        backgroundColor: '#36E27B',
-                                        color: '#121212',
-                                        border: 'none',
-                                        borderRadius: '8px',
-                                        fontWeight: 'bold',
-                                        cursor: 'pointer',
-                                        fontSize: '14px'
-                                    }}>
-                                        + Add VPN Config
-                                    </button>
-                                </div>
-                                <div style={{
-                                    padding: '25px',
-                                    backgroundColor: palette.bgCard,
-                                    border: '1px solid #282828',
-                                    borderRadius: '10px',
-                                    textAlign: 'center',
-                                    color: '#888'
-                                }}>
-                                    <p>No VPN configurations yet. Click "Add VPN Config" to create your first configuration.</p>
-                                </div>
-                            </div>
+                            <VpnManagement theme={theme} palette={palette} />
                         )}
 
                         {/* Firewall View */}
