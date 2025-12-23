@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { firewallAPI, getErrorMessage } from '../services/api';
 import { MdModeEdit } from 'react-icons/md';
-import { SlReload } from 'react-icons/sl';
 import { RiDeleteBin6Line } from 'react-icons/ri';
 
 const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
@@ -46,19 +45,11 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
     const [actionButtonHover, setActionButtonHover] = useState(null);
 
     const initialFirewallForm = {
-        action: 'allow',
-        direction: 'inbound',
-        protocol: 'tcp',
-        sourceIPType: 'any',
-        sourceIP: '',
-        destinationIPType: 'any',
-        destinationIP: '',
-        sourcePortType: 'any',
-        sourcePort: '',
-        destinationPortType: 'any',
-        destinationPort: '',
-        description: '',
-        enabled: true
+        ip_address: '',
+        port_start: '',
+        port_end: '',
+        protocol: 0, // 0: TCP, 1: UDP, 2: BOTH
+        action: 0    // 0: ACCEPT, 1: REJECT, 2: DROP
     };
     const [firewallForm, setFirewallForm] = useState(initialFirewallForm);
 
@@ -108,10 +99,22 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
 
     // Form handlers
     const handleFirewallChange = (e) => {
-        const { name, value, type, checked } = e.target;
+        const { name, value, type } = e.target;
+        let processedValue = value;
+
+        // Convert protocol and action to integers
+        if (name === 'protocol' || name === 'action') {
+            processedValue = parseInt(value, 10);
+        }
+
+        // Convert port fields to integers or empty string
+        if (name === 'port_start' || name === 'port_end') {
+            processedValue = value === '' ? '' : parseInt(value, 10);
+        }
+
         setFirewallForm((prev) => ({
             ...prev,
-            [name]: type === 'checkbox' ? checked : value
+            [name]: processedValue
         }));
     };
 
@@ -120,31 +123,32 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
         setFirewallError('');
         setFirewallLoading(true);
         try {
+            // Validate required fields
+            if (!firewallForm.ip_address.trim()) {
+                setFirewallError('IP Address is required');
+                showToast('IP Address is required', 'error');
+                return;
+            }
+
             const payload = {
-                action: firewallForm.action,
-                direction: firewallForm.direction,
+                ip_address: firewallForm.ip_address.trim(),
+                port_start: firewallForm.port_start === '' ? null : firewallForm.port_start,
+                port_end: firewallForm.port_end === '' ? null : firewallForm.port_end,
                 protocol: firewallForm.protocol,
-                sourceIP: firewallForm.sourceIPType === 'any' ? null : (firewallForm.sourceIP || null),
-                destinationIP: firewallForm.destinationIPType === 'any' ? null : (firewallForm.destinationIP || null),
-                sourcePort: firewallForm.sourcePortType === 'any' ? null : (firewallForm.sourcePort || null),
-                destinationPort: firewallForm.destinationPortType === 'any' ? null : (firewallForm.destinationPort || null),
-                description: firewallForm.description || null,
-                enabled: firewallForm.enabled
+                action: firewallForm.action
             };
 
             let response;
             if (editingRuleId) {
                 response = await firewallAPI.updateRule(editingRuleId, payload);
                 if (response.success) {
-                    setFirewallRules((prev) =>
-                        prev.map((rule) => (rule.id === editingRuleId ? response.data : rule))
-                    );
+                    await fetchFirewallRules(); // Refresh from server to ensure consistency
                     showToast('Firewall rule updated', 'success');
                 }
             } else {
                 response = await firewallAPI.createRule(payload);
                 if (response.success) {
-                    setFirewallRules((prev) => [response.data, ...prev]);
+                    await fetchFirewallRules(); // Refresh from server to ensure consistency
                     showToast('Firewall rule added', 'success');
                 }
             }
@@ -169,22 +173,12 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
     const handleEditRule = (rule) => {
         console.log('Editing rule:', rule);
         setEditingRuleId(rule.id);
-        // Ensure protocol is either TCP or UDP, default to TCP if not
-        const validProtocol = (rule.protocol === 'tcp' || rule.protocol === 'udp') ? rule.protocol : 'tcp';
         setFirewallForm({
-            action: rule.action,
-            direction: rule.direction,
-            protocol: validProtocol,
-            sourceIPType: rule.sourceIP ? (rule.sourceIP.includes('/') ? 'range' : 'specific') : 'any',
-            sourceIP: rule.sourceIP || '',
-            destinationIPType: rule.destinationIP ? (rule.destinationIP.includes('/') ? 'range' : 'specific') : 'any',
-            destinationIP: rule.destinationIP || '',
-            sourcePortType: rule.sourcePort ? (rule.sourcePort.includes('-') ? 'range' : 'specific') : 'any',
-            sourcePort: rule.sourcePort || '',
-            destinationPortType: rule.destinationPort ? (rule.destinationPort.includes('-') ? 'range' : 'specific') : 'any',
-            destinationPort: rule.destinationPort || '',
-            description: rule.description || '',
-            enabled: rule.enabled !== undefined ? rule.enabled : true
+            ip_address: rule.ip_address || '',
+            port_start: rule.port_start !== null && rule.port_start !== undefined ? rule.port_start : '',
+            port_end: rule.port_end !== null && rule.port_end !== undefined ? rule.port_end : '',
+            protocol: rule.protocol !== undefined ? rule.protocol : 0,
+            action: rule.action !== undefined ? rule.action : 0
         });
         setShowFirewallModal(true);
         // Trigger animation immediately
@@ -203,7 +197,7 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
         try {
             const response = await firewallAPI.deleteRule(confirmDeleteRuleId);
             if (response.success) {
-                setFirewallRules((prev) => prev.filter((rule) => rule.id !== confirmDeleteRuleId));
+                await fetchFirewallRules(); // Refresh from server to ensure consistency
                 showToast('Firewall rule deleted', 'success');
             } else {
                 setFirewallError(response.message || 'Failed to delete firewall rule');
@@ -219,41 +213,6 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
         }
     };
 
-    const handleMoveRuleUp = async (id, idx) => {
-        if (idx === 0) return;
-        const newRules = [...firewallRules];
-        [newRules[idx - 1], newRules[idx]] = [newRules[idx], newRules[idx - 1]];
-        setFirewallRules(newRules);
-        // Update order on server
-        try {
-            await firewallAPI.updateRule(newRules[idx - 1].id, { order: newRules[idx - 1].order - 1 });
-            await firewallAPI.updateRule(newRules[idx].id, { order: newRules[idx].order + 1 });
-        } catch (error) {
-            console.error('Error updating rule order:', error);
-            fetchFirewallRules(); // Revert on error
-        }
-    };
-
-    const handleMoveRuleDown = async (id, idx) => {
-        if (idx === firewallRules.length - 1) return;
-        const newRules = [...firewallRules];
-        [newRules[idx], newRules[idx + 1]] = [newRules[idx + 1], newRules[idx]];
-        setFirewallRules(newRules);
-        // Update order on server
-        try {
-            await firewallAPI.updateRule(newRules[idx].id, { order: newRules[idx].order - 1 });
-            await firewallAPI.updateRule(newRules[idx + 1].id, { order: newRules[idx + 1].order + 1 });
-        } catch (error) {
-            console.error('Error updating rule order:', error);
-            fetchFirewallRules(); // Revert on error
-        }
-    };
-
-    const handleResetRule = async (id) => {
-        // Refresh rule from server
-        await fetchFirewallRules();
-        showToast('Rule refreshed', 'success');
-    };
 
     // Toast notification system
     const [toasts, setToasts] = useState([]);
@@ -352,82 +311,28 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr style={{ borderBottom: `1px solid ${colors.border}`, backgroundColor: theme === 'light' ? '#f8f9fa' : colors.bgPanel }}>
-                                    <th style={{ padding: '14px 12px', textAlign: 'left', color: colors.textMuted, fontWeight: 600, fontSize: '13px' }}>Order</th>
-                                    <th style={{ padding: '14px 12px', textAlign: 'left', color: colors.textMuted, fontWeight: 600, fontSize: '13px' }}>Action</th>
-                                    <th style={{ padding: '14px 12px', textAlign: 'left', color: colors.textMuted, fontWeight: 600, fontSize: '13px' }}>Source</th>
-                                    <th style={{ padding: '14px 12px', textAlign: 'left', color: colors.textMuted, fontWeight: 600, fontSize: '13px' }}>Destination</th>
+                                    <th style={{ padding: '14px 12px', textAlign: 'left', color: colors.textMuted, fontWeight: 600, fontSize: '13px' }}>IP Address</th>
+                                    <th style={{ padding: '14px 12px', textAlign: 'left', color: colors.textMuted, fontWeight: 600, fontSize: '13px' }}>Port Range</th>
                                     <th style={{ padding: '14px 12px', textAlign: 'left', color: colors.textMuted, fontWeight: 600, fontSize: '13px' }}>Protocol</th>
-                                    <th style={{ padding: '14px 12px', textAlign: 'left', color: colors.textMuted, fontWeight: 600, fontSize: '13px' }}>Port</th>
-                                    <th style={{ padding: '14px 12px', textAlign: 'left', color: colors.textMuted, fontWeight: 600, fontSize: '13px' }}>Description</th>
+                                    <th style={{ padding: '14px 12px', textAlign: 'left', color: colors.textMuted, fontWeight: 600, fontSize: '13px' }}>Action</th>
                                     <th style={{ padding: '14px 12px', textAlign: 'left', color: colors.textMuted, fontWeight: 600, fontSize: '13px' }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {firewallRules.map((rule, idx) => (
-                                    <tr key={rule.id} style={{
-                                        borderBottom: idx === firewallRules.length - 1 ? 'none' : `1px solid ${colors.border}`
-                                    }}>
-                                        <td style={{ padding: '14px 12px' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                                                <button
-                                                    onClick={() => handleMoveRuleUp(rule.id, idx)}
-                                                    style={{
-                                                        background: 'none',
-                                                        border: 'none',
-                                                        color: colors.textMuted,
-                                                        cursor: idx === 0 ? 'not-allowed' : 'pointer',
-                                                        opacity: idx === 0 ? 0.3 : 1,
-                                                        fontSize: '12px',
-                                                        padding: '2px'
-                                                    }}
-                                                    disabled={idx === 0}
-                                                >
-                                                    ▲
-                                                </button>
-                                                <button
-                                                    onClick={() => handleMoveRuleDown(rule.id, idx)}
-                                                    style={{
-                                                        background: 'none',
-                                                        border: 'none',
-                                                        color: colors.textMuted,
-                                                        cursor: idx === firewallRules.length - 1 ? 'not-allowed' : 'pointer',
-                                                        opacity: idx === firewallRules.length - 1 ? 0.3 : 1,
-                                                        fontSize: '12px',
-                                                        padding: '2px'
-                                                    }}
-                                                    disabled={idx === firewallRules.length - 1}
-                                                >
-                                                    ▼
-                                                </button>
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '14px 12px' }}>
-                                            <span style={{
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '6px',
-                                                padding: '4px 10px',
-                                                borderRadius: '12px',
-                                                fontSize: '12px',
-                                                fontWeight: 600,
-                                                backgroundColor: rule.action === 'allow'
-                                                    ? (theme === 'dark' ? '#1E402C' : '#e6f4ed')
-                                                    : (theme === 'dark' ? '#40201E' : '#fee2e2'),
-                                                color: rule.action === 'allow'
-                                                    ? (theme === 'dark' ? '#36E27B' : '#1fa45a')
-                                                    : (theme === 'dark' ? '#FF7777' : '#d4183d'),
-                                                border: rule.action === 'allow'
-                                                    ? (theme === 'dark' ? '1px solid #36E27B' : '1px solid #1fa45a')
-                                                    : (theme === 'dark' ? '1px solid #FF7777' : '1px solid #d4183d')
-                                            }}>
-                                                {rule.action === 'allow' ? '✓' : '✗'} {rule.action === 'allow' ? 'Allow' : 'Deny'}
-                                            </span>
+                                {firewallRules.map((rule) => (
+                                    <tr key={rule.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                                        <td style={{ padding: '14px 12px', color: colors.text, fontSize: '14px' }}>
+                                            {rule.ip_address}
                                         </td>
                                         <td style={{ padding: '14px 12px', color: colors.text, fontSize: '14px' }}>
-                                            {rule.sourceIP || 'Any'}
-                                        </td>
-                                        <td style={{ padding: '14px 12px', color: colors.text, fontSize: '14px' }}>
-                                            {rule.destinationIP || 'Any'}
+                                            {rule.port_start !== null && rule.port_end !== null
+                                                ? `${rule.port_start}-${rule.port_end}`
+                                                : rule.port_start !== null
+                                                    ? `${rule.port_start}`
+                                                    : rule.port_end !== null
+                                                        ? `${rule.port_end}`
+                                                        : 'All ports'
+                                            }
                                         </td>
                                         <td style={{ padding: '14px 12px' }}>
                                             <span style={{
@@ -438,46 +343,42 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
                                                 color: colors.textMuted,
                                                 fontWeight: 500
                                             }}>
-                                                {(rule.protocol || 'tcp').toUpperCase()}
+                                                {rule.protocol === 0 ? 'TCP' : rule.protocol === 1 ? 'UDP' : 'BOTH'}
                                             </span>
                                         </td>
-                                        <td style={{ padding: '14px 12px', color: colors.text, fontSize: '14px' }}>
-                                            {rule.destinationPort || rule.sourcePort || 'Any'}
-                                        </td>
-                                        <td style={{ padding: '14px 12px', color: colors.text, fontSize: '14px' }}>
-                                            {rule.description || '—'}
+                                        <td style={{ padding: '14px 12px' }}>
+                                            <span style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                padding: '4px 10px',
+                                                borderRadius: '12px',
+                                                fontSize: '12px',
+                                                fontWeight: 600,
+                                                backgroundColor: rule.action === 0
+                                                    ? (theme === 'dark' ? '#1E402C' : '#e6f4ed')
+                                                    : rule.action === 1
+                                                        ? (theme === 'dark' ? '#40301E' : '#fef3c7')
+                                                        : (theme === 'dark' ? '#40201E' : '#fee2e2'),
+                                                color: rule.action === 0
+                                                    ? (theme === 'dark' ? '#36E27B' : '#1fa45a')
+                                                    : rule.action === 1
+                                                        ? (theme === 'dark' ? '#F59E0B' : '#d97706')
+                                                        : (theme === 'dark' ? '#FF7777' : '#d4183d'),
+                                                border: rule.action === 0
+                                                    ? (theme === 'dark' ? '1px solid #36E27B' : '1px solid #1fa45a')
+                                                    : rule.action === 1
+                                                        ? (theme === 'dark' ? '1px solid #F59E0B' : '1px solid #d97706')
+                                                        : (theme === 'dark' ? '1px solid #FF7777' : '1px solid #d4183d')
+                                            }}>
+                                                {rule.action === 0 ? '✓ ACCEPT' : rule.action === 1 ? '⚠ REJECT' : '✗ DROP'}
+                                            </span>
                                         </td>
                                         <td style={{ padding: '14px 12px' }}>
                                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                                 <button
-                                                    onClick={() => handleResetRule(rule.id)}
-                                                    onMouseEnter={() => setActionButtonHover(`reset-${rule.id}`)}
-                                                    onMouseLeave={() => setActionButtonHover(null)}
-                                                    title="Reset/Refresh"
-                                                    style={{
-                                                        background: actionButtonHover === `reset-${rule.id}`
-                                                            ? (theme === 'dark' ? 'rgba(54,226,123,0.15)' : 'rgba(31,164,90,0.1)')
-                                                            : 'none',
-                                                        border: 'none',
-                                                        color: actionButtonHover === `reset-${rule.id}`
-                                                            ? colors.accent
-                                                            : colors.textMuted,
-                                                        cursor: 'pointer',
-                                                        fontSize: '16px',
-                                                        padding: '4px 6px',
-                                                        borderRadius: '6px',
-                                                        transition: 'all 0.15s ease',
-                                                        transform: actionButtonHover === `reset-${rule.id}` ? 'scale(1.1)' : 'scale(1)'
-                                                    }}
-                                                >
-                                                    <SlReload />
-                                                </button>
-                                                <button
                                                     type="button"
-                                                    onClick={() => {
-                                                        console.log('Edit button clicked for rule:', rule.id);
-                                                        handleEditRule(rule);
-                                                    }}
+                                                    onClick={() => handleEditRule(rule)}
                                                     onMouseEnter={() => setActionButtonHover(`edit-${rule.id}`)}
                                                     onMouseLeave={() => setActionButtonHover(null)}
                                                     title="Edit"
@@ -623,124 +524,89 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
                         </p>
 
                         <form onSubmit={handleSaveRule}>
-                            {/* Rule Description */}
+                            {/* IP Address */}
                             <div style={{ marginBottom: '24px' }}>
                                 <label style={{ display: 'block', marginBottom: '8px', color: colors.text, fontWeight: 500, fontSize: '14px' }}>
-                                    Rule Description
+                                    IP Address (CIDR Format)
                                 </label>
-                                <div style={{ position: 'relative' }}>
-                                    <input
-                                        type="text"
-                                        name="description"
-                                        value={firewallForm.description}
-                                        onChange={handleFirewallChange}
-                                        placeholder="e.g., Allow HTTPS traffic from anywhere"
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 40px 12px 14px',
-                                            backgroundColor: theme === 'light' ? '#fff' : colors.bgPanel,
-                                            border: `1px solid ${colors.border}`,
-                                            borderRadius: '8px',
-                                            color: colors.text,
-                                            fontSize: '14px',
-                                            boxSizing: 'border-box'
-                                        }}
-                                    />
-                                    {firewallForm.description && (
-                                        <span style={{
-                                            position: 'absolute',
-                                            right: '12px',
-                                            top: '50%',
-                                            transform: 'translateY(-50%)',
-                                            color: colors.accent,
-                                            fontSize: '18px'
-                                        }}>✓</span>
-                                    )}
+                                <input
+                                    type="text"
+                                    name="ip_address"
+                                    value={firewallForm.ip_address}
+                                    onChange={handleFirewallChange}
+                                    placeholder="e.g., 192.168.1.0/24 or 192.168.1.1"
+                                    required
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px 14px',
+                                        backgroundColor: theme === 'light' ? '#fff' : colors.bgPanel,
+                                        border: `1px solid ${colors.border}`,
+                                        borderRadius: '8px',
+                                        color: colors.text,
+                                        fontSize: '14px',
+                                        boxSizing: 'border-box'
+                                    }}
+                                />
+                                <div style={{ marginTop: '4px', color: colors.textMuted, fontSize: '12px' }}>
+                                    Supports CIDR notation (e.g., 192.168.1.0/24) or specific IP addresses
                                 </div>
                             </div>
 
-                            {/* Action - Radio Buttons */}
+                            {/* Port Range */}
                             <div style={{ marginBottom: '24px' }}>
-                                <label style={{ display: 'block', marginBottom: '12px', color: colors.text, fontWeight: 500, fontSize: '14px' }}>
-                                    Action
+                                <label style={{ display: 'block', marginBottom: '8px', color: colors.text, fontWeight: 500, fontSize: '14px' }}>
+                                    Port Range (Optional)
                                 </label>
-                                <div style={{ display: 'flex', gap: '16px' }}>
-                                    <label style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        cursor: 'pointer',
-                                        padding: '10px 16px',
-                                        borderRadius: '8px',
-                                        border: `2px solid ${firewallForm.action === 'allow' ? colors.accent : colors.border}`,
-                                        backgroundColor: firewallForm.action === 'allow' ? (theme === 'light' ? colors.accentSoft : 'rgba(54,226,123,0.1)') : 'transparent',
-                                        transition: 'all 0.2s ease'
-                                    }}>
+                                <div style={{ display: 'flex', gap: '12px' }}>
+                                    <div style={{ flex: 1 }}>
                                         <input
-                                            type="radio"
-                                            name="action"
-                                            value="allow"
-                                            checked={firewallForm.action === 'allow'}
+                                            type="number"
+                                            name="port_start"
+                                            value={firewallForm.port_start}
                                             onChange={handleFirewallChange}
-                                            style={{ display: 'none' }}
+                                            placeholder="Start port"
+                                            min="0"
+                                            max="65535"
+                                            style={{
+                                                width: '100%',
+                                                padding: '12px 14px',
+                                                backgroundColor: theme === 'light' ? '#fff' : colors.bgPanel,
+                                                border: `1px solid ${colors.border}`,
+                                                borderRadius: '8px',
+                                                color: colors.text,
+                                                fontSize: '14px',
+                                                boxSizing: 'border-box'
+                                            }}
                                         />
-                                        <div style={{
-                                            width: '20px',
-                                            height: '20px',
-                                            borderRadius: '50%',
-                                            backgroundColor: firewallForm.action === 'allow' ? colors.accent : 'transparent',
-                                            border: `2px solid ${firewallForm.action === 'allow' ? colors.accent : colors.border}`,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: '#fff',
-                                            fontSize: '12px',
-                                            fontWeight: 'bold'
-                                        }}>
-                                            {firewallForm.action === 'allow' ? '✓' : ''}
-                                        </div>
-                                        <span style={{ color: colors.text, fontSize: '14px', fontWeight: 500 }}>Allow</span>
-                                    </label>
-                                    <label style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        cursor: 'pointer',
-                                        padding: '10px 16px',
-                                        borderRadius: '8px',
-                                        border: `2px solid ${firewallForm.action === 'deny' ? colors.danger : colors.border}`,
-                                        backgroundColor: firewallForm.action === 'deny' ? (theme === 'light' ? 'rgba(212,24,61,0.1)' : 'rgba(224,72,72,0.1)') : 'transparent',
-                                        transition: 'all 0.2s ease'
-                                    }}>
+                                    </div>
+                                    <div style={{ flex: 1 }}>
                                         <input
-                                            type="radio"
-                                            name="action"
-                                            value="deny"
-                                            checked={firewallForm.action === 'deny'}
+                                            type="number"
+                                            name="port_end"
+                                            value={firewallForm.port_end}
                                             onChange={handleFirewallChange}
-                                            style={{ display: 'none' }}
+                                            placeholder="End port"
+                                            min="0"
+                                            max="65535"
+                                            style={{
+                                                width: '100%',
+                                                padding: '12px 14px',
+                                                backgroundColor: theme === 'light' ? '#fff' : colors.bgPanel,
+                                                border: `1px solid ${colors.border}`,
+                                                borderRadius: '8px',
+                                                color: colors.text,
+                                                fontSize: '14px',
+                                                boxSizing: 'border-box'
+                                            }}
                                         />
-                                        <div style={{
-                                            width: '20px',
-                                            height: '20px',
-                                            borderRadius: '50%',
-                                            backgroundColor: firewallForm.action === 'deny' ? colors.danger : 'transparent',
-                                            border: `2px solid ${firewallForm.action === 'deny' ? colors.danger : colors.border}`,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: '#fff',
-                                            fontSize: '12px',
-                                            fontWeight: 'bold'
-                                        }}>
-                                            {firewallForm.action === 'deny' ? '✗' : ''}
-                                        </div>
-                                        <span style={{ color: colors.text, fontSize: '14px', fontWeight: 500 }}>Deny</span>
-                                    </label>
+                                    </div>
+                                </div>
+                                <div style={{ marginTop: '4px', color: colors.textMuted, fontSize: '12px' }}>
+                                    Leave empty for all ports, or specify start/end range (0-65535)
                                 </div>
                             </div>
 
-                            {/* Protocol - Only TCP and UDP */}
+                            {/* Protocol */}
                             <div style={{ marginBottom: '24px' }}>
                                 <label style={{ display: 'block', marginBottom: '8px', color: colors.text, fontWeight: 500, fontSize: '14px' }}>
                                     Protocol
@@ -766,418 +632,131 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
                                         paddingRight: '40px'
                                     }}
                                 >
-                                    <option value="tcp">TCP</option>
-                                    <option value="udp">UDP</option>
+                                    <option value={0}>TCP</option>
+                                    <option value={1}>UDP</option>
+                                    <option value={2}>BOTH</option>
                                 </select>
                             </div>
 
-                            {/* Source IP/Range - Radio Buttons */}
-                            <div style={{ marginBottom: '24px' }}>
-                                <label style={{ display: 'block', marginBottom: '12px', color: colors.text, fontWeight: 500, fontSize: '14px' }}>
-                                    Source IP/Range
-                                </label>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: firewallForm.sourceIPType !== 'any' ? '12px' : '0' }}>
-                                    <label style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        cursor: 'pointer',
-                                        padding: '8px 12px',
-                                        borderRadius: '6px',
-                                        backgroundColor: firewallForm.sourceIPType === 'any' ? (theme === 'light' ? colors.accentSoft : 'rgba(54,226,123,0.1)') : 'transparent',
-                                        border: `1px solid ${firewallForm.sourceIPType === 'any' ? colors.accent : 'transparent'}`,
-                                        transition: 'all 0.2s ease'
-                                    }}>
-                                        <input
-                                            type="radio"
-                                            name="sourceIPType"
-                                            value="any"
-                                            checked={firewallForm.sourceIPType === 'any'}
-                                            onChange={handleFirewallChange}
-                                        />
-                                        <span style={{ color: colors.text, fontSize: '14px' }}>Any</span>
-                                    </label>
-                                    <label style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        cursor: 'pointer',
-                                        padding: '8px 12px',
-                                        borderRadius: '6px',
-                                        backgroundColor: firewallForm.sourceIPType === 'specific' ? (theme === 'light' ? colors.accentSoft : 'rgba(54,226,123,0.1)') : 'transparent',
-                                        border: `1px solid ${firewallForm.sourceIPType === 'specific' ? colors.accent : 'transparent'}`,
-                                        transition: 'all 0.2s ease'
-                                    }}>
-                                        <input
-                                            type="radio"
-                                            name="sourceIPType"
-                                            value="specific"
-                                            checked={firewallForm.sourceIPType === 'specific'}
-                                            onChange={handleFirewallChange}
-                                        />
-                                        <span style={{ color: colors.text, fontSize: '14px' }}>Specific IP</span>
-                                    </label>
-                                    <label style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        cursor: 'pointer',
-                                        padding: '8px 12px',
-                                        borderRadius: '6px',
-                                        backgroundColor: firewallForm.sourceIPType === 'range' ? (theme === 'light' ? colors.accentSoft : 'rgba(54,226,123,0.1)') : 'transparent',
-                                        border: `1px solid ${firewallForm.sourceIPType === 'range' ? colors.accent : 'transparent'}`,
-                                        transition: 'all 0.2s ease'
-                                    }}>
-                                        <input
-                                            type="radio"
-                                            name="sourceIPType"
-                                            value="range"
-                                            checked={firewallForm.sourceIPType === 'range'}
-                                            onChange={handleFirewallChange}
-                                        />
-                                        <span style={{ color: colors.text, fontSize: '14px' }}>IP Range/CIDR</span>
-                                    </label>
-                                </div>
-                                {firewallForm.sourceIPType !== 'any' && (
-                                    <input
-                                        type="text"
-                                        name="sourceIP"
-                                        value={firewallForm.sourceIP}
-                                        onChange={handleFirewallChange}
-                                        placeholder={firewallForm.sourceIPType === 'range' ? 'e.g., 192.168.1.0/24' : 'e.g., 192.168.1.1'}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 14px',
-                                            backgroundColor: theme === 'light' ? '#fff' : colors.bgPanel,
-                                            border: `1px solid ${colors.border}`,
-                                            borderRadius: '8px',
-                                            color: colors.text,
-                                            fontSize: '14px',
-                                            boxSizing: 'border-box'
-                                        }}
-                                    />
-                                )}
-                            </div>
-
-                            {/* Destination IP/Range - Radio Buttons */}
-                            <div style={{ marginBottom: '24px' }}>
-                                <label style={{ display: 'block', marginBottom: '12px', color: colors.text, fontWeight: 500, fontSize: '14px' }}>
-                                    Destination IP/Range
-                                </label>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: firewallForm.destinationIPType !== 'any' ? '12px' : '0' }}>
-                                    <label style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        cursor: 'pointer',
-                                        padding: '8px 12px',
-                                        borderRadius: '6px',
-                                        backgroundColor: firewallForm.destinationIPType === 'any' ? (theme === 'light' ? colors.accentSoft : 'rgba(54,226,123,0.1)') : 'transparent',
-                                        border: `1px solid ${firewallForm.destinationIPType === 'any' ? colors.accent : 'transparent'}`,
-                                        transition: 'all 0.2s ease'
-                                    }}>
-                                        <input
-                                            type="radio"
-                                            name="destinationIPType"
-                                            value="any"
-                                            checked={firewallForm.destinationIPType === 'any'}
-                                            onChange={handleFirewallChange}
-                                        />
-                                        <span style={{ color: colors.text, fontSize: '14px' }}>Any</span>
-                                    </label>
-                                    <label style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        cursor: 'pointer',
-                                        padding: '8px 12px',
-                                        borderRadius: '6px',
-                                        backgroundColor: firewallForm.destinationIPType === 'specific' ? (theme === 'light' ? colors.accentSoft : 'rgba(54,226,123,0.1)') : 'transparent',
-                                        border: `1px solid ${firewallForm.destinationIPType === 'specific' ? colors.accent : 'transparent'}`,
-                                        transition: 'all 0.2s ease'
-                                    }}>
-                                        <input
-                                            type="radio"
-                                            name="destinationIPType"
-                                            value="specific"
-                                            checked={firewallForm.destinationIPType === 'specific'}
-                                            onChange={handleFirewallChange}
-                                        />
-                                        <span style={{ color: colors.text, fontSize: '14px' }}>Specific IP</span>
-                                    </label>
-                                    <label style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        cursor: 'pointer',
-                                        padding: '8px 12px',
-                                        borderRadius: '6px',
-                                        backgroundColor: firewallForm.destinationIPType === 'range' ? (theme === 'light' ? colors.accentSoft : 'rgba(54,226,123,0.1)') : 'transparent',
-                                        border: `1px solid ${firewallForm.destinationIPType === 'range' ? colors.accent : 'transparent'}`,
-                                        transition: 'all 0.2s ease'
-                                    }}>
-                                        <input
-                                            type="radio"
-                                            name="destinationIPType"
-                                            value="range"
-                                            checked={firewallForm.destinationIPType === 'range'}
-                                            onChange={handleFirewallChange}
-                                        />
-                                        <span style={{ color: colors.text, fontSize: '14px' }}>IP Range/CIDR</span>
-                                    </label>
-                                </div>
-                                {firewallForm.destinationIPType !== 'any' && (
-                                    <input
-                                        type="text"
-                                        name="destinationIP"
-                                        value={firewallForm.destinationIP}
-                                        onChange={handleFirewallChange}
-                                        placeholder={firewallForm.destinationIPType === 'range' ? 'e.g., 192.168.1.0/24' : 'e.g., 192.168.1.1'}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 14px',
-                                            backgroundColor: theme === 'light' ? '#fff' : colors.bgPanel,
-                                            border: `1px solid ${colors.border}`,
-                                            borderRadius: '8px',
-                                            color: colors.text,
-                                            fontSize: '14px',
-                                            boxSizing: 'border-box'
-                                        }}
-                                    />
-                                )}
-                            </div>
-
-                            {/* Source Port - Radio Buttons */}
-                            <div style={{ marginBottom: '24px' }}>
-                                <label style={{ display: 'block', marginBottom: '12px', color: colors.text, fontWeight: 500, fontSize: '14px' }}>
-                                    Source Port
-                                </label>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: firewallForm.sourcePortType !== 'any' ? '12px' : '0' }}>
-                                    <label style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        cursor: 'pointer',
-                                        padding: '8px 12px',
-                                        borderRadius: '6px',
-                                        backgroundColor: firewallForm.sourcePortType === 'any' ? (theme === 'light' ? colors.accentSoft : 'rgba(54,226,123,0.1)') : 'transparent',
-                                        border: `1px solid ${firewallForm.sourcePortType === 'any' ? colors.accent : 'transparent'}`,
-                                        transition: 'all 0.2s ease'
-                                    }}>
-                                        <input
-                                            type="radio"
-                                            name="sourcePortType"
-                                            value="any"
-                                            checked={firewallForm.sourcePortType === 'any'}
-                                            onChange={handleFirewallChange}
-                                        />
-                                        <span style={{ color: colors.text, fontSize: '14px' }}>Any</span>
-                                    </label>
-                                    <label style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        cursor: 'pointer',
-                                        padding: '8px 12px',
-                                        borderRadius: '6px',
-                                        backgroundColor: firewallForm.sourcePortType === 'specific' ? (theme === 'light' ? colors.accentSoft : 'rgba(54,226,123,0.1)') : 'transparent',
-                                        border: `1px solid ${firewallForm.sourcePortType === 'specific' ? colors.accent : 'transparent'}`,
-                                        transition: 'all 0.2s ease'
-                                    }}>
-                                        <input
-                                            type="radio"
-                                            name="sourcePortType"
-                                            value="specific"
-                                            checked={firewallForm.sourcePortType === 'specific'}
-                                            onChange={handleFirewallChange}
-                                        />
-                                        <span style={{ color: colors.text, fontSize: '14px' }}>Specific Port</span>
-                                    </label>
-                                    <label style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        cursor: 'pointer',
-                                        padding: '8px 12px',
-                                        borderRadius: '6px',
-                                        backgroundColor: firewallForm.sourcePortType === 'range' ? (theme === 'light' ? colors.accentSoft : 'rgba(54,226,123,0.1)') : 'transparent',
-                                        border: `1px solid ${firewallForm.sourcePortType === 'range' ? colors.accent : 'transparent'}`,
-                                        transition: 'all 0.2s ease'
-                                    }}>
-                                        <input
-                                            type="radio"
-                                            name="sourcePortType"
-                                            value="range"
-                                            checked={firewallForm.sourcePortType === 'range'}
-                                            onChange={handleFirewallChange}
-                                        />
-                                        <span style={{ color: colors.text, fontSize: '14px' }}>Port Range</span>
-                                    </label>
-                                </div>
-                                {firewallForm.sourcePortType !== 'any' && (
-                                    <input
-                                        type="text"
-                                        name="sourcePort"
-                                        value={firewallForm.sourcePort}
-                                        onChange={handleFirewallChange}
-                                        placeholder={firewallForm.sourcePortType === 'range' ? 'e.g., 8000-9000' : 'e.g., 80'}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 14px',
-                                            backgroundColor: theme === 'light' ? '#fff' : colors.bgPanel,
-                                            border: `1px solid ${colors.border}`,
-                                            borderRadius: '8px',
-                                            color: colors.text,
-                                            fontSize: '14px',
-                                            boxSizing: 'border-box'
-                                        }}
-                                    />
-                                )}
-                            </div>
-
-                            {/* Destination Port - Radio Buttons */}
-                            <div style={{ marginBottom: '24px' }}>
-                                <label style={{ display: 'block', marginBottom: '12px', color: colors.text, fontWeight: 500, fontSize: '14px' }}>
-                                    Destination Port
-                                </label>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: firewallForm.destinationPortType !== 'any' ? '12px' : '0' }}>
-                                    <label style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        cursor: 'pointer',
-                                        padding: '8px 12px',
-                                        borderRadius: '6px',
-                                        backgroundColor: firewallForm.destinationPortType === 'any' ? (theme === 'light' ? colors.accentSoft : 'rgba(54,226,123,0.1)') : 'transparent',
-                                        border: `1px solid ${firewallForm.destinationPortType === 'any' ? colors.accent : 'transparent'}`,
-                                        transition: 'all 0.2s ease'
-                                    }}>
-                                        <input
-                                            type="radio"
-                                            name="destinationPortType"
-                                            value="any"
-                                            checked={firewallForm.destinationPortType === 'any'}
-                                            onChange={handleFirewallChange}
-                                        />
-                                        <span style={{ color: colors.text, fontSize: '14px' }}>Any</span>
-                                    </label>
-                                    <label style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        cursor: 'pointer',
-                                        padding: '8px 12px',
-                                        borderRadius: '6px',
-                                        backgroundColor: firewallForm.destinationPortType === 'specific' ? (theme === 'light' ? colors.accentSoft : 'rgba(54,226,123,0.1)') : 'transparent',
-                                        border: `1px solid ${firewallForm.destinationPortType === 'specific' ? colors.accent : 'transparent'}`,
-                                        transition: 'all 0.2s ease'
-                                    }}>
-                                        <input
-                                            type="radio"
-                                            name="destinationPortType"
-                                            value="specific"
-                                            checked={firewallForm.destinationPortType === 'specific'}
-                                            onChange={handleFirewallChange}
-                                        />
-                                        <span style={{ color: colors.text, fontSize: '14px' }}>Specific Port</span>
-                                    </label>
-                                    <label style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        cursor: 'pointer',
-                                        padding: '8px 12px',
-                                        borderRadius: '6px',
-                                        backgroundColor: firewallForm.destinationPortType === 'range' ? (theme === 'light' ? colors.accentSoft : 'rgba(54,226,123,0.1)') : 'transparent',
-                                        border: `1px solid ${firewallForm.destinationPortType === 'range' ? colors.accent : 'transparent'}`,
-                                        transition: 'all 0.2s ease'
-                                    }}>
-                                        <input
-                                            type="radio"
-                                            name="destinationPortType"
-                                            value="range"
-                                            checked={firewallForm.destinationPortType === 'range'}
-                                            onChange={handleFirewallChange}
-                                        />
-                                        <span style={{ color: colors.text, fontSize: '14px' }}>Port Range</span>
-                                    </label>
-                                </div>
-                                {firewallForm.destinationPortType !== 'any' && (
-                                    <input
-                                        type="text"
-                                        name="destinationPort"
-                                        value={firewallForm.destinationPort}
-                                        onChange={handleFirewallChange}
-                                        placeholder={firewallForm.destinationPortType === 'range' ? 'e.g., 8000-9000' : 'e.g., 80'}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px 14px',
-                                            backgroundColor: theme === 'light' ? '#fff' : colors.bgPanel,
-                                            border: `1px solid ${colors.border}`,
-                                            borderRadius: '8px',
-                                            color: colors.text,
-                                            fontSize: '14px',
-                                            boxSizing: 'border-box'
-                                        }}
-                                    />
-                                )}
-                            </div>
-
-                            {/* Enable Rule - Toggle Switch */}
+                            {/* Action */}
                             <div style={{ marginBottom: '32px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <div>
-                                        <label style={{ display: 'block', marginBottom: '4px', color: colors.text, fontWeight: 500, fontSize: '14px' }}>
-                                            Enable Rule
-                                        </label>
-                                        <span style={{ color: colors.textMuted, fontSize: '13px' }}>
-                                            {firewallForm.enabled ? 'Rule is enabled and will be applied' : 'Rule is disabled'}
-                                        </span>
-                                    </div>
+                                <label style={{ display: 'block', marginBottom: '12px', color: colors.text, fontWeight: 500, fontSize: '14px' }}>
+                                    Action
+                                </label>
+                                <div style={{ display: 'flex', gap: '12px' }}>
                                     <label style={{
-                                        position: 'relative',
-                                        display: 'inline-block',
-                                        width: '52px',
-                                        height: '28px',
-                                        cursor: 'pointer'
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        cursor: 'pointer',
+                                        padding: '12px 16px',
+                                        borderRadius: '8px',
+                                        border: `2px solid ${firewallForm.action === 0 ? colors.accent : colors.border}`,
+                                        backgroundColor: firewallForm.action === 0 ? (theme === 'light' ? colors.accentSoft : 'rgba(54,226,123,0.1)') : 'transparent',
+                                        transition: 'all 0.2s ease',
+                                        flex: 1,
+                                        justifyContent: 'center'
                                     }}>
                                         <input
-                                            type="checkbox"
-                                            name="enabled"
-                                            checked={firewallForm.enabled}
+                                            type="radio"
+                                            name="action"
+                                            value={0}
+                                            checked={firewallForm.action === 0}
                                             onChange={handleFirewallChange}
-                                            style={{
-                                                opacity: 0,
-                                                width: 0,
-                                                height: 0
-                                            }}
+                                            style={{ display: 'none' }}
                                         />
-                                        <span style={{
-                                            position: 'absolute',
-                                            cursor: 'pointer',
-                                            top: 0,
-                                            left: 0,
-                                            right: 0,
-                                            bottom: 0,
-                                            backgroundColor: firewallForm.enabled ? colors.accent : (theme === 'light' ? '#d1d5db' : '#4b5563'),
-                                            borderRadius: '28px',
-                                            transition: 'background-color 0.3s ease',
-                                            boxShadow: firewallForm.enabled
-                                                ? (theme === 'light' ? '0 2px 4px rgba(34, 197, 94, 0.2)' : '0 2px 4px rgba(54, 226, 123, 0.3)')
-                                                : 'none'
+                                        <div style={{
+                                            width: '20px',
+                                            height: '20px',
+                                            borderRadius: '50%',
+                                            backgroundColor: firewallForm.action === 0 ? colors.accent : 'transparent',
+                                            border: `2px solid ${firewallForm.action === 0 ? colors.accent : colors.border}`,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#fff',
+                                            fontSize: '12px',
+                                            fontWeight: 'bold'
                                         }}>
-                                            <span style={{
-                                                position: 'absolute',
-                                                height: '22px',
-                                                width: '22px',
-                                                left: firewallForm.enabled ? '26px' : '3px',
-                                                bottom: '3px',
-                                                backgroundColor: '#ffffff',
-                                                borderRadius: '50%',
-                                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
-                                            }} />
-                                        </span>
+                                            {firewallForm.action === 0 ? '✓' : ''}
+                                        </div>
+                                        <span style={{ color: colors.text, fontSize: '14px', fontWeight: 500 }}>ACCEPT</span>
+                                    </label>
+                                    <label style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        cursor: 'pointer',
+                                        padding: '12px 16px',
+                                        borderRadius: '8px',
+                                        border: `2px solid ${firewallForm.action === 1 ? '#f59e0b' : colors.border}`,
+                                        backgroundColor: firewallForm.action === 1 ? (theme === 'light' ? '#fef3c7' : 'rgba(245,158,11,0.1)') : 'transparent',
+                                        transition: 'all 0.2s ease',
+                                        flex: 1,
+                                        justifyContent: 'center'
+                                    }}>
+                                        <input
+                                            type="radio"
+                                            name="action"
+                                            value={1}
+                                            checked={firewallForm.action === 1}
+                                            onChange={handleFirewallChange}
+                                            style={{ display: 'none' }}
+                                        />
+                                        <div style={{
+                                            width: '20px',
+                                            height: '20px',
+                                            borderRadius: '50%',
+                                            backgroundColor: firewallForm.action === 1 ? '#f59e0b' : 'transparent',
+                                            border: `2px solid ${firewallForm.action === 1 ? '#f59e0b' : colors.border}`,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#fff',
+                                            fontSize: '12px',
+                                            fontWeight: 'bold'
+                                        }}>
+                                            {firewallForm.action === 1 ? '⚠' : ''}
+                                        </div>
+                                        <span style={{ color: colors.text, fontSize: '14px', fontWeight: 500 }}>REJECT</span>
+                                    </label>
+                                    <label style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        cursor: 'pointer',
+                                        padding: '12px 16px',
+                                        borderRadius: '8px',
+                                        border: `2px solid ${firewallForm.action === 2 ? colors.danger : colors.border}`,
+                                        backgroundColor: firewallForm.action === 2 ? (theme === 'light' ? 'rgba(212,24,61,0.1)' : 'rgba(224,72,72,0.1)') : 'transparent',
+                                        transition: 'all 0.2s ease',
+                                        flex: 1,
+                                        justifyContent: 'center'
+                                    }}>
+                                        <input
+                                            type="radio"
+                                            name="action"
+                                            value={2}
+                                            checked={firewallForm.action === 2}
+                                            onChange={handleFirewallChange}
+                                            style={{ display: 'none' }}
+                                        />
+                                        <div style={{
+                                            width: '20px',
+                                            height: '20px',
+                                            borderRadius: '50%',
+                                            backgroundColor: firewallForm.action === 2 ? colors.danger : 'transparent',
+                                            border: `2px solid ${firewallForm.action === 2 ? colors.danger : colors.border}`,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#fff',
+                                            fontSize: '12px',
+                                            fontWeight: 'bold'
+                                        }}>
+                                            {firewallForm.action === 2 ? '✗' : ''}
+                                        </div>
+                                        <span style={{ color: colors.text, fontSize: '14px', fontWeight: 500 }}>DROP</span>
                                     </label>
                                 </div>
                             </div>
