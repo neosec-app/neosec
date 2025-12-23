@@ -5,14 +5,29 @@ const { getClientIP } = require('../utils/ipUtils');
 // Helper to validate payload
 const validateRulePayload = (payload) => {
   const errors = [];
-  if (!payload.action || !['allow', 'deny'].includes(payload.action)) {
-    errors.push('action must be allow or deny');
+  if (payload.ip_address === undefined || payload.ip_address === null || payload.ip_address === '') {
+    errors.push('ip_address is required');
   }
-  if (!payload.direction || !['inbound', 'outbound'].includes(payload.direction)) {
-    errors.push('direction must be inbound or outbound');
+  if (payload.protocol === undefined || payload.protocol === null || ![0, 1, 2].includes(payload.protocol)) {
+    errors.push('protocol must be 0 (TCP), 1 (UDP), or 2 (BOTH)');
   }
-  if (!payload.protocol || !['any', 'tcp', 'udp', 'icmp'].includes(payload.protocol)) {
-    errors.push('protocol must be any, tcp, udp, or icmp');
+  if (payload.action === undefined || payload.action === null || ![0, 1, 2].includes(payload.action)) {
+    errors.push('action must be 0 (ACCEPT), 1 (REJECT), or 2 (DROP)');
+  }
+  if (payload.port_start !== undefined && payload.port_start !== null) {
+    if (!Number.isInteger(payload.port_start) || payload.port_start < 0 || payload.port_start > 65535) {
+      errors.push('port_start must be an integer between 0 and 65535');
+    }
+  }
+  if (payload.port_end !== undefined && payload.port_end !== null) {
+    if (!Number.isInteger(payload.port_end) || payload.port_end < 0 || payload.port_end > 65535) {
+      errors.push('port_end must be an integer between 0 and 65535');
+    }
+  }
+  if (payload.port_start !== undefined && payload.port_end !== undefined &&
+      payload.port_start !== null && payload.port_end !== null &&
+      payload.port_start > payload.port_end) {
+    errors.push('port_start cannot be greater than port_end');
   }
   return errors;
 };
@@ -20,21 +35,10 @@ const validateRulePayload = (payload) => {
 // Get all firewall rules for the current user
 const getRules = async (req, res) => {
   try {
-    // Try to order by 'order' column, fallback to createdAt if column doesn't exist
-    let rules;
-    try {
-      rules = await FirewallRule.findAll({
-        where: { userId: req.user.id },
-        order: [['order', 'ASC'], ['createdAt', 'ASC']]
-      });
-    } catch (orderError) {
-      // If order column doesn't exist, just order by createdAt
-      console.log('Order column not found, using createdAt for ordering');
-      rules = await FirewallRule.findAll({
-        where: { userId: req.user.id },
-        order: [['createdAt', 'ASC']]
-      });
-    }
+    const rules = await FirewallRule.findAll({
+      where: { userId: req.user.id },
+      order: [['createdAt', 'ASC']]
+    });
 
     res.status(200).json({
       success: true,
@@ -55,8 +59,8 @@ const getRules = async (req, res) => {
 // Create a new firewall rule
 const createRule = async (req, res) => {
   try {
-    const { action, direction, protocol, sourceIP, destinationIP, sourcePort, destinationPort, description, enabled, order } = req.body;
-    const errors = validateRulePayload({ action, direction, protocol: protocol || 'any' });
+    const { ip_address, port_start, port_end, protocol, action } = req.body;
+    const errors = validateRulePayload({ ip_address, port_start, port_end, protocol, action });
     if (errors.length) {
       return res.status(400).json({
         success: false,
@@ -65,31 +69,23 @@ const createRule = async (req, res) => {
       });
     }
 
-    // Get max order for this user to set default
-    const maxOrder = await FirewallRule.max('order', {
-      where: { userId: req.user.id }
-    }) || 0;
-
     const rule = await FirewallRule.create({
+      ip_address,
+      port_start: port_start !== undefined ? port_start : null,
+      port_end: port_end !== undefined ? port_end : null,
+      protocol,
       action,
-      direction,
-      protocol: protocol || 'any',
-      sourceIP: sourceIP || null,
-      destinationIP: destinationIP || null,
-      sourcePort: sourcePort || null,
-      destinationPort: destinationPort || null,
-      description: description || null,
-      enabled: enabled !== undefined ? enabled : true,
-      order: order !== undefined ? order : maxOrder + 1,
       userId: req.user.id
     });
 
     // Log firewall rule creation
     try {
       const ipAddress = getClientIP(req);
+      const actionText = action === 0 ? 'ACCEPT' : action === 1 ? 'REJECT' : 'DROP';
+      const protocolText = protocol === 0 ? 'TCP' : protocol === 1 ? 'UDP' : 'BOTH';
       await ActivityLog.create({
         eventType: 'Firewall Rule Update',
-        description: `Firewall rule created: ${action} ${direction} ${protocol || 'any'}`,
+        description: `Firewall rule created: ${actionText} ${protocolText} for ${ip_address}`,
         status: 'Success',
         severity: 'info',
         userId: req.user.id,
@@ -97,8 +93,8 @@ const createRule = async (req, res) => {
         metadata: {
           ruleId: rule.id,
           action,
-          direction,
-          protocol: protocol || 'any'
+          protocol,
+          ip_address
         }
       });
     } catch (logError) {
@@ -122,7 +118,7 @@ const createRule = async (req, res) => {
 const updateRule = async (req, res) => {
   try {
     const { id } = req.params;
-    const { action, direction, protocol, sourceIP, destinationIP, sourcePort, destinationPort, description, enabled, order } = req.body;
+    const { ip_address, port_start, port_end, protocol, action } = req.body;
 
     const rule = await FirewallRule.findOne({
       where: { id, userId: req.user.id }
@@ -136,9 +132,11 @@ const updateRule = async (req, res) => {
     }
 
     const errors = validateRulePayload({
-      action: action ?? rule.action,
-      direction: direction ?? rule.direction,
-      protocol: protocol ?? rule.protocol
+      ip_address: ip_address ?? rule.ip_address,
+      port_start: port_start ?? rule.port_start,
+      port_end: port_end ?? rule.port_end,
+      protocol: protocol ?? rule.protocol,
+      action: action ?? rule.action
     });
     if (errors.length) {
       return res.status(400).json({
@@ -148,25 +146,22 @@ const updateRule = async (req, res) => {
       });
     }
 
-    rule.action = action ?? rule.action;
-    rule.direction = direction ?? rule.direction;
+    rule.ip_address = ip_address ?? rule.ip_address;
+    rule.port_start = port_start !== undefined ? port_start : rule.port_start;
+    rule.port_end = port_end !== undefined ? port_end : rule.port_end;
     rule.protocol = protocol ?? rule.protocol;
-    rule.sourceIP = sourceIP !== undefined ? sourceIP : rule.sourceIP;
-    rule.destinationIP = destinationIP !== undefined ? destinationIP : rule.destinationIP;
-    rule.sourcePort = sourcePort !== undefined ? sourcePort : rule.sourcePort;
-    rule.destinationPort = destinationPort !== undefined ? destinationPort : rule.destinationPort;
-    rule.description = description !== undefined ? description : rule.description;
-    rule.enabled = enabled !== undefined ? enabled : rule.enabled;
-    rule.order = order !== undefined ? order : rule.order;
+    rule.action = action ?? rule.action;
 
     await rule.save();
 
     // Log firewall rule update
     try {
       const ipAddress = getClientIP(req);
+      const actionText = rule.action === 0 ? 'ACCEPT' : rule.action === 1 ? 'REJECT' : 'DROP';
+      const protocolText = rule.protocol === 0 ? 'TCP' : rule.protocol === 1 ? 'UDP' : 'BOTH';
       await ActivityLog.create({
         eventType: 'Firewall Rule Update',
-        description: `Firewall rule updated: ${rule.action} ${rule.direction} ${rule.protocol}`,
+        description: `Firewall rule updated: ${actionText} ${protocolText} for ${rule.ip_address}`,
         status: 'Success',
         severity: 'info',
         userId: req.user.id,
@@ -174,8 +169,8 @@ const updateRule = async (req, res) => {
         metadata: {
           ruleId: rule.id,
           action: rule.action,
-          direction: rule.direction,
-          protocol: rule.protocol
+          protocol: rule.protocol,
+          ip_address: rule.ip_address
         }
       });
     } catch (logError) {
@@ -211,11 +206,8 @@ const deleteRule = async (req, res) => {
       });
     }
 
-    const ruleData = {
-      action: rule.action,
-      direction: rule.direction,
-      protocol: rule.protocol
-    };
+    const actionText = rule.action === 0 ? 'ACCEPT' : rule.action === 1 ? 'REJECT' : 'DROP';
+    const protocolText = rule.protocol === 0 ? 'TCP' : rule.protocol === 1 ? 'UDP' : 'BOTH';
 
     await rule.destroy();
 
@@ -224,16 +216,16 @@ const deleteRule = async (req, res) => {
       const ipAddress = getClientIP(req);
       await ActivityLog.create({
         eventType: 'Firewall Rule Update',
-        description: `Firewall rule deleted: ${ruleData.action} ${ruleData.direction} ${ruleData.protocol}`,
+        description: `Firewall rule deleted: ${actionText} ${protocolText} for ${rule.ip_address}`,
         status: 'Success',
         severity: 'info',
         userId: req.user.id,
         ipAddress: ipAddress,
         metadata: {
           ruleId: id,
-          action: ruleData.action,
-          direction: ruleData.direction,
-          protocol: ruleData.protocol
+          action: rule.action,
+          protocol: rule.protocol,
+          ip_address: rule.ip_address
         }
       });
     } catch (logError) {

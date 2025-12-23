@@ -8,48 +8,44 @@ const FirewallRule = sequelize.define('FirewallRule', {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true
   },
-  action: {
-    type: DataTypes.ENUM('allow', 'deny'),
-    allowNull: false
+  ip_address: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    comment: 'CIDR Format supported'
   },
-  direction: {
-    type: DataTypes.ENUM('inbound', 'outbound'),
-    allowNull: false
+  port_start: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    validate: {
+      min: 0,
+      max: 65535
+    }
+  },
+  port_end: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    validate: {
+      min: 0,
+      max: 65535
+    }
   },
   protocol: {
-    type: DataTypes.ENUM('any', 'tcp', 'udp', 'icmp'),
-    allowNull: false,
-    defaultValue: 'any'
-  },
-  sourceIP: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  destinationIP: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  sourcePort: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  destinationPort: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  description: {
-    type: DataTypes.TEXT,
-    allowNull: true
-  },
-  order: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    defaultValue: 0
+    validate: {
+      min: 0,
+      max: 2
+    },
+    comment: '0: TCP, 1: UDP, 2: BOTH'
   },
-  enabled: {
-    type: DataTypes.BOOLEAN,
+  action: {
+    type: DataTypes.INTEGER,
     allowNull: false,
-    defaultValue: true
+    validate: {
+      min: 0,
+      max: 2
+    },
+    comment: '0: ACCEPT, 1: REJECT, 2: DROP'
   },
   userId: {
     type: DataTypes.UUID,
