@@ -141,16 +141,31 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                                 color: palette.textMuted
                             }}>{user.email}</p>
                             <span style={{
-                                display: 'inline-block',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
                                 marginTop: '10px',
                                 padding: '5px 12px',
                                 borderRadius: '15px',
                                 fontSize: '12px',
                                 backgroundColor: user.role === 'admin' ? palette.accentSoft : palette.bgPanel,
                                 color: user.role === 'admin' ? palette.accent : palette.text,
-                                border: user.role === 'admin' ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`
+                                border: user.role === 'admin' ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`,
+                                minWidth: '80px'
                             }}>
-                                {user.role === 'admin' ? ' Admin' : ' User'}
+                                <span>{user.role === 'admin' ? 'Admin' : 'User'}</span>
+                                {user.accountType === 'leader' && (
+                                    <>
+                                        <span style={{
+                                            margin: '0 6px',
+                                            height: '12px',
+                                            width: '1px',
+                                            backgroundColor: user.role === 'admin' ? palette.accent : palette.textMuted,
+                                            opacity: 0.6
+                                        }}></span>
+                                        <span>Leader</span>
+                                    </>
+                                )}
                             </span>
                             <div style={{
                                 marginTop: '4px',
