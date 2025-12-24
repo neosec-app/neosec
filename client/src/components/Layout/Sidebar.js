@@ -150,7 +150,8 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                                 color: user.role === 'admin' ? palette.accent : palette.text,
                                 border: user.role === 'admin' ? `1px solid ${palette.accent}` : `1px solid ${palette.border}`
                             }}>
-                                {user.role === 'admin' ? ' Admin' : ' User'}
+                                {user.role === 'admin' ? 'Admin' : 'User'}
+                                {user.accountType === 'leader' ? ' Leader' : ''}
                             </span>
                             <div style={{
                                 marginTop: '4px',
