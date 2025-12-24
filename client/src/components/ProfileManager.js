@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 import ShareCreationModal from './ShareCreationModal';
+import ShareManagement from './ShareManagement';
 import countries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
 countries.registerLocale(enLocale);
@@ -360,6 +361,7 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
   const [firewallRules, setFirewallRules] = useState([]);
   const [showShareModal, setShowShareModal] = useState(false);
   const [sharingProfile, setSharingProfile] = useState(null);
+  const [showShareManagement, setShowShareManagement] = useState(false);
 
 
 
@@ -790,24 +792,17 @@ const handleRemoveCountry = (countryToRemove) => {
 
          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <button
-            onClick={() => {
-              // Navigate to share management view
-              if (window.setCurrentView) {
-                window.setCurrentView('share-management');
-              } else {
-                // Fallback: open in new window
-                window.location.href = '/share-management';
-              }
-            }} 
+            onClick={() => setShowShareManagement(true)}
             style={{
-              padding: '10px 18px',
-              borderRadius: 999,
-              border: `1px solid ${colors.accent}`,
+              padding: '8px 16px',
+              borderRadius: 8,
+              border: `1px solid ${colors.border}`,
               backgroundColor: 'transparent',
-              color: colors.accent,
+              color: colors.text,
               fontSize: 14,
-              fontWeight: 600,
+              fontWeight: 500,
               cursor: 'pointer',
+              transition: 'all 0.2s',
             }}
           >
             Manage All Shares
@@ -816,14 +811,15 @@ const handleRemoveCountry = (countryToRemove) => {
           <button
             onClick={() => setShowLogs(!showLogs)}
             style={{
-              padding: '10px 18px',
-              borderRadius: 999,
+              padding: '8px 16px',
+              borderRadius: 8,
               border: `1px solid ${colors.border}`,
-              backgroundColor: showLogs ? colors.accentSoft : colors.bgCard,
+              backgroundColor: showLogs ? colors.accentSoft : 'transparent',
               color: colors.text,
               fontSize: 14,
               fontWeight: 500,
               cursor: 'pointer',
+              transition: 'all 0.2s',
             }}
           >
             {showLogs ? 'Hide Logs' : 'View Activity Logs'}
@@ -1824,6 +1820,8 @@ const handleRemoveCountry = (countryToRemove) => {
                     justifyContent: 'space-between',
                     alignItems: 'flex-start',
                     gap: 16,
+                    position: 'relative',
+                    minHeight: '200px',
                   }}
                 >
                   {/* LEFT: info */}
@@ -2030,7 +2028,7 @@ const handleRemoveCountry = (countryToRemove) => {
                     </div>
                   </div>
 
-                  {/* RIGHT: actions (top-right) */}
+                  {/* RIGHT: actions - positioned lower */}
                   <div
                     className="profile-actions"
                     style={{
@@ -2038,8 +2036,10 @@ const handleRemoveCountry = (countryToRemove) => {
                       flexDirection: 'row',
                       gap: 8,
                       alignItems: 'center',
+                      flexWrap: 'wrap',
                       justifyContent: 'flex-end',
-                      minWidth: 260,
+                      marginTop: '40px',
+                      minWidth: 300,
                     }}
                   >
                     {/* Activate / Deactivate – transparent, outlined */}
@@ -2075,7 +2075,7 @@ const handleRemoveCountry = (countryToRemove) => {
                       >
                         Deactivate
                       </button>
-                      
+
                     )}
 
                     {/* Edit – subtle neutral outline */}
@@ -2110,14 +2110,13 @@ const handleRemoveCountry = (countryToRemove) => {
                       Delete
                     </button>
                   </div>
-                  {/* Profile Share Button*/}
+
+                  {/* Share Profile button - positioned at bottom right corner */}
                   <div
                     style={{
-                      marginTop: 16,
-                      paddingTop: 16,
-                      borderTop: `1px solid ${colors.border}`,
-                      display: 'flex',
-                      justifyContent: 'flex-end',
+                      position: 'absolute',
+                      bottom: '20px',
+                      right: '20px',
                     }}
                   >
                     <button
@@ -2132,13 +2131,13 @@ const handleRemoveCountry = (countryToRemove) => {
                         border: 'none',
                         borderRadius: 6,
                         cursor: 'pointer',
-                        fontSize: 14,
-                        fontWeight: 600
+                        fontSize: 13,
+                        fontWeight: 600,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                       }}
                     >
                       Share Profile
                     </button>
-
                   </div>
 
 
@@ -2161,6 +2160,67 @@ const handleRemoveCountry = (countryToRemove) => {
           theme={theme}
           palette={colors}
         />
+      )}
+
+      {showShareManagement && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+          }}
+          onClick={() => setShowShareManagement(false)}
+        >
+          <div
+            style={{
+              backgroundColor: colors.bgCard,
+              borderRadius: 12,
+              border: `1px solid ${colors.border}`,
+              width: '90%',
+              maxWidth: '1200px',
+              height: '80%',
+              maxHeight: '800px',
+              overflow: 'hidden',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                padding: '20px',
+                borderBottom: `1px solid ${colors.border}`,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <h2 style={{ margin: 0, color: colors.text }}>Share Management</h2>
+              <button
+                onClick={() => setShowShareManagement(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: colors.text,
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  padding: '4px',
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div style={{ height: 'calc(100% - 80px)', overflow: 'auto' }}>
+              <ShareManagement theme={theme} palette={colors} />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
