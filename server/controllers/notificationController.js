@@ -1,5 +1,6 @@
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const { createNotification } = require('../utils/notificationHelper');
 
 // Get all notifications for current user (or all if admin)
 exports.getNotifications = async (req, res) => {
@@ -107,25 +108,15 @@ exports.createNotification = async (req, res) => {
             });
         }
 
-        // Create notification
-        const notification = await Notification.create({
+                // Create notification using helper (which handles email sending)
+        const notification = await createNotification(targetUserId, {
             title,
             message,
             eventType,
             priority: priority || 'medium',
             emailRecipients: emailRecipients ? JSON.stringify(emailRecipients) : null,
-            eventLog,
-            userId: targetUserId,
-            emailSent: false
-        });
-
-        // Log to console for demo purposes
-        console.log('🔔 NEW NOTIFICATION CREATED:');
-        console.log(`   Title: ${title}`);
-        console.log(`   Type: ${eventType}`);
-        console.log(`   Priority: ${priority || 'medium'}`);
-        console.log(`   User: ${req.user.email}`);
-        console.log(`   Time: ${new Date().toISOString()}`);
+            eventLog
+        }, true);
 
         res.status(201).json({
             success: true,
@@ -146,7 +137,7 @@ exports.simulateVpnTunnelDown = async (req, res) => {
     try {
         const { serverName, siteId } = req.body;
 
-        const notification = await Notification.create({
+        const notification = await createNotification(req.user.id, {
             title: 'WireGuard Tunnel Down',
             message: `WireGuard tunnel to ${serverName || 'Site A'} is Down`,
             eventType: 'vpn_tunnel_down',
@@ -156,16 +147,14 @@ exports.simulateVpnTunnelDown = async (req, res) => {
                 'user1@hotmail.com',
                 'user2@gmail.com'
             ]),
-            eventLog: `WireGuard tunnel connection failed. Site: ${siteId || 'Site A'}. Last successful connection: ${new Date(Date.now() - 15 * 60 * 1000).toISOString()}`,
-            userId: req.user.id,
-            emailSent: false
-        });
+            eventLog: `WireGuard tunnel connection failed. Site: ${siteId || 'Site A'}. Last successful connection: ${new Date(Date.now() - 15 * 60 * 1000).toISOString()}`
+        }, true);
 
         console.log('🚨 CRITICAL ALERT: VPN Tunnel Down');
 
         res.status(201).json({
             success: true,
-            message: 'VPN tunnel down notification created',
+            message: 'VPN tunnel down notification created and email sent',
             data: notification
         });
     } catch (error) {
@@ -182,21 +171,19 @@ exports.simulateCertificateExpiring = async (req, res) => {
     try {
         const { certificateName, daysLeft } = req.body;
 
-        const notification = await Notification.create({
+        const notification = await createNotification(req.user.id, {
             title: 'OpenVPN Certificate Expiring',
             message: `${certificateName || 'OpenVPN'} certificate will expire in ${daysLeft || 7} days`,
             eventType: 'certificate_expiring',
             priority: daysLeft <= 3 ? 'high' : 'medium',
-            eventLog: `Certificate expiration warning. Certificate: ${certificateName}. Expires: ${new Date(Date.now() + (daysLeft || 7) * 24 * 60 * 60 * 1000).toISOString()}`,
-            userId: req.user.id,
-            emailSent: false
-        });
+            eventLog: `Certificate expiration warning. Certificate: ${certificateName}. Expires: ${new Date(Date.now() + (daysLeft || 7) * 24 * 60 * 60 * 1000).toISOString()}`
+        }, true);
 
         console.log('⚠️ REMINDER: Certificate Expiring');
 
         res.status(201).json({
             success: true,
-            message: 'Certificate expiring notification created',
+            message: 'Certificate expiring notification created and email sent',
             data: notification
         });
     } catch (error) {
@@ -213,21 +200,19 @@ exports.simulateFirewallError = async (req, res) => {
     try {
         const { errorMessage } = req.body;
 
-        const notification = await Notification.create({
+        const notification = await createNotification(req.user.id, {
             title: 'Firewall Error',
             message: errorMessage || 'Critical firewall configuration error detected',
             eventType: 'firewall_error',
             priority: 'critical',
-            eventLog: `Firewall error detected at ${new Date().toISOString()}. Error: ${errorMessage}`,
-            userId: req.user.id,
-            emailSent: false
-        });
+            eventLog: `Firewall error detected at ${new Date().toISOString()}. Error: ${errorMessage}`
+        }, true);
 
         console.log('🔥 CRITICAL: Firewall Error');
 
         res.status(201).json({
             success: true,
-            message: 'Firewall error notification created',
+            message: 'Firewall error notification created and email sent',
             data: notification
         });
     } catch (error) {
