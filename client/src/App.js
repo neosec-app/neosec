@@ -454,7 +454,7 @@ if (isShareManagementPage) {
                         />
                         )}
 
-                        {currentView === "groups" && user.accountType === "leader" && <GroupManagement user={user} />}
+                        {currentView === "groups" && user.accountType === "leader" && <GroupManagement user={user} theme={theme} palette={palette} isMobile={isMobile} isTablet={isTablet} />}
                         {currentView === "invitations" && <Invitations />}
                         {currentView === "memberships" && <Memberships />}
 
