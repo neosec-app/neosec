@@ -296,7 +296,6 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                         )}
 
                         <SidebarButton label="Invitations" view="invitations" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
-                        <SidebarButton label="My Memberships" view="memberships" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
                     </nav>
 
                     {user.role === 'admin' && (
