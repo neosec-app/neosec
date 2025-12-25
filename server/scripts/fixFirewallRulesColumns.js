@@ -113,9 +113,115 @@ async function fixFirewallRulesColumns() {
       `);
     }
 
+    // Check and fix protocol column type (should be INTEGER, not ENUM)
+    const protocolColumn = columns.find(col => col.column_name === 'protocol');
+    if (protocolColumn && protocolColumn.data_type === 'USER-DEFINED') {
+      console.log('⚠️  protocol column is ENUM type. Converting to INTEGER...');
+      try {
+        // Check if constraint exists and drop it
+        await sequelize.query(`
+          DO $$ 
+          BEGIN
+            IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'protocol_check') THEN
+              ALTER TABLE firewall_rules DROP CONSTRAINT protocol_check;
+            END IF;
+          END $$;
+        `);
+        
+        // First, add a temporary INTEGER column
+        await sequelize.query(`
+          ALTER TABLE firewall_rules 
+          ADD COLUMN IF NOT EXISTS protocol_new INTEGER;
+        `);
+        
+        // Copy data (convert ENUM values to integers)
+        await sequelize.query(`
+          UPDATE firewall_rules 
+          SET protocol_new = CASE 
+            WHEN protocol::text = 'tcp' OR protocol::text = 'TCP' THEN 0
+            WHEN protocol::text = 'udp' OR protocol::text = 'UDP' THEN 1
+            WHEN protocol::text = 'both' OR protocol::text = 'BOTH' THEN 2
+            ELSE COALESCE(protocol::text::integer, 0)
+          END;
+        `);
+        
+        // Drop old column and rename new one
+        await sequelize.query(`
+          ALTER TABLE firewall_rules 
+          DROP COLUMN protocol,
+          RENAME COLUMN protocol_new TO protocol;
+        `);
+        
+        // Add NOT NULL constraint and check
+        await sequelize.query(`
+          ALTER TABLE firewall_rules 
+          ALTER COLUMN protocol SET NOT NULL,
+          ADD CONSTRAINT protocol_check CHECK (protocol >= 0 AND protocol <= 2);
+        `);
+        
+        console.log('✅ protocol column converted to INTEGER');
+      } catch (convError) {
+        console.error('⚠️  Error converting protocol column:', convError.message);
+        console.error('Conversion error stack:', convError.stack);
+      }
+    }
+    
+    // Check and fix action column type (should be INTEGER, not ENUM)
+    const actionColumn = columns.find(col => col.column_name === 'action');
+    if (actionColumn && actionColumn.data_type === 'USER-DEFINED') {
+      console.log('⚠️  action column is ENUM type. Converting to INTEGER...');
+      try {
+        // Check if constraint exists and drop it
+        await sequelize.query(`
+          DO $$ 
+          BEGIN
+            IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'action_check') THEN
+              ALTER TABLE firewall_rules DROP CONSTRAINT action_check;
+            END IF;
+          END $$;
+        `);
+        
+        // First, add a temporary INTEGER column
+        await sequelize.query(`
+          ALTER TABLE firewall_rules 
+          ADD COLUMN IF NOT EXISTS action_new INTEGER;
+        `);
+        
+        // Copy data (convert ENUM values to integers)
+        await sequelize.query(`
+          UPDATE firewall_rules 
+          SET action_new = CASE 
+            WHEN action::text = 'accept' OR action::text = 'ACCEPT' THEN 0
+            WHEN action::text = 'reject' OR action::text = 'REJECT' THEN 1
+            WHEN action::text = 'drop' OR action::text = 'DROP' THEN 2
+            ELSE COALESCE(action::text::integer, 0)
+          END;
+        `);
+        
+        // Drop old column and rename new one
+        await sequelize.query(`
+          ALTER TABLE firewall_rules 
+          DROP COLUMN action,
+          RENAME COLUMN action_new TO action;
+        `);
+        
+        // Add NOT NULL constraint and check
+        await sequelize.query(`
+          ALTER TABLE firewall_rules 
+          ALTER COLUMN action SET NOT NULL,
+          ADD CONSTRAINT action_check CHECK (action >= 0 AND action <= 2);
+        `);
+        
+        console.log('✅ action column converted to INTEGER');
+      } catch (convError) {
+        console.error('⚠️  Error converting action column:', convError.message);
+        console.error('Conversion error stack:', convError.stack);
+      }
+    }
+
     // Verify final state
     const [finalColumns] = await sequelize.query(`
-      SELECT column_name
+      SELECT column_name, data_type
       FROM information_schema.columns
       WHERE table_name = 'firewall_rules' AND table_schema = 'public';
     `);

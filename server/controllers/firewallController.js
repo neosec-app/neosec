@@ -37,12 +37,26 @@ const getRules = async (req, res) => {
   try {
     const rules = await FirewallRule.findAll({
       where: { userId: req.user.id },
-      order: [['createdAt', 'ASC']]
+      order: [['createdAt', 'ASC']],
+      raw: false // Get model instances to ensure proper field mapping
     });
+
+    // Convert to plain objects with correct field names
+    const rulesData = rules.map(rule => ({
+      id: rule.id,
+      ip_address: rule.ip_address,
+      port_start: rule.port_start,
+      port_end: rule.port_end,
+      protocol: rule.protocol,
+      action: rule.action,
+      userId: rule.userId,
+      createdAt: rule.createdAt,
+      updatedAt: rule.updatedAt
+    }));
 
     res.status(200).json({
       success: true,
-      data: rules
+      data: rulesData
     });
   } catch (error) {
     console.error('Get firewall rules error:', error);
@@ -101,15 +115,38 @@ const createRule = async (req, res) => {
       console.error('Error logging firewall rule creation:', logError);
     }
 
+    // Return consistent format
     res.status(201).json({
       success: true,
-      data: rule
+      data: {
+        id: rule.id,
+        ip_address: rule.ip_address,
+        port_start: rule.port_start,
+        port_end: rule.port_end,
+        protocol: rule.protocol,
+        action: rule.action,
+        userId: rule.userId,
+        createdAt: rule.createdAt,
+        updatedAt: rule.updatedAt
+      }
     });
   } catch (error) {
     console.error('Create firewall rule error:', error);
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Provide more helpful error messages
+    let errorMessage = 'Server error creating firewall rule';
+    if (error.original && error.original.code === '22P02') {
+      errorMessage = 'Invalid protocol or action value. Please ensure protocol and action are integers (0-2).';
+    } else if (error.original && error.original.message) {
+      errorMessage = `Database error: ${error.original.message}`;
+    }
+    
     res.status(500).json({
       success: false,
-      message: 'Server error creating firewall rule'
+      message: errorMessage,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -177,15 +214,38 @@ const updateRule = async (req, res) => {
       console.error('Error logging firewall rule update:', logError);
     }
 
+    // Return consistent format
     res.status(200).json({
       success: true,
-      data: rule
+      data: {
+        id: rule.id,
+        ip_address: rule.ip_address,
+        port_start: rule.port_start,
+        port_end: rule.port_end,
+        protocol: rule.protocol,
+        action: rule.action,
+        userId: rule.userId,
+        createdAt: rule.createdAt,
+        updatedAt: rule.updatedAt
+      }
     });
   } catch (error) {
     console.error('Update firewall rule error:', error);
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Provide more helpful error messages
+    let errorMessage = 'Server error updating firewall rule';
+    if (error.original && error.original.code === '22P02') {
+      errorMessage = 'Invalid protocol or action value. Please ensure protocol and action are integers (0-2).';
+    } else if (error.original && error.original.message) {
+      errorMessage = `Database error: ${error.original.message}`;
+    }
+    
     res.status(500).json({
       success: false,
-      message: 'Server error updating firewall rule'
+      message: errorMessage,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
