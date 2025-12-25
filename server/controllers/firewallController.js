@@ -176,7 +176,7 @@ const createRule = async (req, res) => {
       const protocolColumn = columns.find(col => col.column_name === 'protocol');
       const actionColumn = columns.find(col => col.column_name === 'action');
       
-      // If ENUM type, get the actual ENUM values and convert integer to correct string
+      // If ENUM type, try to get actual values, otherwise use common cases
       if (protocolColumn && protocolColumn.data_type === 'USER-DEFINED') {
         try {
           // Query the actual ENUM values
@@ -203,9 +203,15 @@ const createRule = async (req, res) => {
           console.log(`Converting protocol ${protocol} to ENUM: ${protocolValue}`);
         } catch (enumError) {
           console.error('Error querying protocol ENUM values:', enumError.message);
-          // Fallback to uppercase
-          const protocolMap = { 0: 'TCP', 1: 'UDP', 2: 'BOTH' };
-          protocolValue = protocolMap[protocol] || 'TCP';
+          // Try multiple case variations as fallback
+          const protocolMaps = [
+            { 0: 'TCP', 1: 'UDP', 2: 'BOTH' },
+            { 0: 'tcp', 1: 'udp', 2: 'both' },
+            { 0: 'Tcp', 1: 'Udp', 2: 'Both' }
+          ];
+          // Try uppercase first (most common)
+          protocolValue = protocolMaps[0][protocol] || 'TCP';
+          console.log(`Using fallback protocol value: ${protocolValue}`);
         }
       }
       
@@ -235,9 +241,15 @@ const createRule = async (req, res) => {
           console.log(`Converting action ${action} to ENUM: ${actionValue}`);
         } catch (enumError) {
           console.error('Error querying action ENUM values:', enumError.message);
-          // Fallback to uppercase (most common in PostgreSQL)
-          const actionMap = { 0: 'ACCEPT', 1: 'REJECT', 2: 'DROP' };
-          actionValue = actionMap[action] || 'ACCEPT';
+          // Try multiple case variations as fallback - try uppercase first
+          const actionMaps = [
+            { 0: 'ACCEPT', 1: 'REJECT', 2: 'DROP' },
+            { 0: 'accept', 1: 'reject', 2: 'drop' },
+            { 0: 'Accept', 1: 'Reject', 2: 'Drop' }
+          ];
+          // Try uppercase first (most common in PostgreSQL)
+          actionValue = actionMaps[0][action] || 'ACCEPT';
+          console.log(`Using fallback action value: ${actionValue}`);
         }
       }
     } catch (typeCheckError) {
@@ -246,7 +258,7 @@ const createRule = async (req, res) => {
       console.warn('Type check error stack:', typeCheckError.stack);
     }
 
-    const rule = await FirewallRule.create({
+    console.log('Creating firewall rule with values:', {
       ip_address,
       port_start,
       port_end,
@@ -254,6 +266,53 @@ const createRule = async (req, res) => {
       action: actionValue,
       userId: req.user.id
     });
+
+    let rule;
+    try {
+      rule = await FirewallRule.create({
+        ip_address,
+        port_start,
+        port_end,
+        protocol: protocolValue,
+        action: actionValue,
+        userId: req.user.id
+      });
+    } catch (createError) {
+      console.error('FirewallRule.create error:', createError);
+      console.error('Error details:', createError.message);
+      console.error('Error original:', createError.original);
+      console.error('Error stack:', createError.stack);
+      
+      // If ENUM error, try with different case
+      if (createError.original && createError.original.message && 
+          createError.original.message.includes('invalid input value for enum')) {
+        console.log('ENUM error detected, trying alternative cases...');
+        
+        // Try uppercase if we used lowercase, or vice versa
+        const altProtocol = typeof protocolValue === 'string' && protocolValue === protocolValue.toLowerCase()
+          ? protocolValue.toUpperCase()
+          : protocolValue.toLowerCase();
+        const altAction = typeof actionValue === 'string' && actionValue === actionValue.toLowerCase()
+          ? actionValue.toUpperCase()
+          : actionValue.toLowerCase();
+        
+        try {
+          rule = await FirewallRule.create({
+            ip_address,
+            port_start,
+            port_end,
+            protocol: altProtocol,
+            action: altAction,
+            userId: req.user.id
+          });
+          console.log('Successfully created with alternative case values');
+        } catch (retryError) {
+          throw createError; // Throw original error if retry also fails
+        }
+      } else {
+        throw createError;
+      }
+    }
 
     // Log firewall rule creation
     try {
@@ -308,20 +367,32 @@ const createRule = async (req, res) => {
   } catch (error) {
     console.error('Create firewall rule error:', error);
     console.error('Error details:', error.message);
+    console.error('Error original:', error.original);
     console.error('Error stack:', error.stack);
     
     // Provide more helpful error messages
     let errorMessage = 'Server error creating firewall rule';
     if (error.original && error.original.code === '22P02') {
-      errorMessage = 'Invalid protocol or action value. Please ensure protocol and action are integers (0-2).';
+      errorMessage = 'Invalid protocol or action value. The database ENUM type may not match the expected values.';
     } else if (error.original && error.original.message) {
-      errorMessage = `Database error: ${error.original.message}`;
+      if (error.original.message.includes('enum')) {
+        errorMessage = `Database ENUM error: ${error.original.message}. The conversion script may need to run to convert ENUMs to INTEGERs.`;
+      } else {
+        errorMessage = `Database error: ${error.original.message}`;
+      }
+    } else if (error.message) {
+      errorMessage = error.message;
     }
     
     res.status(500).json({
       success: false,
       message: errorMessage,
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        original: error.original?.message,
+        code: error.original?.code,
+        sql: error.sql
+      } : undefined
     });
   }
 };
