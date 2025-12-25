@@ -38,9 +38,18 @@ const getProfiles = async (req, res) => {
     });
   } catch (error) {
     console.error('Get profiles error:', error);
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Provide more helpful error messages
+    let errorMessage = 'Error fetching profiles';
+    if (error.original && error.original.message) {
+      errorMessage = `Database error: ${error.original.message}`;
+    }
+    
     res.status(500).json({
       success: false,
-      message: 'Error fetching profiles',
+      message: errorMessage,
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

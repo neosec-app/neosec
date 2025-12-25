@@ -42,17 +42,35 @@ const getRules = async (req, res) => {
     });
 
     // Convert to plain objects with correct field names
-    const rulesData = rules.map(rule => ({
-      id: rule.id,
-      ip_address: rule.ip_address,
-      port_start: rule.port_start,
-      port_end: rule.port_end,
-      protocol: rule.protocol,
-      action: rule.action,
-      userId: rule.userId,
-      createdAt: rule.createdAt,
-      updatedAt: rule.updatedAt
-    }));
+    // Also convert ENUM strings to integers if needed
+    const rulesData = rules.map(rule => {
+      let protocol = rule.protocol;
+      let action = rule.action;
+      
+      // Convert protocol ENUM string to integer
+      if (typeof protocol === 'string') {
+        const protocolMap = { 'tcp': 0, 'udp': 1, 'both': 2, 'TCP': 0, 'UDP': 1, 'BOTH': 2 };
+        protocol = protocolMap[protocol] ?? 0;
+      }
+      
+      // Convert action ENUM string to integer
+      if (typeof action === 'string') {
+        const actionMap = { 'accept': 0, 'reject': 1, 'drop': 2, 'ACCEPT': 0, 'REJECT': 1, 'DROP': 2 };
+        action = actionMap[action] ?? 0;
+      }
+      
+      return {
+        id: rule.id,
+        ip_address: rule.ip_address,
+        port_start: rule.port_start,
+        port_end: rule.port_end,
+        protocol,
+        action,
+        userId: rule.userId,
+        createdAt: rule.createdAt,
+        updatedAt: rule.updatedAt
+      };
+    });
 
     res.status(200).json({
       success: true,
@@ -111,12 +129,48 @@ const createRule = async (req, res) => {
       });
     }
 
+    // Check if database has ENUM columns and convert values accordingly
+    // This is a workaround until the conversion script runs
+    let protocolValue = protocol;
+    let actionValue = action;
+    
+    try {
+      // Try to get column type to determine if it's ENUM
+      const { sequelize } = require('../config/db');
+      const [columns] = await sequelize.query(`
+        SELECT column_name, data_type, udt_name
+        FROM information_schema.columns
+        WHERE table_name = 'firewall_rules' 
+        AND column_name IN ('protocol', 'action')
+        AND table_schema = 'public';
+      `);
+      
+      const protocolColumn = columns.find(col => col.column_name === 'protocol');
+      const actionColumn = columns.find(col => col.column_name === 'action');
+      
+      // If ENUM type, convert integer to string
+      if (protocolColumn && protocolColumn.data_type === 'USER-DEFINED') {
+        const enumMap = { 0: 'tcp', 1: 'udp', 2: 'both' };
+        protocolValue = enumMap[protocol] || 'tcp';
+        console.log(`Converting protocol ${protocol} to ENUM: ${protocolValue}`);
+      }
+      
+      if (actionColumn && actionColumn.data_type === 'USER-DEFINED') {
+        const enumMap = { 0: 'accept', 1: 'reject', 2: 'drop' };
+        actionValue = enumMap[action] || 'accept';
+        console.log(`Converting action ${action} to ENUM: ${actionValue}`);
+      }
+    } catch (typeCheckError) {
+      // If we can't check, assume INTEGER and proceed
+      console.warn('Could not check column types, assuming INTEGER:', typeCheckError.message);
+    }
+
     const rule = await FirewallRule.create({
       ip_address,
       port_start,
       port_end,
-      protocol,
-      action,
+      protocol: protocolValue,
+      action: actionValue,
       userId: req.user.id
     });
 
@@ -143,6 +197,18 @@ const createRule = async (req, res) => {
       console.error('Error logging firewall rule creation:', logError);
     }
 
+    // Convert ENUM strings back to integers for response
+    let responseProtocol = rule.protocol;
+    let responseAction = rule.action;
+    if (typeof responseProtocol === 'string') {
+      const protocolMap = { 'tcp': 0, 'udp': 1, 'both': 2, 'TCP': 0, 'UDP': 1, 'BOTH': 2 };
+      responseProtocol = protocolMap[responseProtocol] ?? 0;
+    }
+    if (typeof responseAction === 'string') {
+      const actionMap = { 'accept': 0, 'reject': 1, 'drop': 2, 'ACCEPT': 0, 'REJECT': 1, 'DROP': 2 };
+      responseAction = actionMap[responseAction] ?? 0;
+    }
+    
     // Return consistent format
     res.status(201).json({
       success: true,
@@ -151,8 +217,8 @@ const createRule = async (req, res) => {
         ip_address: rule.ip_address,
         port_start: rule.port_start,
         port_end: rule.port_end,
-        protocol: rule.protocol,
-        action: rule.action,
+        protocol: responseProtocol,
+        action: responseAction,
         userId: rule.userId,
         createdAt: rule.createdAt,
         updatedAt: rule.updatedAt
@@ -225,11 +291,44 @@ const updateRule = async (req, res) => {
       });
     }
 
+    // Check if database has ENUM columns and convert values accordingly
+    let protocolValue = protocol !== undefined ? protocol : rule.protocol;
+    let actionValue = action !== undefined ? action : rule.action;
+    
+    try {
+      const { sequelize } = require('../config/db');
+      const [columns] = await sequelize.query(`
+        SELECT column_name, data_type, udt_name
+        FROM information_schema.columns
+        WHERE table_name = 'firewall_rules' 
+        AND column_name IN ('protocol', 'action')
+        AND table_schema = 'public';
+      `);
+      
+      const protocolColumn = columns.find(col => col.column_name === 'protocol');
+      const actionColumn = columns.find(col => col.column_name === 'action');
+      
+      // If ENUM type, convert integer to string
+      if (protocol !== undefined && protocolColumn && protocolColumn.data_type === 'USER-DEFINED') {
+        const enumMap = { 0: 'tcp', 1: 'udp', 2: 'both' };
+        protocolValue = enumMap[protocol] || 'tcp';
+        console.log(`Converting protocol ${protocol} to ENUM: ${protocolValue}`);
+      }
+      
+      if (action !== undefined && actionColumn && actionColumn.data_type === 'USER-DEFINED') {
+        const enumMap = { 0: 'accept', 1: 'reject', 2: 'drop' };
+        actionValue = enumMap[action] || 'accept';
+        console.log(`Converting action ${action} to ENUM: ${actionValue}`);
+      }
+    } catch (typeCheckError) {
+      console.warn('Could not check column types during update:', typeCheckError.message);
+    }
+
     rule.ip_address = ip_address ?? rule.ip_address;
     rule.port_start = port_start !== undefined ? port_start : rule.port_start;
     rule.port_end = port_end !== undefined ? port_end : rule.port_end;
-    rule.protocol = protocol !== undefined ? protocol : rule.protocol;
-    rule.action = action !== undefined ? action : rule.action;
+    rule.protocol = protocolValue;
+    rule.action = actionValue;
 
     await rule.save();
 
@@ -256,6 +355,18 @@ const updateRule = async (req, res) => {
       console.error('Error logging firewall rule update:', logError);
     }
 
+    // Convert ENUM strings back to integers for response
+    let responseProtocol = rule.protocol;
+    let responseAction = rule.action;
+    if (typeof responseProtocol === 'string') {
+      const protocolMap = { 'tcp': 0, 'udp': 1, 'both': 2, 'TCP': 0, 'UDP': 1, 'BOTH': 2 };
+      responseProtocol = protocolMap[responseProtocol] ?? 0;
+    }
+    if (typeof responseAction === 'string') {
+      const actionMap = { 'accept': 0, 'reject': 1, 'drop': 2, 'ACCEPT': 0, 'REJECT': 1, 'DROP': 2 };
+      responseAction = actionMap[responseAction] ?? 0;
+    }
+    
     // Return consistent format
     res.status(200).json({
       success: true,
@@ -264,8 +375,8 @@ const updateRule = async (req, res) => {
         ip_address: rule.ip_address,
         port_start: rule.port_start,
         port_end: rule.port_end,
-        protocol: rule.protocol,
-        action: rule.action,
+        protocol: responseProtocol,
+        action: responseAction,
         userId: rule.userId,
         createdAt: rule.createdAt,
         updatedAt: rule.updatedAt
