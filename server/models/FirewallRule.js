@@ -11,11 +11,13 @@ const FirewallRule = sequelize.define('FirewallRule', {
   ip_address: {
     type: DataTypes.STRING,
     allowNull: false,
+    field: 'ip_address', // Explicitly map to database column
     comment: 'CIDR Format supported'
   },
   port_start: {
     type: DataTypes.INTEGER,
     allowNull: true,
+    field: 'port_start', // Explicitly map to database column
     validate: {
       min: 0,
       max: 65535
@@ -24,6 +26,7 @@ const FirewallRule = sequelize.define('FirewallRule', {
   port_end: {
     type: DataTypes.INTEGER,
     allowNull: true,
+    field: 'port_end', // Explicitly map to database column
     validate: {
       min: 0,
       max: 65535
@@ -57,7 +60,8 @@ const FirewallRule = sequelize.define('FirewallRule', {
   }
 }, {
   tableName: 'firewall_rules',
-  timestamps: true
+  timestamps: true,
+  underscored: true // Use snake_case for column names
 });
 
 // Associations

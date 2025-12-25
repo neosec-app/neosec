@@ -17,6 +17,10 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
     dialect: 'postgres',
     // from both files: log in dev, disable in prod
     logging: isProd ? false : console.log,
+    // Use snake_case for column names to match database schema
+    define: {
+        underscored: true,
+    },
     dialectOptions: {
         ssl:
             process.env.DATABASE_URL?.includes('render.com') ||
@@ -203,7 +207,16 @@ const connectDB = async () => {
             // Don't fail the entire connection if column check fails
         }
 
-        // 6) Schema sync behavior
+        // 6) Fix firewall_rules table columns if needed
+        try {
+            const { fixFirewallRulesColumns } = require('../scripts/fixFirewallRulesColumns');
+            await fixFirewallRulesColumns();
+        } catch (fixError) {
+            console.error('Error fixing firewall_rules columns:', fixError.message);
+            // Don't fail the entire connection if column fix fails
+        }
+
+        // 7) Schema sync behavior
         if (!isProd) {
             // Development: auto-update schema safely
             console.log('Syncing database schema (alter mode)...');
