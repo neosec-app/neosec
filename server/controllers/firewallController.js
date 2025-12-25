@@ -157,160 +157,72 @@ const createRule = async (req, res) => {
       });
     }
 
-    // Check if database has ENUM columns and convert values accordingly
-    // This is a workaround until the conversion script runs
-    let protocolValue = protocol;
-    let actionValue = action;
-    
-    try {
-      // Try to get column type to determine if it's ENUM
-      const { sequelize } = require('../config/db');
-      const [columns] = await sequelize.query(`
-        SELECT column_name, data_type, udt_name
-        FROM information_schema.columns
-        WHERE table_name = 'firewall_rules' 
-        AND column_name IN ('protocol', 'action')
-        AND table_schema = 'public';
-      `);
-      
-      const protocolColumn = columns.find(col => col.column_name === 'protocol');
-      const actionColumn = columns.find(col => col.column_name === 'action');
-      
-      // If ENUM type, try to get actual values, otherwise use common cases
-      if (protocolColumn && protocolColumn.data_type === 'USER-DEFINED') {
-        try {
-          // Query the actual ENUM values
-          const [enumValues] = await sequelize.query(`
-            SELECT unnest(enum_range(NULL::${protocolColumn.udt_name}))::text AS enum_value;
-          `);
-          const enumVals = enumValues.map(e => e.enum_value);
-          console.log('Protocol ENUM values found:', enumVals);
-          
-          // Map based on actual ENUM values (case-sensitive)
-          const protocolMap = {};
-          if (enumVals.includes('TCP') || enumVals.includes('tcp')) {
-            protocolMap[0] = enumVals.find(v => v.toLowerCase() === 'tcp') || 'tcp';
-            protocolMap[1] = enumVals.find(v => v.toLowerCase() === 'udp') || 'udp';
-            protocolMap[2] = enumVals.find(v => v.toLowerCase() === 'both') || 'both';
-          } else {
-            // Default fallback
-            protocolMap[0] = 'tcp';
-            protocolMap[1] = 'udp';
-            protocolMap[2] = 'both';
-          }
-          
-          protocolValue = protocolMap[protocol] || protocolMap[0];
-          console.log(`Converting protocol ${protocol} to ENUM: ${protocolValue}`);
-        } catch (enumError) {
-          console.error('Error querying protocol ENUM values:', enumError.message);
-          // Try multiple case variations as fallback
-          const protocolMaps = [
-            { 0: 'TCP', 1: 'UDP', 2: 'BOTH' },
-            { 0: 'tcp', 1: 'udp', 2: 'both' },
-            { 0: 'Tcp', 1: 'Udp', 2: 'Both' }
-          ];
-          // Try uppercase first (most common)
-          protocolValue = protocolMaps[0][protocol] || 'TCP';
-          console.log(`Using fallback protocol value: ${protocolValue}`);
-        }
-      }
-      
-      if (actionColumn && actionColumn.data_type === 'USER-DEFINED') {
-        try {
-          // Query the actual ENUM values
-          const [enumValues] = await sequelize.query(`
-            SELECT unnest(enum_range(NULL::${actionColumn.udt_name}))::text AS enum_value;
-          `);
-          const enumVals = enumValues.map(e => e.enum_value);
-          console.log('Action ENUM values found:', enumVals);
-          
-          // Map based on actual ENUM values (case-sensitive)
-          const actionMap = {};
-          if (enumVals.includes('ACCEPT') || enumVals.includes('accept')) {
-            actionMap[0] = enumVals.find(v => v.toLowerCase() === 'accept') || 'accept';
-            actionMap[1] = enumVals.find(v => v.toLowerCase() === 'reject') || 'reject';
-            actionMap[2] = enumVals.find(v => v.toLowerCase() === 'drop') || 'drop';
-          } else {
-            // Default fallback
-            actionMap[0] = 'accept';
-            actionMap[1] = 'reject';
-            actionMap[2] = 'drop';
-          }
-          
-          actionValue = actionMap[action] || actionMap[0];
-          console.log(`Converting action ${action} to ENUM: ${actionValue}`);
-        } catch (enumError) {
-          console.error('Error querying action ENUM values:', enumError.message);
-          // Try multiple case variations as fallback - try uppercase first
-          const actionMaps = [
-            { 0: 'ACCEPT', 1: 'REJECT', 2: 'DROP' },
-            { 0: 'accept', 1: 'reject', 2: 'drop' },
-            { 0: 'Accept', 1: 'Reject', 2: 'Drop' }
-          ];
-          // Try uppercase first (most common in PostgreSQL)
-          actionValue = actionMaps[0][action] || 'ACCEPT';
-          console.log(`Using fallback action value: ${actionValue}`);
-        }
-      }
-    } catch (typeCheckError) {
-      // If we can't check, assume INTEGER and proceed
-      console.warn('Could not check column types, assuming INTEGER:', typeCheckError.message);
-      console.warn('Type check error stack:', typeCheckError.stack);
-    }
-
-    console.log('Creating firewall rule with values:', {
-      ip_address,
-      port_start,
-      port_end,
-      protocol: protocolValue,
-      action: actionValue,
-      userId: req.user.id
-    });
-
+    // Try to create with integers first (most common case)
+    // If that fails with ENUM error, retry with ENUM strings
     let rule;
-    try {
-      rule = await FirewallRule.create({
-        ip_address,
-        port_start,
-        port_end,
-        protocol: protocolValue,
-        action: actionValue,
-        userId: req.user.id
-      });
-    } catch (createError) {
-      console.error('FirewallRule.create error:', createError);
-      console.error('Error details:', createError.message);
-      console.error('Error original:', createError.original);
-      console.error('Error stack:', createError.stack);
-      
-      // If ENUM error, try with different case
-      if (createError.original && createError.original.message && 
-          createError.original.message.includes('invalid input value for enum')) {
-        console.log('ENUM error detected, trying alternative cases...');
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+      try {
+        let protocolValue = protocol;
+        let actionValue = action;
         
-        // Try uppercase if we used lowercase, or vice versa
-        const altProtocol = typeof protocolValue === 'string' && protocolValue === protocolValue.toLowerCase()
-          ? protocolValue.toUpperCase()
-          : protocolValue.toLowerCase();
-        const altAction = typeof actionValue === 'string' && actionValue === actionValue.toLowerCase()
-          ? actionValue.toUpperCase()
-          : actionValue.toLowerCase();
-        
-        try {
-          rule = await FirewallRule.create({
-            ip_address,
-            port_start,
-            port_end,
-            protocol: altProtocol,
-            action: altAction,
-            userId: req.user.id
-          });
-          console.log('Successfully created with alternative case values');
-        } catch (retryError) {
-          throw createError; // Throw original error if retry also fails
+        // On first attempt, use integers
+        // On subsequent attempts, try different ENUM string cases
+        if (attempts === 1) {
+          // Try uppercase ENUM strings
+          const protocolMap = { 0: 'TCP', 1: 'UDP', 2: 'BOTH' };
+          const actionMap = { 0: 'ACCEPT', 1: 'REJECT', 2: 'DROP' };
+          protocolValue = protocolMap[protocol] || 'TCP';
+          actionValue = actionMap[action] || 'ACCEPT';
+          console.log(`Attempt ${attempts + 1}: Trying uppercase ENUM values - protocol: ${protocolValue}, action: ${actionValue}`);
+        } else if (attempts === 2) {
+          // Try lowercase ENUM strings
+          const protocolMap = { 0: 'tcp', 1: 'udp', 2: 'both' };
+          const actionMap = { 0: 'accept', 1: 'reject', 2: 'drop' };
+          protocolValue = protocolMap[protocol] || 'tcp';
+          actionValue = actionMap[action] || 'accept';
+          console.log(`Attempt ${attempts + 1}: Trying lowercase ENUM values - protocol: ${protocolValue}, action: ${actionValue}`);
+        } else {
+          console.log(`Attempt ${attempts + 1}: Trying integer values - protocol: ${protocolValue}, action: ${actionValue}`);
         }
-      } else {
-        throw createError;
+        
+        rule = await FirewallRule.create({
+          ip_address,
+          port_start,
+          port_end,
+          protocol: protocolValue,
+          action: actionValue,
+          userId: req.user.id
+        });
+        
+        console.log('Successfully created firewall rule on attempt', attempts + 1);
+        break; // Success, exit loop
+        
+      } catch (createError) {
+        attempts++;
+        console.error(`FirewallRule.create attempt ${attempts} failed:`, createError.message);
+        
+        // Check if it's an ENUM error
+        const isEnumError = createError.original && createError.original.message && 
+          (createError.original.message.includes('invalid input value for enum') ||
+           createError.original.message.includes('enum'));
+        
+        if (isEnumError && attempts < maxAttempts) {
+          console.log(`ENUM error detected on attempt ${attempts}, will retry with different case...`);
+          continue; // Try next attempt
+        } else if (attempts >= maxAttempts) {
+          // All attempts failed
+          console.error('All attempts to create firewall rule failed');
+          console.error('Final error:', createError);
+          console.error('Error original:', createError.original);
+          console.error('Error stack:', createError.stack);
+          throw createError;
+        } else {
+          // Not an ENUM error, throw immediately
+          throw createError;
+        }
       }
     }
 
