@@ -3,6 +3,7 @@ const { sequelize } = require('../config/db');
 const User = require('./User');
 const Device = require('./Device');
 
+
 const ActivityLog = sequelize.define('ActivityLog', {
   id: {
     type: DataTypes.UUID,
