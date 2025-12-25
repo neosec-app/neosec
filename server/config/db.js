@@ -141,10 +141,16 @@ const connectDB = async () => {
             const columnNames = columns.map(col => col.column_name);
             
             // Check for missing columns and add them
+            // Note: With underscored: true, Sequelize converts camelCase to snake_case
+            // So we check for both camelCase (quoted) and snake_case versions
             const missingColumns = [];
-            if (!columnNames.includes('accountType')) missingColumns.push('accountType');
-            if (!columnNames.includes('subscriptionTier')) missingColumns.push('subscriptionTier');
-            if (!columnNames.includes('isPaid')) missingColumns.push('isPaid');
+            const hasAccountType = columnNames.includes('accountType') || columnNames.includes('account_type');
+            const hasSubscriptionTier = columnNames.includes('subscriptionTier') || columnNames.includes('subscription_tier');
+            const hasIsPaid = columnNames.includes('isPaid') || columnNames.includes('is_paid');
+            
+            if (!hasAccountType) missingColumns.push('accountType');
+            if (!hasSubscriptionTier) missingColumns.push('subscriptionTier');
+            if (!hasIsPaid) missingColumns.push('isPaid');
             
             if (missingColumns.length > 0) {
                 console.log(`Missing columns detected: ${missingColumns.join(', ')}. Adding them...`);
@@ -167,35 +173,71 @@ const connectDB = async () => {
                 `);
                 
                 // Add missing columns
+                // Use snake_case to match Sequelize's underscored: true setting
                 if (missingColumns.includes('accountType')) {
                     await sequelize.query(`
                         ALTER TABLE users 
-                        ADD COLUMN IF NOT EXISTS "accountType" account_type_enum DEFAULT 'user' NOT NULL;
+                        ADD COLUMN IF NOT EXISTS account_type account_type_enum DEFAULT 'user' NOT NULL;
                     `);
                 }
                 
                 if (missingColumns.includes('subscriptionTier')) {
                     await sequelize.query(`
                         ALTER TABLE users 
-                        ADD COLUMN IF NOT EXISTS "subscriptionTier" subscription_tier_enum DEFAULT 'free' NOT NULL;
+                        ADD COLUMN IF NOT EXISTS subscription_tier subscription_tier_enum DEFAULT 'free' NOT NULL;
                     `);
                 }
                 
                 if (missingColumns.includes('isPaid')) {
                     await sequelize.query(`
                         ALTER TABLE users 
-                        ADD COLUMN IF NOT EXISTS "isPaid" BOOLEAN DEFAULT false;
+                        ADD COLUMN IF NOT EXISTS is_paid BOOLEAN DEFAULT false;
                     `);
                 }
                 
-                // Update existing users with default values
+                // Migrate data from camelCase to snake_case if camelCase columns exist
+                const hasCamelCase = columnNames.includes('accountType') || columnNames.includes('subscriptionTier') || columnNames.includes('isPaid');
+                if (hasCamelCase) {
+                    console.log('⚠️  Migrating camelCase columns to snake_case...');
+                    try {
+                        // Migrate accountType
+                        if (columnNames.includes('accountType') && columnNames.includes('account_type')) {
+                            await sequelize.query(`
+                                UPDATE users 
+                                SET account_type = "accountType"
+                                WHERE account_type IS NULL AND "accountType" IS NOT NULL;
+                            `);
+                        }
+                        // Migrate subscriptionTier
+                        if (columnNames.includes('subscriptionTier') && columnNames.includes('subscription_tier')) {
+                            await sequelize.query(`
+                                UPDATE users 
+                                SET subscription_tier = "subscriptionTier"
+                                WHERE subscription_tier IS NULL AND "subscriptionTier" IS NOT NULL;
+                            `);
+                        }
+                        // Migrate isPaid
+                        if (columnNames.includes('isPaid') && columnNames.includes('is_paid')) {
+                            await sequelize.query(`
+                                UPDATE users 
+                                SET is_paid = "isPaid"
+                                WHERE is_paid IS NULL AND "isPaid" IS NOT NULL;
+                            `);
+                        }
+                        console.log('✅ Migration completed');
+                    } catch (migError) {
+                        console.warn('⚠️  Migration warning (non-critical):', migError.message);
+                    }
+                }
+                
+                // Update existing users with default values for snake_case columns
                 await sequelize.query(`
                     UPDATE users 
                     SET 
-                        "accountType" = COALESCE("accountType", 'user'),
-                        "subscriptionTier" = COALESCE("subscriptionTier", 'free'),
-                        "isPaid" = COALESCE("isPaid", false)
-                    WHERE "accountType" IS NULL OR "subscriptionTier" IS NULL OR "isPaid" IS NULL;
+                        account_type = COALESCE(account_type, 'user'),
+                        subscription_tier = COALESCE(subscription_tier, 'free'),
+                        is_paid = COALESCE(is_paid, false)
+                    WHERE account_type IS NULL OR subscription_tier IS NULL OR is_paid IS NULL;
                 `);
                 
                 console.log('✅ Missing columns added successfully.');

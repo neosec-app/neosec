@@ -145,27 +145,68 @@ const login = async (req, res) => {
     // Test database connection first
     const { sequelize } = require('../config/db');
     try {
+      // Test connection with a simple query
       await sequelize.authenticate();
+      
+      // Verify the users table exists and is accessible
+      const [results] = await sequelize.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'users'
+        );
+      `);
+      
+      if (!results || !results[0] || !results[0].exists) {
+        throw new Error('Users table does not exist in database');
+      }
     } catch (connError) {
       console.error('Database connection error in login:', connError.message);
+      console.error('Connection error stack:', connError.stack);
       return res.status(503).json({
         success: false,
-        message: 'Database connection unavailable. Please try again later.'
+        message: 'Database connection unavailable. Please try again later.',
+        error: process.env.NODE_ENV === 'development' ? connError.message : undefined
       });
     }
 
     // Find user by email
     let user;
     try {
-      user = await User.findOne({ where: { email } });
+      // Ensure database connection is ready
+      const { sequelize } = require('../config/db');
+      if (!sequelize) {
+        throw new Error('Database connection not available');
+      }
+      
+      // Test connection before query
+      await sequelize.authenticate();
+      
+      // Query user by email (Sequelize handles column name conversion automatically)
+      user = await User.findOne({ 
+        where: { email: email.toLowerCase().trim() },
+        raw: false // Ensure we get a model instance, not plain object
+      });
     } catch (dbError) {
       console.error('Database error finding user:', dbError);
       console.error('Database error details:', dbError.message);
       console.error('Database error stack:', dbError.stack);
+      console.error('Database error name:', dbError.name);
+      
+      // Provide more helpful error messages
+      let errorMessage = 'Database error. Please try again later.';
+      if (process.env.NODE_ENV === 'development') {
+        errorMessage = `Database error: ${dbError.message}`;
+      }
+      
       return res.status(500).json({
         success: false,
-        message: 'Database error. Please try again later.',
-        error: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+        message: errorMessage,
+        error: process.env.NODE_ENV === 'development' ? {
+          message: dbError.message,
+          name: dbError.name,
+          stack: dbError.stack
+        } : undefined
       });
     }
 
