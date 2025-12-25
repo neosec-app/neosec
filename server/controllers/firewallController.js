@@ -8,26 +8,34 @@ const validateRulePayload = (payload) => {
   if (payload.ip_address === undefined || payload.ip_address === null || payload.ip_address === '') {
     errors.push('ip_address is required');
   }
-  if (payload.protocol === undefined || payload.protocol === null || ![0, 1, 2].includes(payload.protocol)) {
+  // Protocol and action should already be converted to integers by this point
+  const protocolNum = Number(payload.protocol);
+  const actionNum = Number(payload.action);
+  if (isNaN(protocolNum) || ![0, 1, 2].includes(protocolNum)) {
     errors.push('protocol must be 0 (TCP), 1 (UDP), or 2 (BOTH)');
   }
-  if (payload.action === undefined || payload.action === null || ![0, 1, 2].includes(payload.action)) {
+  if (isNaN(actionNum) || ![0, 1, 2].includes(actionNum)) {
     errors.push('action must be 0 (ACCEPT), 1 (REJECT), or 2 (DROP)');
   }
   if (payload.port_start !== undefined && payload.port_start !== null) {
-    if (!Number.isInteger(payload.port_start) || payload.port_start < 0 || payload.port_start > 65535) {
+    const portStartNum = Number(payload.port_start);
+    if (isNaN(portStartNum) || !Number.isInteger(portStartNum) || portStartNum < 0 || portStartNum > 65535) {
       errors.push('port_start must be an integer between 0 and 65535');
     }
   }
   if (payload.port_end !== undefined && payload.port_end !== null) {
-    if (!Number.isInteger(payload.port_end) || payload.port_end < 0 || payload.port_end > 65535) {
+    const portEndNum = Number(payload.port_end);
+    if (isNaN(portEndNum) || !Number.isInteger(portEndNum) || portEndNum < 0 || portEndNum > 65535) {
       errors.push('port_end must be an integer between 0 and 65535');
     }
   }
   if (payload.port_start !== undefined && payload.port_end !== undefined &&
-      payload.port_start !== null && payload.port_end !== null &&
-      payload.port_start > payload.port_end) {
-    errors.push('port_start cannot be greater than port_end');
+      payload.port_start !== null && payload.port_end !== null) {
+    const portStartNum = Number(payload.port_start);
+    const portEndNum = Number(payload.port_end);
+    if (!isNaN(portStartNum) && !isNaN(portEndNum) && portStartNum > portEndNum) {
+      errors.push('port_start cannot be greater than port_end');
+    }
   }
   return errors;
 };
@@ -94,29 +102,49 @@ const createRule = async (req, res) => {
     let { ip_address, port_start, port_end, protocol, action } = req.body;
     
     // Log received values for debugging
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Received firewall rule data:', { ip_address, port_start, port_end, protocol, action, protocolType: typeof protocol, actionType: typeof action });
-    }
+    console.log('Received firewall rule data:', { 
+      ip_address, 
+      port_start, 
+      port_end, 
+      protocol, 
+      action, 
+      protocolType: typeof protocol, 
+      actionType: typeof action,
+      rawBody: req.body
+    });
     
-    // Ensure protocol and action are integers (convert from string if needed)
-    protocol = typeof protocol === 'string' ? parseInt(protocol, 10) : protocol;
-    action = typeof action === 'string' ? parseInt(action, 10) : action;
-    port_start = port_start !== undefined && port_start !== null ? (typeof port_start === 'string' ? parseInt(port_start, 10) : port_start) : null;
-    port_end = port_end !== undefined && port_end !== null ? (typeof port_end === 'string' ? parseInt(port_end, 10) : port_end) : null;
+    // Convert values to proper types BEFORE validation
+    // Handle string numbers, actual numbers, and null/undefined
+    protocol = protocol !== undefined && protocol !== null 
+      ? (typeof protocol === 'string' ? parseInt(protocol, 10) : Number(protocol))
+      : undefined;
+    action = action !== undefined && action !== null 
+      ? (typeof action === 'string' ? parseInt(action, 10) : Number(action))
+      : undefined;
+    port_start = port_start !== undefined && port_start !== null && port_start !== '' 
+      ? (typeof port_start === 'string' ? parseInt(port_start, 10) : Number(port_start))
+      : null;
+    port_end = port_end !== undefined && port_end !== null && port_end !== '' 
+      ? (typeof port_end === 'string' ? parseInt(port_end, 10) : Number(port_end))
+      : null;
+    
+    console.log('After conversion:', { protocol, action, port_start, port_end });
     
     // Validate after conversion
-    if (isNaN(protocol) || protocol < 0 || protocol > 2) {
+    if (protocol === undefined || protocol === null || isNaN(protocol) || protocol < 0 || protocol > 2) {
       return res.status(400).json({
         success: false,
         message: 'Invalid protocol value. Must be 0 (TCP), 1 (UDP), or 2 (BOTH)',
-        received: req.body.protocol
+        received: req.body.protocol,
+        converted: protocol
       });
     }
-    if (isNaN(action) || action < 0 || action > 2) {
+    if (action === undefined || action === null || isNaN(action) || action < 0 || action > 2) {
       return res.status(400).json({
         success: false,
         message: 'Invalid action value. Must be 0 (ACCEPT), 1 (REJECT), or 2 (DROP)',
-        received: req.body.action
+        received: req.body.action,
+        converted: action
       });
     }
     
