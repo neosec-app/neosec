@@ -73,7 +73,35 @@ const getRules = async (req, res) => {
 // Create a new firewall rule
 const createRule = async (req, res) => {
   try {
-    const { ip_address, port_start, port_end, protocol, action } = req.body;
+    let { ip_address, port_start, port_end, protocol, action } = req.body;
+    
+    // Log received values for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Received firewall rule data:', { ip_address, port_start, port_end, protocol, action, protocolType: typeof protocol, actionType: typeof action });
+    }
+    
+    // Ensure protocol and action are integers (convert from string if needed)
+    protocol = typeof protocol === 'string' ? parseInt(protocol, 10) : protocol;
+    action = typeof action === 'string' ? parseInt(action, 10) : action;
+    port_start = port_start !== undefined && port_start !== null ? (typeof port_start === 'string' ? parseInt(port_start, 10) : port_start) : null;
+    port_end = port_end !== undefined && port_end !== null ? (typeof port_end === 'string' ? parseInt(port_end, 10) : port_end) : null;
+    
+    // Validate after conversion
+    if (isNaN(protocol) || protocol < 0 || protocol > 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid protocol value. Must be 0 (TCP), 1 (UDP), or 2 (BOTH)',
+        received: req.body.protocol
+      });
+    }
+    if (isNaN(action) || action < 0 || action > 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid action value. Must be 0 (ACCEPT), 1 (REJECT), or 2 (DROP)',
+        received: req.body.action
+      });
+    }
+    
     const errors = validateRulePayload({ ip_address, port_start, port_end, protocol, action });
     if (errors.length) {
       return res.status(400).json({
@@ -85,8 +113,8 @@ const createRule = async (req, res) => {
 
     const rule = await FirewallRule.create({
       ip_address,
-      port_start: port_start !== undefined ? port_start : null,
-      port_end: port_end !== undefined ? port_end : null,
+      port_start,
+      port_end,
       protocol,
       action,
       userId: req.user.id
@@ -155,7 +183,7 @@ const createRule = async (req, res) => {
 const updateRule = async (req, res) => {
   try {
     const { id } = req.params;
-    const { ip_address, port_start, port_end, protocol, action } = req.body;
+    let { ip_address, port_start, port_end, protocol, action } = req.body;
 
     const rule = await FirewallRule.findOne({
       where: { id, userId: req.user.id }
@@ -166,6 +194,20 @@ const updateRule = async (req, res) => {
         success: false,
         message: 'Firewall rule not found'
       });
+    }
+
+    // Ensure protocol and action are integers (convert from string if needed)
+    if (protocol !== undefined && protocol !== null) {
+      protocol = typeof protocol === 'string' ? parseInt(protocol, 10) : protocol;
+    }
+    if (action !== undefined && action !== null) {
+      action = typeof action === 'string' ? parseInt(action, 10) : action;
+    }
+    if (port_start !== undefined && port_start !== null) {
+      port_start = typeof port_start === 'string' ? parseInt(port_start, 10) : port_start;
+    }
+    if (port_end !== undefined && port_end !== null) {
+      port_end = typeof port_end === 'string' ? parseInt(port_end, 10) : port_end;
     }
 
     const errors = validateRulePayload({
@@ -186,8 +228,8 @@ const updateRule = async (req, res) => {
     rule.ip_address = ip_address ?? rule.ip_address;
     rule.port_start = port_start !== undefined ? port_start : rule.port_start;
     rule.port_end = port_end !== undefined ? port_end : rule.port_end;
-    rule.protocol = protocol ?? rule.protocol;
-    rule.action = action ?? rule.action;
+    rule.protocol = protocol !== undefined ? protocol : rule.protocol;
+    rule.action = action !== undefined ? action : rule.action;
 
     await rule.save();
 
