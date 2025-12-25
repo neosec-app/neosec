@@ -176,21 +176,74 @@ const createRule = async (req, res) => {
       const protocolColumn = columns.find(col => col.column_name === 'protocol');
       const actionColumn = columns.find(col => col.column_name === 'action');
       
-      // If ENUM type, convert integer to string
+      // If ENUM type, get the actual ENUM values and convert integer to correct string
       if (protocolColumn && protocolColumn.data_type === 'USER-DEFINED') {
-        const enumMap = { 0: 'tcp', 1: 'udp', 2: 'both' };
-        protocolValue = enumMap[protocol] || 'tcp';
-        console.log(`Converting protocol ${protocol} to ENUM: ${protocolValue}`);
+        try {
+          // Query the actual ENUM values
+          const [enumValues] = await sequelize.query(`
+            SELECT unnest(enum_range(NULL::${protocolColumn.udt_name}))::text AS enum_value;
+          `);
+          const enumVals = enumValues.map(e => e.enum_value);
+          console.log('Protocol ENUM values found:', enumVals);
+          
+          // Map based on actual ENUM values (case-sensitive)
+          const protocolMap = {};
+          if (enumVals.includes('TCP') || enumVals.includes('tcp')) {
+            protocolMap[0] = enumVals.find(v => v.toLowerCase() === 'tcp') || 'tcp';
+            protocolMap[1] = enumVals.find(v => v.toLowerCase() === 'udp') || 'udp';
+            protocolMap[2] = enumVals.find(v => v.toLowerCase() === 'both') || 'both';
+          } else {
+            // Default fallback
+            protocolMap[0] = 'tcp';
+            protocolMap[1] = 'udp';
+            protocolMap[2] = 'both';
+          }
+          
+          protocolValue = protocolMap[protocol] || protocolMap[0];
+          console.log(`Converting protocol ${protocol} to ENUM: ${protocolValue}`);
+        } catch (enumError) {
+          console.error('Error querying protocol ENUM values:', enumError.message);
+          // Fallback to uppercase
+          const protocolMap = { 0: 'TCP', 1: 'UDP', 2: 'BOTH' };
+          protocolValue = protocolMap[protocol] || 'TCP';
+        }
       }
       
       if (actionColumn && actionColumn.data_type === 'USER-DEFINED') {
-        const enumMap = { 0: 'accept', 1: 'reject', 2: 'drop' };
-        actionValue = enumMap[action] || 'accept';
-        console.log(`Converting action ${action} to ENUM: ${actionValue}`);
+        try {
+          // Query the actual ENUM values
+          const [enumValues] = await sequelize.query(`
+            SELECT unnest(enum_range(NULL::${actionColumn.udt_name}))::text AS enum_value;
+          `);
+          const enumVals = enumValues.map(e => e.enum_value);
+          console.log('Action ENUM values found:', enumVals);
+          
+          // Map based on actual ENUM values (case-sensitive)
+          const actionMap = {};
+          if (enumVals.includes('ACCEPT') || enumVals.includes('accept')) {
+            actionMap[0] = enumVals.find(v => v.toLowerCase() === 'accept') || 'accept';
+            actionMap[1] = enumVals.find(v => v.toLowerCase() === 'reject') || 'reject';
+            actionMap[2] = enumVals.find(v => v.toLowerCase() === 'drop') || 'drop';
+          } else {
+            // Default fallback
+            actionMap[0] = 'accept';
+            actionMap[1] = 'reject';
+            actionMap[2] = 'drop';
+          }
+          
+          actionValue = actionMap[action] || actionMap[0];
+          console.log(`Converting action ${action} to ENUM: ${actionValue}`);
+        } catch (enumError) {
+          console.error('Error querying action ENUM values:', enumError.message);
+          // Fallback to uppercase (most common in PostgreSQL)
+          const actionMap = { 0: 'ACCEPT', 1: 'REJECT', 2: 'DROP' };
+          actionValue = actionMap[action] || 'ACCEPT';
+        }
       }
     } catch (typeCheckError) {
       // If we can't check, assume INTEGER and proceed
       console.warn('Could not check column types, assuming INTEGER:', typeCheckError.message);
+      console.warn('Type check error stack:', typeCheckError.stack);
     }
 
     const rule = await FirewallRule.create({
@@ -336,17 +389,53 @@ const updateRule = async (req, res) => {
       const protocolColumn = columns.find(col => col.column_name === 'protocol');
       const actionColumn = columns.find(col => col.column_name === 'action');
       
-      // If ENUM type, convert integer to string
+      // If ENUM type, get the actual ENUM values and convert integer to correct string
       if (protocol !== undefined && protocolColumn && protocolColumn.data_type === 'USER-DEFINED') {
-        const enumMap = { 0: 'tcp', 1: 'udp', 2: 'both' };
-        protocolValue = enumMap[protocol] || 'tcp';
-        console.log(`Converting protocol ${protocol} to ENUM: ${protocolValue}`);
+        try {
+          const [enumValues] = await sequelize.query(`
+            SELECT unnest(enum_range(NULL::${protocolColumn.udt_name}))::text AS enum_value;
+          `);
+          const enumVals = enumValues.map(e => e.enum_value);
+          const protocolMap = {};
+          if (enumVals.includes('TCP') || enumVals.includes('tcp')) {
+            protocolMap[0] = enumVals.find(v => v.toLowerCase() === 'tcp') || 'tcp';
+            protocolMap[1] = enumVals.find(v => v.toLowerCase() === 'udp') || 'udp';
+            protocolMap[2] = enumVals.find(v => v.toLowerCase() === 'both') || 'both';
+          } else {
+            protocolMap[0] = 'tcp';
+            protocolMap[1] = 'udp';
+            protocolMap[2] = 'both';
+          }
+          protocolValue = protocolMap[protocol] || protocolMap[0];
+          console.log(`Converting protocol ${protocol} to ENUM: ${protocolValue}`);
+        } catch (enumError) {
+          const protocolMap = { 0: 'TCP', 1: 'UDP', 2: 'BOTH' };
+          protocolValue = protocolMap[protocol] || 'TCP';
+        }
       }
       
       if (action !== undefined && actionColumn && actionColumn.data_type === 'USER-DEFINED') {
-        const enumMap = { 0: 'accept', 1: 'reject', 2: 'drop' };
-        actionValue = enumMap[action] || 'accept';
-        console.log(`Converting action ${action} to ENUM: ${actionValue}`);
+        try {
+          const [enumValues] = await sequelize.query(`
+            SELECT unnest(enum_range(NULL::${actionColumn.udt_name}))::text AS enum_value;
+          `);
+          const enumVals = enumValues.map(e => e.enum_value);
+          const actionMap = {};
+          if (enumVals.includes('ACCEPT') || enumVals.includes('accept')) {
+            actionMap[0] = enumVals.find(v => v.toLowerCase() === 'accept') || 'accept';
+            actionMap[1] = enumVals.find(v => v.toLowerCase() === 'reject') || 'reject';
+            actionMap[2] = enumVals.find(v => v.toLowerCase() === 'drop') || 'drop';
+          } else {
+            actionMap[0] = 'accept';
+            actionMap[1] = 'reject';
+            actionMap[2] = 'drop';
+          }
+          actionValue = actionMap[action] || actionMap[0];
+          console.log(`Converting action ${action} to ENUM: ${actionValue}`);
+        } catch (enumError) {
+          const actionMap = { 0: 'ACCEPT', 1: 'REJECT', 2: 'DROP' };
+          actionValue = actionMap[action] || 'ACCEPT';
+        }
       }
     } catch (typeCheckError) {
       console.warn('Could not check column types during update:', typeCheckError.message);
