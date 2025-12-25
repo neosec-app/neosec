@@ -53,6 +53,7 @@ const FirewallRule = sequelize.define('FirewallRule', {
   userId: {
     type: DataTypes.UUID,
     allowNull: false,
+    field: 'userId', // Explicitly map to camelCase column (database has userId, not user_id)
     references: {
       model: 'users',
       key: 'id'
@@ -61,7 +62,8 @@ const FirewallRule = sequelize.define('FirewallRule', {
 }, {
   tableName: 'firewall_rules',
   timestamps: true,
-  underscored: true // Use snake_case for column names
+  underscored: false // Disable underscored since database uses camelCase for userId
+  // Note: ip_address, port_start, port_end are explicitly mapped above with field option
 });
 
 // Associations

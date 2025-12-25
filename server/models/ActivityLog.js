@@ -68,6 +68,7 @@ const ActivityLog = sequelize.define('ActivityLog', {
   timestamps: true,
   updatedAt: false, // Only track createdAt
   tableName: 'activity_logs',
+  underscored: false, // Disable underscored since database uses camelCase columns
   indexes: [
     { fields: ['eventType'] },
     { fields: ['severity'] },
