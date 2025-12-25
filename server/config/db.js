@@ -141,12 +141,22 @@ const connectDB = async () => {
             const columnNames = columns.map(col => col.column_name);
             
             // Check for missing columns and add them
-            // Note: With underscored: true, Sequelize converts camelCase to snake_case
-            // So we check for both camelCase (quoted) and snake_case versions
+            // Note: Database may have camelCase columns (isApproved, accountType, etc.)
+            // We check for both camelCase and snake_case versions
             const missingColumns = [];
+            const hasIsApproved = columnNames.includes('isApproved') || columnNames.includes('is_approved');
             const hasAccountType = columnNames.includes('accountType') || columnNames.includes('account_type');
             const hasSubscriptionTier = columnNames.includes('subscriptionTier') || columnNames.includes('subscription_tier');
             const hasIsPaid = columnNames.includes('isPaid') || columnNames.includes('is_paid');
+            
+            // isApproved should already exist, but check anyway
+            if (!hasIsApproved) {
+                console.log('⚠️  isApproved column missing. Adding it...');
+                await sequelize.query(`
+                    ALTER TABLE users 
+                    ADD COLUMN IF NOT EXISTS "isApproved" BOOLEAN DEFAULT false NOT NULL;
+                `);
+            }
             
             if (!hasAccountType) missingColumns.push('accountType');
             if (!hasSubscriptionTier) missingColumns.push('subscriptionTier');

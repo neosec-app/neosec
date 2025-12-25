@@ -27,6 +27,7 @@ const User = sequelize.define('User', {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
         allowNull: false
+        // With underscored: false, Sequelize will use 'isApproved' directly
     },
     role: {
         type: DataTypes.ENUM('user', 'admin'),
@@ -37,19 +38,26 @@ const User = sequelize.define('User', {
         type: DataTypes.ENUM('user', 'leader', 'admin'),
         defaultValue: 'user',
         allowNull: false
+        // With underscored: false, Sequelize will use 'accountType' directly
     },
     subscriptionTier: {
         type: DataTypes.ENUM('free', 'basic', 'pro', 'enterprise'),
         defaultValue: 'free',
         allowNull: false
+        // With underscored: false, Sequelize will use 'subscriptionTier' directly
     },
     isPaid: {
         type: DataTypes.BOOLEAN,
         defaultValue: false
+        // With underscored: false, Sequelize will use 'isPaid' directly
     }
 }, {
     tableName: 'users',
     timestamps: true,
+    // Note: Database has camelCase columns (isApproved, accountType, etc.)
+    // but timestamps might be snake_case (created_at, updated_at)
+    // We'll handle this with explicit field mappings where needed
+    underscored: false, // Disable underscored for User model to match existing camelCase columns
     hooks: {
         // Hash password before creating user
         beforeCreate: async (user) => {
