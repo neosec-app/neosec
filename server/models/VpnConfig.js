@@ -49,7 +49,8 @@ const VpnConfig = sequelize.define('VpnConfig', {
     }
 }, {
     timestamps: true,
-    tableName: 'vpn_configs'
+    tableName: 'vpn_configs',
+    underscored: false // Disable underscored since database uses camelCase columns
 });
 
 // Define association
