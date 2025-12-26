@@ -93,6 +93,7 @@ const BlocklistIP = sequelize.define('BlocklistIP', {
 }, {
   timestamps: true,
   tableName: 'blocklist_ips',
+  underscored: false, // Override global setting - use camelCase for timestamps
   indexes: [
     { fields: ['ipAddress'], unique: true },
     { fields: ['threatType'] },

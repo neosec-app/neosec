@@ -38,7 +38,7 @@ async function fixFirewallRulesColumns() {
 
     // Get current columns
     const [columns] = await sequelize.query(`
-      SELECT column_name, data_type
+      SELECT column_name, data_type, udt_name
       FROM information_schema.columns
       WHERE table_name = 'firewall_rules' AND table_schema = 'public'
       ORDER BY ordinal_position;
@@ -46,6 +46,62 @@ async function fixFirewallRulesColumns() {
 
     const columnNames = columns.map(col => col.column_name);
     console.log('Current columns:', columnNames);
+    
+    // Clean up any leftover temporary columns from previous failed migrations
+    if (columnNames.includes('protocol_new')) {
+      console.log('⚠️  Found leftover protocol_new column. Cleaning up...');
+      try {
+        // If protocol column exists and is INTEGER, drop protocol_new
+        const protocolCol = columns.find(col => col.column_name === 'protocol');
+        if (protocolCol && protocolCol.data_type === 'integer') {
+          await sequelize.query(`ALTER TABLE firewall_rules DROP COLUMN IF EXISTS protocol_new;`);
+          console.log('✅ Cleaned up protocol_new column');
+        } else {
+          // If protocol is still ENUM, rename protocol_new to protocol
+          await sequelize.query(`ALTER TABLE firewall_rules DROP COLUMN IF EXISTS protocol;`);
+          await sequelize.query(`ALTER TABLE firewall_rules RENAME COLUMN protocol_new TO protocol;`);
+          await sequelize.query(`ALTER TABLE firewall_rules ALTER COLUMN protocol SET NOT NULL;`);
+          await sequelize.query(`ALTER TABLE firewall_rules ADD CONSTRAINT protocol_check CHECK (protocol >= 0 AND protocol <= 2);`);
+          console.log('✅ Migrated protocol_new to protocol');
+        }
+      } catch (cleanupError) {
+        console.warn('⚠️  Could not clean up protocol_new:', cleanupError.message);
+      }
+    }
+    
+    if (columnNames.includes('action_new')) {
+      console.log('⚠️  Found leftover action_new column. Cleaning up...');
+      try {
+        // If action column exists and is INTEGER, drop action_new
+        const actionCol = columns.find(col => col.column_name === 'action');
+        if (actionCol && actionCol.data_type === 'integer') {
+          await sequelize.query(`ALTER TABLE firewall_rules DROP COLUMN IF EXISTS action_new;`);
+          console.log('✅ Cleaned up action_new column');
+        } else {
+          // If action is still ENUM, rename action_new to action
+          // First, set any NULL values to 0 (ACCEPT)
+          await sequelize.query(`UPDATE firewall_rules SET action_new = 0 WHERE action_new IS NULL;`);
+          await sequelize.query(`ALTER TABLE firewall_rules DROP COLUMN IF EXISTS action;`);
+          await sequelize.query(`ALTER TABLE firewall_rules RENAME COLUMN action_new TO action;`);
+          await sequelize.query(`ALTER TABLE firewall_rules ALTER COLUMN action SET NOT NULL;`);
+          await sequelize.query(`ALTER TABLE firewall_rules ADD CONSTRAINT action_check CHECK (action >= 0 AND action <= 2);`);
+          console.log('✅ Migrated action_new to action');
+        }
+      } catch (cleanupError) {
+        console.warn('⚠️  Could not clean up action_new:', cleanupError.message);
+      }
+    }
+    
+    // Refresh columns after cleanup
+    const [columnsAfterCleanup] = await sequelize.query(`
+      SELECT column_name, data_type, udt_name
+      FROM information_schema.columns
+      WHERE table_name = 'firewall_rules' AND table_schema = 'public'
+      ORDER BY ordinal_position;
+    `);
+    // Update columns variable with cleaned up data
+    columns.length = 0;
+    columns.push(...columnsAfterCleanup);
 
     // Check if ip_address column exists (with underscore)
     const hasIpAddress = columnNames.includes('ip_address');
@@ -145,10 +201,15 @@ async function fixFirewallRulesColumns() {
           END;
         `);
         
-        // Drop old column and rename new one
+        // Drop old column
         await sequelize.query(`
           ALTER TABLE firewall_rules 
-          DROP COLUMN protocol,
+          DROP COLUMN protocol;
+        `);
+        
+        // Rename new column
+        await sequelize.query(`
+          ALTER TABLE firewall_rules 
           RENAME COLUMN protocol_new TO protocol;
         `);
         
@@ -188,20 +249,28 @@ async function fixFirewallRulesColumns() {
         `);
         
         // Copy data (convert ENUM values to integers)
+        // Handle 'deny' as DROP (2), and other known values
+        // Set NULL values to 0 (ACCEPT) as default
         await sequelize.query(`
           UPDATE firewall_rules 
           SET action_new = CASE 
             WHEN action::text = 'accept' OR action::text = 'ACCEPT' THEN 0
             WHEN action::text = 'reject' OR action::text = 'REJECT' THEN 1
-            WHEN action::text = 'drop' OR action::text = 'DROP' THEN 2
+            WHEN action::text = 'drop' OR action::text = 'DROP' OR action::text = 'deny' OR action::text = 'DENY' THEN 2
+            WHEN action IS NULL THEN 0
             ELSE COALESCE(action::text::integer, 0)
           END;
         `);
         
-        // Drop old column and rename new one
+        // Drop old column
         await sequelize.query(`
           ALTER TABLE firewall_rules 
-          DROP COLUMN action,
+          DROP COLUMN action;
+        `);
+        
+        // Rename new column
+        await sequelize.query(`
+          ALTER TABLE firewall_rules 
           RENAME COLUMN action_new TO action;
         `);
         

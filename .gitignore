@@ -60,3 +60,6 @@ __pycache__/
 
 # User data from the desktop client
 neosec-desktop/data/
+
+# Documentation
+THREAT_BLOCKER_IMPLEMENTATION.md

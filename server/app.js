@@ -109,6 +109,11 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Threat blocker middleware - check IPs against blocklist
+// Add this early to block threats before they reach routes
+const threatBlockerMiddleware = require('./middleware/threatBlocker');
+app.use(threatBlockerMiddleware);
+
 // Routes
 app.use('/api/auth', authRoutes);
 const profileRoutes = require('./routes/profileRoutes');
@@ -222,6 +227,20 @@ app.listen(PORT, () => {
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`JWT_SECRET: ${process.env.JWT_SECRET ? 'Set' : 'NOT SET - THIS WILL CAUSE ERRORS!'}`);
     console.log(`DATABASE_URL: ${process.env.DATABASE_URL ? 'Set' : 'NOT SET - THIS WILL CAUSE ERRORS!'}`);
+    
+    // Start automatic threat blocker scheduler
+    // Wait a bit for database to be ready
+    setTimeout(() => {
+        try {
+            const { startScheduler } = require('./services/threatBlockerScheduler');
+            // Start with daily updates by default (can be changed via settings)
+            const frequency = process.env.THREAT_BLOCKER_UPDATE_FREQUENCY || 'daily';
+            startScheduler(frequency);
+            console.log(`✅ Automatic Threat Blocker scheduler started (frequency: ${frequency})`);
+        } catch (error) {
+            console.error('⚠️  Failed to start threat blocker scheduler:', error.message);
+        }
+    }, 5000); // Wait 5 seconds for database connection
 });
 
 

@@ -162,28 +162,41 @@ function App() {
     }, [currentView, user]);
 
     // Fetch dashboard data when user is logged in
-    useEffect(() => {
-        const fetchDashboard = async () => {
-            if (user && currentView === 'dashboard') {
-                try {
-                    setDashboardLoading(true);
-                    setDashboardError(null);
-                    const response = await dashboardAPI.getDashboard();
-                    if (response.success) {
-                        setDashboardData(response.data);
-                    } else {
-                        setDashboardError(response.message || 'Failed to load dashboard data');
-                    }
-                } catch (error) {
-                    console.error('Dashboard fetch error:', error);
-                    setDashboardError(getErrorMessage(error, 'Failed to load dashboard data'));
-                } finally {
-                    setDashboardLoading(false);
+    const fetchDashboard = useCallback(async () => {
+        if (user && currentView === 'dashboard') {
+            try {
+                setDashboardLoading(true);
+                setDashboardError(null);
+                const response = await dashboardAPI.getDashboard();
+                if (response.success) {
+                    setDashboardData(response.data);
+                } else {
+                    setDashboardError(response.message || 'Failed to load dashboard data');
                 }
+            } catch (error) {
+                console.error('Dashboard fetch error:', error);
+                setDashboardError(getErrorMessage(error, 'Failed to load dashboard data'));
+            } finally {
+                setDashboardLoading(false);
             }
-        };
-        fetchDashboard();
+        }
     }, [user, currentView]);
+
+    // Initial load and when dependencies change
+    useEffect(() => {
+        fetchDashboard();
+    }, [fetchDashboard]);
+
+    // Auto-refresh dashboard every 30 seconds when on dashboard view
+    useEffect(() => {
+        if (!user || currentView !== 'dashboard') return;
+
+        const interval = setInterval(() => {
+            fetchDashboard();
+        }, 30000); // Refresh every 30 seconds
+
+        return () => clearInterval(interval);
+    }, [user, currentView, fetchDashboard]);
 
     // Admin Data Fetch
     useEffect(() => {

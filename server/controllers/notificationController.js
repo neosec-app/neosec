@@ -5,14 +5,25 @@ const { createNotification } = require('../utils/notificationHelper');
 // Get all notifications for current user (or all if admin)
 exports.getNotifications = async (req, res) => {
     try {
+        // Check authentication
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({
+                success: false,
+                message: 'User not authenticated'
+            });
+        }
+
         const { status, priority, userId } = req.query;
 
         const whereClause = {};
         
+        // Check if user is admin (handle both role and accountType)
+        const isAdmin = req.user && (req.user.role === 'admin' || req.user.accountType === 'admin');
+        
         // Admins can view all notifications or filter by userId
-        if (req.user.role === 'admin' && userId) {
+        if (isAdmin && userId) {
             whereClause.userId = userId;
-        } else if (req.user.role !== 'admin') {
+        } else if (!isAdmin) {
             // Regular users only see their own notifications
             whereClause.userId = req.user.id;
         }
@@ -30,7 +41,7 @@ exports.getNotifications = async (req, res) => {
             where: whereClause,
             include: [
                 {
-                    model: require('../models/User'),
+                    model: User,
                     as: 'user',
                     attributes: ['id', 'email'],
                     required: false
@@ -49,9 +60,17 @@ exports.getNotifications = async (req, res) => {
         });
     } catch (error) {
         console.error('Get notifications error:', error);
+        console.error('Error details:', error.message);
+        console.error('Error stack:', error.stack);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch notifications'
+            message: 'Failed to fetch notifications',
+            error: process.env.NODE_ENV === 'development' ? {
+                message: error.message,
+                original: error.original?.message,
+                code: error.original?.code,
+                stack: error.stack
+            } : undefined
         });
     }
 };
@@ -81,7 +100,8 @@ exports.createNotification = async (req, res) => {
         const targetUserId = userId || req.user.id;
 
         // Only admins can send notifications to other users
-        if (userId && userId !== req.user.id && req.user.role !== 'admin') {
+        const isAdmin = req.user && (req.user.role === 'admin' || req.user.accountType === 'admin');
+        if (userId && userId !== req.user.id && !isAdmin) {
             return res.status(403).json({
                 success: false,
                 message: 'Only admins can send notifications to other users'
@@ -263,7 +283,8 @@ exports.markAllAsRead = async (req, res) => {
         const whereClause = { userId: req.user.id, status: 'unread' };
 
         // Admins can mark all for a specific user if userId is provided
-        if (req.user.role === 'admin' && req.body.userId) {
+        const isAdmin = req.user && (req.user.role === 'admin' || req.user.accountType === 'admin');
+        if (isAdmin && req.body.userId) {
             whereClause.userId = req.body.userId;
         }
 

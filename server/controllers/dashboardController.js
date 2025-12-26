@@ -6,6 +6,8 @@ const Threat = require('../models/Threat');
 const Profile = require('../models/Profile');
 const Notification = require('../models/Notification');
 const DataTransfer = require('../models/DataTransfer');
+const ActivityLog = require('../models/ActivityLog');
+const { getClientIP } = require('../utils/ipUtils');
 
 // Helper to format time ago
 const getTimeAgo = (date) => {
@@ -132,7 +134,7 @@ const getDashboard = async (req, res) => {
       console.error('Error getting active profile:', profileError);
     }
 
-    // Get recent activity logs (combine threats and notifications)
+    // Get recent activity logs (combine threats, notifications, and activity logs)
     const oneWeekAgoForLogs = new Date();
     oneWeekAgoForLogs.setDate(oneWeekAgoForLogs.getDate() - 7);
 
@@ -171,6 +173,24 @@ const getDashboard = async (req, res) => {
       console.error('Error getting recent notifications:', notificationsError);
     }
 
+    // Get ActivityLog entries (VPN, Firewall, Profile activities, etc.)
+    let recentActivityLogs = [];
+    try {
+      recentActivityLogs = await ActivityLog.findAll({
+        where: {
+          userId: userId,
+          createdAt: {
+            [Op.gte]: oneWeekAgoForLogs
+          }
+        },
+        order: [['createdAt', 'DESC']],
+        limit: 15, // Get more to account for filtering
+        attributes: ['id', 'eventType', 'description', 'status', 'severity', 'createdAt']
+      });
+    } catch (activityLogError) {
+      console.error('Error getting recent activity logs:', activityLogError);
+    }
+
     // Combine and sort activities
     const activities = [
       ...recentThreats.map(t => ({
@@ -186,6 +206,15 @@ const getDashboard = async (req, res) => {
         message: n.message || n.title,
         timestamp: n.createdAt,
         isBlocked: n.eventType ? (n.eventType.includes('error') || n.eventType.includes('failed')) : false
+      })),
+      ...recentActivityLogs.map(log => ({
+        id: log.id,
+        type: log.eventType.toLowerCase().replace(/\s+/g, '_'), // e.g., 'vpn_connection', 'firewall_rule_update'
+        message: log.description,
+        timestamp: log.createdAt,
+        isBlocked: log.status === 'Blocked' || log.severity === 'critical',
+        eventType: log.eventType,
+        status: log.status
       }))
     ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 10);
 
@@ -259,6 +288,22 @@ const getDashboard = async (req, res) => {
       console.error('Error counting total threats:', err);
     }
 
+    // Get client IP address (actual connection IP when VPN is active)
+    let clientIP = null;
+    if (activeVpn) {
+      try {
+        clientIP = getClientIP(req);
+        // If it's localhost in development, use server address as fallback
+        if (clientIP === '127.0.0.1 (Local Development)' || clientIP === '127.0.0.1' || clientIP === 'unknown') {
+          clientIP = activeVpn.serverAddress || null;
+        }
+      } catch (ipError) {
+        console.error('Error getting client IP:', ipError);
+        // Fallback to server address
+        clientIP = activeVpn.serverAddress || null;
+      }
+    }
+
     res.status(200).json({
       success: true,
       data: {
@@ -268,7 +313,7 @@ const getDashboard = async (req, res) => {
           protocol: activeVpn ? activeVpn.protocol : null,
           configName: activeVpn ? activeVpn.name : null,
           serverLocation: activeVpn ? (activeVpn.description || 'Unknown Location') : null,
-          ipAddress: activeVpn ? '192.168.1.50' : null, // Placeholder - would need actual connection IP
+          ipAddress: clientIP, // Dynamic IP from request or server address
           connectionTime: connectionTime
         },
         threatsBlocked: {

@@ -74,7 +74,8 @@ const Notification = sequelize.define('Notification', {
     }
 }, {
     timestamps: true,
-    tableName: 'notifications'
+    tableName: 'notifications',
+    underscored: false // Override global setting - use camelCase for timestamps
 });
 
 // Association

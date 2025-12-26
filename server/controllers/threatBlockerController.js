@@ -382,22 +382,45 @@ exports.getStats = async (req, res) => {
 };
 
 /**
- * Update settings (for future use)
+ * Update settings
  */
 exports.updateSettings = async (req, res) => {
   try {
-    // This would typically update a settings table
-    // For now, we'll just return success
+    const { updateFrequency, autoApply, enabled } = req.body;
+    const { startScheduler, stopScheduler } = require('../services/threatBlockerScheduler');
+    
+    // Update scheduler if frequency changed
+    if (updateFrequency) {
+      if (enabled !== false) {
+        startScheduler(updateFrequency);
+        console.log(`Threat blocker scheduler updated to: ${updateFrequency}`);
+      } else {
+        stopScheduler();
+        console.log('Threat blocker scheduler stopped (disabled)');
+      }
+    }
+    
+    // Store settings (in a real app, you'd save to a settings table)
+    // For now, we'll use environment variable or just log
+    if (updateFrequency) {
+      process.env.THREAT_BLOCKER_UPDATE_FREQUENCY = updateFrequency;
+    }
+    
     res.status(200).json({
       success: true,
       message: 'Settings updated successfully',
-      data: req.body
+      data: {
+        updateFrequency: updateFrequency || 'daily',
+        autoApply: autoApply !== false,
+        enabled: enabled !== false
+      }
     });
   } catch (error) {
     console.error('Update settings error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update settings'
+      message: 'Failed to update settings',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

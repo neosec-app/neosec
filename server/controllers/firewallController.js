@@ -1,6 +1,7 @@
 const FirewallRule = require('../models/FirewallRule');
 const ActivityLog = require('../models/ActivityLog');
 const { getClientIP } = require('../utils/ipUtils');
+const { sequelize } = require('../config/db');
 
 // Helper to validate payload
 const validateRulePayload = (payload) => {
@@ -43,11 +44,23 @@ const validateRulePayload = (payload) => {
 // Get all firewall rules for the current user
 const getRules = async (req, res) => {
   try {
+    // Check if user is authenticated
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+
+    console.log('Fetching firewall rules for user:', req.user.id);
+    
     const rules = await FirewallRule.findAll({
       where: { userId: req.user.id },
       order: [['createdAt', 'ASC']],
       raw: false // Get model instances to ensure proper field mapping
     });
+
+    console.log(`Found ${rules.length} firewall rules`);
 
     // Convert to plain objects with correct field names
     // Also convert ENUM strings to integers if needed
@@ -55,16 +68,20 @@ const getRules = async (req, res) => {
       let protocol = rule.protocol;
       let action = rule.action;
       
-      // Convert protocol ENUM string to integer
+      // Convert protocol ENUM string to integer (if database still has ENUMs)
       if (typeof protocol === 'string') {
         const protocolMap = { 'tcp': 0, 'udp': 1, 'both': 2, 'TCP': 0, 'UDP': 1, 'BOTH': 2 };
         protocol = protocolMap[protocol] ?? 0;
+      } else {
+        protocol = Number(protocol);
       }
       
-      // Convert action ENUM string to integer
+      // Convert action ENUM string to integer (if database still has ENUMs)
       if (typeof action === 'string') {
         const actionMap = { 'accept': 0, 'reject': 1, 'drop': 2, 'ACCEPT': 0, 'REJECT': 1, 'DROP': 2 };
         action = actionMap[action] ?? 0;
+      } else {
+        action = Number(action);
       }
       
       return {
@@ -87,11 +104,17 @@ const getRules = async (req, res) => {
   } catch (error) {
     console.error('Get firewall rules error:', error);
     console.error('Error details:', error.message);
+    console.error('Error original:', error.original);
     console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Server error fetching firewall rules',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        original: error.original?.message,
+        code: error.original?.code,
+        sql: error.sql
+      } : undefined
     });
   }
 };
@@ -110,7 +133,7 @@ const createRule = async (req, res) => {
       action, 
       protocolType: typeof protocol, 
       actionType: typeof action,
-      rawBody: req.body
+      userId: req.user?.id
     });
     
     // Convert values to proper types BEFORE validation
@@ -157,73 +180,66 @@ const createRule = async (req, res) => {
       });
     }
 
-    // Try to create with integers first (most common case)
-    // If that fails with ENUM error, retry with ENUM strings
-    let rule;
-    let attempts = 0;
-    const maxAttempts = 3;
+    // Check if userId exists
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+
+    // Always use integers - database should have INTEGER columns
+    // If database has ENUMs, the fixFirewallRulesColumns script should convert them
+    console.log('Creating firewall rule with integer values:', { 
+      ip_address, 
+      port_start, 
+      port_end, 
+      protocol, 
+      action, 
+      userId: req.user.id 
+    });
     
-    while (attempts < maxAttempts) {
-      try {
-        let protocolValue = protocol;
-        let actionValue = action;
-        
-        // On first attempt, use integers
-        // On subsequent attempts, try different ENUM string cases
-        if (attempts === 1) {
-          // Try uppercase ENUM strings
-          const protocolMap = { 0: 'TCP', 1: 'UDP', 2: 'BOTH' };
-          const actionMap = { 0: 'ACCEPT', 1: 'REJECT', 2: 'DROP' };
-          protocolValue = protocolMap[protocol] || 'TCP';
-          actionValue = actionMap[action] || 'ACCEPT';
-          console.log(`Attempt ${attempts + 1}: Trying uppercase ENUM values - protocol: ${protocolValue}, action: ${actionValue}`);
-        } else if (attempts === 2) {
-          // Try lowercase ENUM strings
-          const protocolMap = { 0: 'tcp', 1: 'udp', 2: 'both' };
-          const actionMap = { 0: 'accept', 1: 'reject', 2: 'drop' };
-          protocolValue = protocolMap[protocol] || 'tcp';
-          actionValue = actionMap[action] || 'accept';
-          console.log(`Attempt ${attempts + 1}: Trying lowercase ENUM values - protocol: ${protocolValue}, action: ${actionValue}`);
-        } else {
-          console.log(`Attempt ${attempts + 1}: Trying integer values - protocol: ${protocolValue}, action: ${actionValue}`);
-        }
-        
-        rule = await FirewallRule.create({
-          ip_address,
-          port_start,
-          port_end,
-          protocol: protocolValue,
-          action: actionValue,
-          userId: req.user.id
+    let rule;
+    try {
+      rule = await FirewallRule.create({
+        ip_address: ip_address.trim(),
+        port_start,
+        port_end,
+        protocol: protocol, // Always integer
+        action: action, // Always integer
+        userId: req.user.id
+      });
+      console.log('Successfully created firewall rule:', rule.id);
+    } catch (createError) {
+      console.error('FirewallRule.create failed:', createError.message);
+      console.error('Error details:', {
+        message: createError.message,
+        original: createError.original?.message,
+        code: createError.original?.code,
+        sql: createError.sql,
+        stack: createError.stack
+      });
+      
+      // Check if it's an ENUM error - database needs migration
+      const isEnumError = createError.original && createError.original.message && 
+        (createError.original.message.includes('invalid input value for enum') ||
+         createError.original.message.includes('enum') ||
+         createError.original.code === '22P02');
+      
+      if (isEnumError) {
+        return res.status(500).json({
+          success: false,
+          message: 'Database schema error: protocol and action columns are ENUM types but should be INTEGER. Please run the migration script: node server/scripts/fixFirewallRulesColumns.js',
+          error: process.env.NODE_ENV === 'development' ? {
+            message: createError.message,
+            original: createError.original?.message,
+            code: createError.original?.code
+          } : undefined
         });
-        
-        console.log('Successfully created firewall rule on attempt', attempts + 1);
-        break; // Success, exit loop
-        
-      } catch (createError) {
-        attempts++;
-        console.error(`FirewallRule.create attempt ${attempts} failed:`, createError.message);
-        
-        // Check if it's an ENUM error
-        const isEnumError = createError.original && createError.original.message && 
-          (createError.original.message.includes('invalid input value for enum') ||
-           createError.original.message.includes('enum'));
-        
-        if (isEnumError && attempts < maxAttempts) {
-          console.log(`ENUM error detected on attempt ${attempts}, will retry with different case...`);
-          continue; // Try next attempt
-        } else if (attempts >= maxAttempts) {
-          // All attempts failed
-          console.error('All attempts to create firewall rule failed');
-          console.error('Final error:', createError);
-          console.error('Error original:', createError.original);
-          console.error('Error stack:', createError.stack);
-          throw createError;
-        } else {
-          // Not an ENUM error, throw immediately
-          throw createError;
-        }
       }
+      
+      // Re-throw other errors to be handled by outer catch
+      throw createError;
     }
 
     // Log firewall rule creation
@@ -249,19 +265,15 @@ const createRule = async (req, res) => {
       console.error('Error logging firewall rule creation:', logError);
     }
 
-    // Convert ENUM strings back to integers for response
-    let responseProtocol = rule.protocol;
-    let responseAction = rule.action;
-    if (typeof responseProtocol === 'string') {
-      const protocolMap = { 'tcp': 0, 'udp': 1, 'both': 2, 'TCP': 0, 'UDP': 1, 'BOTH': 2 };
-      responseProtocol = protocolMap[responseProtocol] ?? 0;
-    }
-    if (typeof responseAction === 'string') {
-      const actionMap = { 'accept': 0, 'reject': 1, 'drop': 2, 'ACCEPT': 0, 'REJECT': 1, 'DROP': 2 };
-      responseAction = actionMap[responseAction] ?? 0;
-    }
+    // Ensure protocol and action are integers in response (they should already be)
+    let responseProtocol = typeof rule.protocol === 'string' 
+      ? (rule.protocol.toLowerCase() === 'tcp' ? 0 : rule.protocol.toLowerCase() === 'udp' ? 1 : 2)
+      : Number(rule.protocol);
+    let responseAction = typeof rule.action === 'string'
+      ? (rule.action.toLowerCase() === 'accept' ? 0 : rule.action.toLowerCase() === 'reject' ? 1 : 2)
+      : Number(rule.action);
     
-    // Return consistent format
+    // Return consistent format with integers
     res.status(201).json({
       success: true,
       data: {
@@ -296,16 +308,32 @@ const createRule = async (req, res) => {
       errorMessage = error.message;
     }
     
-    res.status(500).json({
+    // Always include error details in development, and include helpful info in production
+    const errorResponse = {
       success: false,
-      message: errorMessage,
-      error: process.env.NODE_ENV === 'development' ? {
+      message: errorMessage
+    };
+    
+    // Include detailed error info in development
+    if (process.env.NODE_ENV === 'development') {
+      errorResponse.error = {
         message: error.message,
         original: error.original?.message,
         code: error.original?.code,
-        sql: error.sql
-      } : undefined
-    });
+        sql: error.sql,
+        stack: error.stack
+      };
+    } else {
+      // In production, still include the original error message if it's helpful
+      if (error.original?.message) {
+        errorResponse.error = {
+          message: error.original.message,
+          code: error.original.code
+        };
+      }
+    }
+    
+    res.status(500).json(errorResponse);
   }
 };
 

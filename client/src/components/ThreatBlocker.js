@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { threatBlockerAPI, getErrorMessage } from '../services/api';
 import { FiShield, FiRefreshCw, FiClock, FiDatabase, FiTrendingUp, FiGlobe, FiAlertTriangle, FiDownload, FiSearch } from 'react-icons/fi';
 import './ThreatBlocker.css'; 
@@ -49,13 +49,7 @@ const ThreatBlocker = ({ theme = 'dark', palette }) => {
   const [autoApply, setAutoApply] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
-  useEffect(() => {
-    loadStatus();
-    loadBlocklist();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, filterType, searchQuery]);
-
-  const loadStatus = async () => {
+  const loadStatus = useCallback(async () => {
     try {
       const response = await threatBlockerAPI.getStatus();
       if (response.success) {
@@ -67,9 +61,9 @@ const ThreatBlocker = ({ theme = 'dark', palette }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loadBlocklist = async () => {
+  const loadBlocklist = useCallback(async () => {
     try {
       const params = {
         page,
@@ -85,7 +79,27 @@ const ThreatBlocker = ({ theme = 'dark', palette }) => {
     } catch (err) {
       setError(getErrorMessage(err));
     }
-  };
+  }, [page, filterType, searchQuery]);
+
+  useEffect(() => {
+    loadStatus();
+    loadBlocklist();
+  }, [loadStatus, loadBlocklist, page, filterType, searchQuery]);
+
+  // Auto-refresh status every 30 seconds to show dynamic updates
+  useEffect(() => {
+    if (!autoBlockingEnabled) return;
+    
+    const interval = setInterval(() => {
+      loadStatus();
+      // Only refresh blocklist if we're on first page and no filters
+      if (page === 1 && filterType === 'all' && !searchQuery) {
+        loadBlocklist();
+      }
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [autoBlockingEnabled, page, filterType, searchQuery, loadStatus, loadBlocklist]);
 
   const handleForceUpdate = async () => {
     setUpdating(true);
@@ -196,7 +210,20 @@ const ThreatBlocker = ({ theme = 'dark', palette }) => {
                     <input
                       type="checkbox"
                       checked={autoBlockingEnabled}
-                      onChange={(e) => setAutoBlockingEnabled(e.target.checked)}
+                      onChange={async (e) => {
+                        const enabled = e.target.checked;
+                        setAutoBlockingEnabled(enabled);
+                        // Save settings to server
+                        try {
+                          await threatBlockerAPI.updateSettings({
+                            updateFrequency: updateFrequency,
+                            autoApply: autoApply,
+                            enabled: enabled
+                          });
+                        } catch (err) {
+                          console.error('Failed to save settings:', err);
+                        }
+                      }}
                     />
                     <span className="slider"></span>
                   </label>
@@ -322,14 +349,27 @@ const ThreatBlocker = ({ theme = 'dark', palette }) => {
               <select
                 className="setting-select"
                 value={updateFrequency}
-                onChange={(e) => setUpdateFrequency(e.target.value)}
+                onChange={async (e) => {
+                  const newFrequency = e.target.value;
+                  setUpdateFrequency(newFrequency);
+                  // Save settings to server
+                  try {
+                    await threatBlockerAPI.updateSettings({
+                      updateFrequency: newFrequency,
+                      autoApply: autoApply,
+                      enabled: autoBlockingEnabled
+                    });
+                  } catch (err) {
+                    console.error('Failed to save settings:', err);
+                  }
+                }}
                 style={{
                   backgroundColor: colors.inputBg,
                   borderColor: colors.inputBorder,
                   color: colors.text
                 }}
               >
-                <option value="realtime">Real-time</option>
+                <option value="realtime">Real-time (every 5 min)</option>
                 <option value="hourly">Every hour</option>
                 <option value="6hours">Every 6 hours</option>
                 <option value="daily">Daily</option>
@@ -347,7 +387,20 @@ const ThreatBlocker = ({ theme = 'dark', palette }) => {
                 <input
                   type="checkbox"
                   checked={autoApply}
-                  onChange={(e) => setAutoApply(e.target.checked)}
+                  onChange={async (e) => {
+                    const apply = e.target.checked;
+                    setAutoApply(apply);
+                    // Save settings to server
+                    try {
+                      await threatBlockerAPI.updateSettings({
+                        updateFrequency: updateFrequency,
+                        autoApply: apply,
+                        enabled: autoBlockingEnabled
+                      });
+                    } catch (err) {
+                      console.error('Failed to save settings:', err);
+                    }
+                  }}
                 />
                 <span className="slider"></span>
               </label>
@@ -364,7 +417,21 @@ const ThreatBlocker = ({ theme = 'dark', palette }) => {
                 <input
                   type="checkbox"
                   checked={notificationsEnabled}
-                  onChange={(e) => setNotificationsEnabled(e.target.checked)}
+                  onChange={async (e) => {
+                    const enabled = e.target.checked;
+                    setNotificationsEnabled(enabled);
+                    // Save settings to server
+                    try {
+                      await threatBlockerAPI.updateSettings({
+                        updateFrequency: updateFrequency,
+                        autoApply: autoApply,
+                        enabled: autoBlockingEnabled,
+                        notificationsEnabled: enabled
+                      });
+                    } catch (err) {
+                      console.error('Failed to save settings:', err);
+                    }
+                  }}
                 />
                 <span className="slider"></span>
               </label>

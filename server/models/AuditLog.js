@@ -56,6 +56,7 @@ const AuditLog = sequelize.define('AuditLog', {
 }, {
   tableName: 'audit_logs',
   timestamps: true,
+  underscored: false, // Override global setting - use camelCase for timestamps
   indexes: [
     { fields: ['adminUserId'] },
     { fields: ['targetUserId'] },
