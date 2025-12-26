@@ -23,6 +23,7 @@ import ScanDashboard from './components/ScanDashboard';
 import ProfileManager from './components/ProfileManager';
 import FirewallRuleManagement from './components/FirewallRuleManagement';
 import AdminAuditTrail from './components/AdminAuditTrail';
+import ActivityLogAndNotification from './components/ActivityLogAndNotification';
 import SystemHealthMetrics from './components/SystemHealthMetrics';
 import MFASettings from './components/MFASettings';
 import DeviceInventory from './components/DeviceInventory';
@@ -473,6 +474,11 @@ if (isShareManagementPage) {
                         {/* Audit View */}
                         {currentView === 'audit' && user.role === 'admin' && (
                             <AdminAuditTrail theme={theme} palette={palette} />
+                        )}
+
+                        {/* Activity Log and Notification View */}
+                        {currentView === 'activity-log-notification' && (
+                            <ActivityLogAndNotification theme={theme} palette={palette} />
                         )}
 
                         {/* System Health View */}
