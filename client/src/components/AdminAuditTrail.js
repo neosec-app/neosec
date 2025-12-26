@@ -54,6 +54,7 @@ const AdminAuditTrail = ({ theme = 'dark' }) => {
 
   // Notifications state
   const [notifications, setNotifications] = useState([]);
+  const [allNotifications, setAllNotifications] = useState([]); // Store all notifications for unread count
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationTab, setNotificationTab] = useState('all');
 
@@ -105,7 +106,21 @@ const AdminAuditTrail = ({ theme = 'dark' }) => {
     }
   }, [dateRange, categoryFilter, adminFilter, searchQuery, pagination.page, pagination.limit]);
 
-  // Load notifications
+  // Load notifications for unread count (all notifications)
+  const loadUnreadCount = async () => {
+    try {
+      const response = await notificationAPI.getNotifications({});
+      if (response.success) {
+        // Store all notifications for unread count calculation
+        setAllNotifications(response.data || []);
+      }
+    } catch (err) {
+      console.error('Load unread count error:', err);
+      // Don't show error for background unread count fetch
+    }
+  };
+
+  // Load notifications (with filters when on notifications tab)
   const loadNotifications = async () => {
     try {
       setNotificationsLoading(true);
@@ -176,7 +191,16 @@ const AdminAuditTrail = ({ theme = 'dark' }) => {
   const handleMarkAsRead = async (notificationId) => {
     try {
       await notificationAPI.markAsRead(notificationId);
+      // Update both filtered notifications and all notifications
+      setNotifications(prev => prev.map(n => 
+        n.id === notificationId ? { ...n, status: 'read' } : n
+      ));
+      setAllNotifications(prev => prev.map(n => 
+        n.id === notificationId ? { ...n, status: 'read' } : n
+      ));
+      // Reload to ensure sync
       loadNotifications();
+      loadUnreadCount();
     } catch (err) {
       console.error('Mark as read error:', err);
       setError(getErrorMessage(err, 'Failed to mark notification as read'));
@@ -186,7 +210,12 @@ const AdminAuditTrail = ({ theme = 'dark' }) => {
   const handleMarkAllAsRead = async () => {
     try {
       await notificationAPI.markAllAsRead();
+      // Update both filtered notifications and all notifications
+      setNotifications(prev => prev.map(n => ({ ...n, status: 'read' })));
+      setAllNotifications(prev => prev.map(n => ({ ...n, status: 'read' })));
+      // Reload to ensure sync
       loadNotifications();
+      loadUnreadCount();
     } catch (err) {
       console.error('Mark all as read error:', err);
       setError(getErrorMessage(err, 'Failed to mark all notifications as read'));
@@ -215,6 +244,20 @@ const AdminAuditTrail = ({ theme = 'dark' }) => {
         return { color: '#4a90e2', bg: isDark ? 'rgba(74, 144, 226, 0.2)' : '#dbeafe' };
     }
   };
+
+  // Load unread count on component mount and periodically
+  useEffect(() => {
+    // Load all notifications to get unread count on mount
+    loadUnreadCount();
+    
+    // Set up periodic refresh for unread count (every 30 seconds)
+    const unreadCountInterval = setInterval(() => {
+      loadUnreadCount();
+    }, 30000);
+    
+    return () => clearInterval(unreadCountInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (activeTab === 'audit') {
@@ -316,8 +359,8 @@ const AdminAuditTrail = ({ theme = 'dark' }) => {
   const uniqueAdmins = new Set(auditLogs.map(e => e.adminUser?.email).filter(Boolean)).size;
   const securityActions = auditLogs.filter(e => e.category === 'Security').length;
 
-  // Notification filtering
-  const unreadCount = notifications.filter(n => n.status === 'unread').length;
+  // Notification filtering - use allNotifications for unread count
+  const unreadCount = allNotifications.filter(n => n.status === 'unread').length;
   const filteredNotifications = notifications.filter(notif => {
     if (notificationTab === 'all') return true;
     if (notificationTab === 'unread') return notif.status === 'unread';
