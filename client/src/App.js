@@ -476,8 +476,8 @@ if (isShareManagementPage) {
                             <AdminAuditTrail theme={theme} palette={palette} />
                         )}
 
-                        {/* Activity Log and Notification View */}
-                        {currentView === 'activity-log-notification' && (
+                        {/* Activity Log and Notification View - Only for non-admin users */}
+                        {currentView === 'activity-log-notification' && user.role !== 'admin' && (
                             <ActivityLogAndNotification theme={theme} palette={palette} />
                         )}
 

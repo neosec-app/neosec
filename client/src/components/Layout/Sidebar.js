@@ -310,14 +310,17 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                         Security Profiles
                     </button>
 
-                    <SidebarButton 
-                        label="Activity Log and Notification" 
-                        view="activity-log-notification" 
-                        currentView={currentView} 
-                        setCurrentView={setCurrentView} 
-                        theme={theme} 
-                        palette={palette} 
-                    />
+                    {/* Activity Log and Notification - Only for non-admin users */}
+                    {user.role !== 'admin' && (
+                        <SidebarButton 
+                            label="Activity Log and Notification" 
+                            view="activity-log-notification" 
+                            currentView={currentView} 
+                            setCurrentView={setCurrentView} 
+                            theme={theme} 
+                            palette={palette} 
+                        />
+                    )}
 
                     <nav className="flex-1 space-y-2 text-sm">
                         {/* HIERARCHY */}
