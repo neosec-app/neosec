@@ -7,6 +7,9 @@ const Profile = require('../models/Profile');
 const Notification = require('../models/Notification');
 const DataTransfer = require('../models/DataTransfer');
 const ActivityLog = require('../models/ActivityLog');
+const GroupMember = require('../models/GroupMember');
+const Device = require('../models/Device');
+const LoginHistory = require('../models/LoginHistory');
 const { getClientIP } = require('../utils/ipUtils');
 
 // Helper to format time ago
@@ -21,6 +24,281 @@ const getTimeAgo = (date) => {
   if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
   if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
   return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+};
+
+// Helper to format inactive time
+const formatInactiveTime = (minutes) => {
+  if (minutes < 60) {
+    return `${Math.floor(minutes)}m ago`;
+  } else {
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.floor(minutes % 60);
+    return mins > 0 ? `${hours}h ${mins}m ago` : `${hours}h ago`;
+  }
+};
+
+// Helper to get active users
+const getActiveUsers = async (userId, userRole) => {
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const now = new Date();
+  
+  if (userRole === 'admin') {
+    // Admins see all active users
+    // Get all devices (both active and inactive within 1 hour)
+    const allDevices = await Device.findAll({
+      where: {
+        lastOnlineAt: { [Op.gte]: oneHourAgo },
+        isActive: true
+      },
+      attributes: ['userId', 'lastOnlineAt'],
+      order: [['lastOnlineAt', 'DESC']]
+    });
+    
+    // Get device user IDs
+    const deviceUserIds = [...new Set(allDevices.map(d => d.userId).filter(id => id && id !== userId))];
+    
+    // Get login history for users without devices or as fallback
+    const recentLogins = await LoginHistory.findAll({
+      where: {
+        success: true,
+        createdAt: { [Op.gte]: oneHourAgo }
+      },
+      attributes: ['userId', 'createdAt'],
+      raw: true,
+      order: [['createdAt', 'DESC']]
+    });
+    
+    // Combine user IDs from devices and logins
+    const allUserIds = [...new Set([
+      ...deviceUserIds,
+      ...recentLogins.map(l => l.userId).filter(id => id && id !== userId)
+    ])];
+    
+    if (allUserIds.length === 0) {
+      return [];
+    }
+    
+    // Get users with approved accounts
+    const users = await User.findAll({
+      where: { 
+        id: { [Op.in]: allUserIds },
+        isApproved: true
+      },
+      attributes: ['id', 'email', 'role', 'accountType']
+    });
+    
+    // Enrich users with status information
+    const usersWithStatus = users.map(user => {
+      // Find most recent device activity
+      const userDevices = allDevices.filter(d => d.userId === user.id);
+      const mostRecentDevice = userDevices.length > 0 
+        ? userDevices.reduce((latest, current) => 
+            current.lastOnlineAt > latest.lastOnlineAt ? current : latest
+          )
+        : null;
+      
+      // Find most recent login
+      const userLogins = recentLogins.filter(l => l.userId === user.id);
+      const mostRecentLogin = userLogins.length > 0
+        ? userLogins.reduce((latest, current) => 
+            new Date(current.createdAt) > new Date(latest.createdAt) ? current : latest
+          )
+        : null;
+      
+      // Determine status
+      let isActive = false;
+      let inactiveDuration = null;
+      let statusText = 'now';
+      
+      if (mostRecentDevice) {
+        const deviceMinutesAgo = (now - new Date(mostRecentDevice.lastOnlineAt)) / (1000 * 60);
+        if (deviceMinutesAgo <= 5) {
+          isActive = true;
+          statusText = 'now';
+        } else {
+          isActive = false;
+          inactiveDuration = deviceMinutesAgo;
+          statusText = formatInactiveTime(deviceMinutesAgo);
+        }
+      } else if (mostRecentLogin) {
+        const loginMinutesAgo = (now - new Date(mostRecentLogin.createdAt)) / (1000 * 60);
+        if (loginMinutesAgo <= 5) {
+          isActive = true;
+          statusText = 'now';
+        } else {
+          isActive = false;
+          inactiveDuration = loginMinutesAgo;
+          statusText = formatInactiveTime(loginMinutesAgo);
+        }
+      }
+      
+      // Only include users inactive for less than 1 hour
+      if (inactiveDuration !== null && inactiveDuration >= 60) {
+        return null; // Filter out users inactive > 1 hour
+      }
+      
+      return {
+        ...user.toJSON(),
+        isActive,
+        inactiveDuration,
+        statusText
+      };
+    }).filter(u => u !== null) // Remove null entries
+      .sort((a, b) => {
+        // Sort: Active users first (green), then inactive users (yellow)
+        // Within each group, sort by most recent activity first
+        if (a.isActive !== b.isActive) {
+          return b.isActive - a.isActive; // true (1) comes before false (0)
+        }
+        // If both have same status, sort by inactiveDuration (lower = more recent)
+        const aDuration = a.inactiveDuration || 0;
+        const bDuration = b.inactiveDuration || 0;
+        return aDuration - bDuration;
+      });
+    
+    return usersWithStatus;
+  } else {
+    // Regular users see only active users in their groups
+    const userGroups = await GroupMember.findAll({
+      where: {
+        userId: userId,
+        status: 'accepted'
+      },
+      attributes: ['groupId']
+    });
+    
+    if (userGroups.length === 0) {
+      return [];
+    }
+    
+    const groupIds = userGroups.map(gm => gm.groupId);
+    
+    // Get all members of user's groups
+    const groupMembers = await GroupMember.findAll({
+      where: {
+        groupId: { [Op.in]: groupIds },
+        status: 'accepted',
+        userId: { [Op.ne]: userId }
+      },
+      attributes: ['userId']
+    });
+    
+    const memberUserIds = [...new Set(groupMembers.map(gm => gm.userId))];
+    
+    if (memberUserIds.length === 0) {
+      return [];
+    }
+    
+    // Get all devices for group members (within 1 hour)
+    const allDevices = await Device.findAll({
+      where: {
+        userId: { [Op.in]: memberUserIds },
+        lastOnlineAt: { [Op.gte]: oneHourAgo },
+        isActive: true
+      },
+      attributes: ['userId', 'lastOnlineAt'],
+      order: [['lastOnlineAt', 'DESC']]
+    });
+    
+    // Get login history for group members
+    const recentLogins = await LoginHistory.findAll({
+      where: {
+        userId: { [Op.in]: memberUserIds },
+        success: true,
+        createdAt: { [Op.gte]: oneHourAgo }
+      },
+      attributes: ['userId', 'createdAt'],
+      raw: true,
+      order: [['createdAt', 'DESC']]
+    });
+    
+    // Combine user IDs
+    const allUserIds = [...new Set([
+      ...allDevices.map(d => d.userId),
+      ...recentLogins.map(l => l.userId)
+    ])];
+    
+    if (allUserIds.length === 0) {
+      return [];
+    }
+    
+    const users = await User.findAll({
+      where: { id: { [Op.in]: allUserIds } },
+      attributes: ['id', 'email', 'role', 'accountType']
+    });
+    
+    // Enrich users with status information
+    const usersWithStatus = users.map(user => {
+      // Find most recent device activity
+      const userDevices = allDevices.filter(d => d.userId === user.id);
+      const mostRecentDevice = userDevices.length > 0 
+        ? userDevices.reduce((latest, current) => 
+            current.lastOnlineAt > latest.lastOnlineAt ? current : latest
+          )
+        : null;
+      
+      // Find most recent login
+      const userLogins = recentLogins.filter(l => l.userId === user.id);
+      const mostRecentLogin = userLogins.length > 0
+        ? userLogins.reduce((latest, current) => 
+            new Date(current.createdAt) > new Date(latest.createdAt) ? current : latest
+          )
+        : null;
+      
+      // Determine status
+      let isActive = false;
+      let inactiveDuration = null;
+      let statusText = 'now';
+      
+      if (mostRecentDevice) {
+        const deviceMinutesAgo = (now - new Date(mostRecentDevice.lastOnlineAt)) / (1000 * 60);
+        if (deviceMinutesAgo <= 5) {
+          isActive = true;
+          statusText = 'now';
+        } else {
+          isActive = false;
+          inactiveDuration = deviceMinutesAgo;
+          statusText = formatInactiveTime(deviceMinutesAgo);
+        }
+      } else if (mostRecentLogin) {
+        const loginMinutesAgo = (now - new Date(mostRecentLogin.createdAt)) / (1000 * 60);
+        if (loginMinutesAgo <= 5) {
+          isActive = true;
+          statusText = 'now';
+        } else {
+          isActive = false;
+          inactiveDuration = loginMinutesAgo;
+          statusText = formatInactiveTime(loginMinutesAgo);
+        }
+      }
+      
+      // Only include users inactive for less than 1 hour
+      if (inactiveDuration !== null && inactiveDuration >= 60) {
+        return null; // Filter out users inactive > 1 hour
+      }
+      
+      return {
+        ...user.toJSON(),
+        isActive,
+        inactiveDuration,
+        statusText
+      };
+    }).filter(u => u !== null) // Remove null entries
+      .sort((a, b) => {
+        // Sort: Active users first (green), then inactive users (yellow)
+        // Within each group, sort by most recent activity first
+        if (a.isActive !== b.isActive) {
+          return b.isActive - a.isActive; // true (1) comes before false (0)
+        }
+        // If both have same status, sort by inactiveDuration (lower = more recent)
+        const aDuration = a.inactiveDuration || 0;
+        const bDuration = b.inactiveDuration || 0;
+        return aDuration - bDuration;
+      });
+    
+    return usersWithStatus;
+  }
 };
 
 // @desc    Get dashboard data (VPN status and threats blocked)
@@ -304,6 +582,22 @@ const getDashboard = async (req, res) => {
       }
     }
 
+    // Get active users
+    let activeUsers = [];
+    try {
+      console.log(`dashboard: Getting active users for user ${userId}, role: ${req.user.role}`);
+      activeUsers = await getActiveUsers(userId, req.user.role);
+      console.log(`dashboard: Found ${activeUsers.length} active users for ${req.user.role}`);
+      if (activeUsers.length > 0) {
+        console.log(`dashboard: Active users:`, activeUsers.map(u => u.email));
+      } else {
+        console.log(`dashboard: No active users found (current user ${userId} is excluded)`);
+      }
+    } catch (activeUsersError) {
+      console.error('Error getting active users:', activeUsersError);
+      console.error('Active users error stack:', activeUsersError.stack);
+    }
+
     res.status(200).json({
       success: true,
       data: {
@@ -342,7 +636,8 @@ const getDashboard = async (req, res) => {
           timestamp: a.timestamp,
           timeAgo: getTimeAgo(new Date(a.timestamp)),
           isBlocked: a.isBlocked
-        }))
+        })),
+        activeUsers: activeUsers
       }
     });
   } catch (error) {
