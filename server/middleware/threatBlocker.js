@@ -2,7 +2,38 @@
 const BlocklistIP = require('../models/BlocklistIP');
 const ActivityLog = require('../models/ActivityLog');
 const Threat = require('../models/Threat');
+const ThreatBlockerSettings = require('../models/ThreatBlockerSettings');
 const { getClientIP, isLocalOrPrivateIP } = require('../utils/ipUtils');
+
+// Helper to check if threat blocker is enabled
+async function isThreatBlockerEnabled() {
+  try {
+    // Check if table exists first
+    const tableExists = await ThreatBlockerSettings.sequelize.getQueryInterface().tableExists(ThreatBlockerSettings.tableName);
+    if (!tableExists) {
+      return true; // Default to enabled if table doesn't exist
+    }
+    
+    const setting = await ThreatBlockerSettings.findOne({ where: { key: 'enabled' } });
+    if (setting && setting.value !== null) {
+      try {
+        return JSON.parse(setting.value);
+      } catch {
+        return setting.value === 'true' || setting.value === true;
+      }
+    }
+    // Default to enabled if no setting exists
+    return true;
+  } catch (error) {
+    // If error, default to enabled for safety
+    if (error.name === 'SequelizeDatabaseError' && 
+        (error.message?.includes('does not exist') || error.message?.includes('relation'))) {
+      return true; // Default to enabled if table doesn't exist
+    }
+    console.warn('Error checking threat blocker enabled status:', error.message);
+    return true;
+  }
+}
 
 /**
  * Middleware to block requests from IPs in the threat blocklist
@@ -10,6 +41,11 @@ const { getClientIP, isLocalOrPrivateIP } = require('../utils/ipUtils');
  */
 const threatBlockerMiddleware = async (req, res, next) => {
   try {
+    // Check if threat blocker is enabled
+    const enabled = await isThreatBlockerEnabled();
+    if (!enabled) {
+      return next(); // Skip blocking if disabled
+    }
     // Skip blocking for health checks, auth routes, and threat blocker routes (to avoid blocking legitimate admin access)
     const skipRoutes = [
       '/api/health', 
@@ -57,23 +93,45 @@ const threatBlockerMiddleware = async (req, res, next) => {
           }
         });
 
-        // Also create Threat entry for Threat Summary (if user is authenticated)
-        if (req.user && req.user.id) {
-          try {
-            // Map blocklist threat type to Threat model threat type
-            const threatTypeMap = {
-              'Malware C&C': 'malware',
-              'Botnet': 'malware',
-              'Brute Force': 'intrusion',
-              'Malware Host': 'malware',
-              'Phishing': 'phishing',
-              'DDoS': 'ddos',
-              'Spam': 'suspicious',
-              'Exploit': 'intrusion',
-              'Suspicious': 'suspicious',
-              'Other': 'other'
-            };
+        // Create Threat entry for Threat Summary
+        // Use authenticated user ID if available, otherwise use system user or first admin
+        try {
+          // Map blocklist threat type to Threat model threat type
+          const threatTypeMap = {
+            'Malware C&C': 'malware',
+            'Botnet': 'malware',
+            'Brute Force': 'intrusion',
+            'Malware Host': 'malware',
+            'Phishing': 'phishing',
+            'DDoS': 'ddos',
+            'Spam': 'suspicious',
+            'Exploit': 'intrusion',
+            'Suspicious': 'suspicious',
+            'Other': 'other'
+          };
 
+          let threatUserId = req.user ? req.user.id : null;
+          
+          // If no user is authenticated, find first admin to associate the threat with
+          // This ensures threats are tracked even for unauthenticated blocks
+          if (!threatUserId) {
+            try {
+              const User = require('../models/User');
+              const admin = await User.findOne({ 
+                where: { role: 'admin' },
+                attributes: ['id'],
+                limit: 1
+              });
+              if (admin) {
+                threatUserId = admin.id;
+              }
+            } catch (adminError) {
+              console.warn('Could not find admin for threat association:', adminError.message);
+            }
+          }
+
+          // Only create Threat entry if we have a userId (either from req.user or admin)
+          if (threatUserId) {
             await Threat.create({
               threatType: threatTypeMap[blockedIP.threatType] || 'other',
               sourceIp: clientIP,
@@ -82,12 +140,12 @@ const threatBlockerMiddleware = async (req, res, next) => {
                        blockedIP.abuseConfidenceScore >= 75 ? 'high' : 
                        blockedIP.abuseConfidenceScore >= 50 ? 'medium' : 'low',
               blocked: true,
-              userId: req.user.id
+              userId: threatUserId
             });
-          } catch (threatError) {
-            console.error('Error creating Threat entry:', threatError);
-            // Continue even if Threat creation fails
           }
+        } catch (threatError) {
+          console.error('Error creating Threat entry:', threatError);
+          // Continue even if Threat creation fails
         }
       } catch (logError) {
         console.error('Error logging blocked threat:', logError);

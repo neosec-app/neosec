@@ -5,6 +5,7 @@ const ActivityLog = require('../models/ActivityLog');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const abuseIPDBService = require('../services/abuseIPDBService');
+const freeBlocklistService = require('../services/freeBlocklistService');
 
 let scheduledJob = null;
 let updateFrequency = 'daily'; // 'realtime', 'hourly', '6hours', 'daily'
@@ -15,16 +16,66 @@ let updateFrequency = 'daily'; // 'realtime', 'hourly', '6hours', 'daily'
 async function updateBlocklist() {
   try {
     const apiKey = process.env.ABUSEIPDB_API_KEY;
+    const useFreeSources = process.env.USE_FREE_BLOCKLIST_SOURCES !== 'false'; // Default to true
     
-    if (!apiKey) {
-      console.warn('⚠️  ABUSEIPDB_API_KEY not configured. Skipping automatic blocklist update.');
+    if (!apiKey && !useFreeSources) {
+      console.warn('⚠️  No blocklist sources configured. Set ABUSEIPDB_API_KEY or USE_FREE_BLOCKLIST_SOURCES=true');
       return;
     }
 
     console.log('🔄 Starting automatic blocklist update...');
     
-    // Fetch blocklist from AbuseIPDB
-    const blocklistData = await abuseIPDBService.fetchBlocklist(apiKey);
+    let blocklistData = [];
+    let sourceUsed = '';
+
+    // Fetch from free sources (no API key needed)
+    if (useFreeSources) {
+      try {
+        const freeSources = ['blocklist.de'];
+        if (process.env.INCLUDE_TOR_EXIT_NODES === 'true') {
+          freeSources.push('tor');
+        }
+        blocklistData = await freeBlocklistService.fetchFreeBlocklist(freeSources);
+        sourceUsed = 'Free Sources';
+      } catch (freeError) {
+        console.warn('⚠️  Free blocklist fetch failed:', freeError.message);
+      }
+    }
+
+    // If AbuseIPDB API key is available, also fetch from there
+    if (apiKey) {
+      try {
+        const maxAgeInDays = parseInt(process.env.ABUSEIPDB_MAX_AGE_DAYS || '90', 10);
+        const confidenceMinimum = parseInt(process.env.ABUSEIPDB_CONFIDENCE_MIN || '75', 10);
+        const limit = parseInt(process.env.ABUSEIPDB_LIMIT || '10000', 10);
+        
+        const abuseIPDBData = await abuseIPDBService.fetchBlocklist(
+          apiKey,
+          maxAgeInDays,
+          confidenceMinimum,
+          limit
+        );
+        
+        if (abuseIPDBData && abuseIPDBData.length > 0) {
+          // Merge with free sources (deduplicate)
+          const existingIPs = new Set(blocklistData.map(ip => ip.ipAddress));
+          for (const ipData of abuseIPDBData) {
+            if (!existingIPs.has(ipData.ipAddress)) {
+              blocklistData.push(ipData);
+              existingIPs.add(ipData.ipAddress);
+            }
+          }
+          sourceUsed = sourceUsed ? `${sourceUsed} + AbuseIPDB` : 'AbuseIPDB';
+        }
+      } catch (abuseError) {
+        console.warn('⚠️  AbuseIPDB fetch failed:', abuseError.message);
+      }
+    }
+    
+    if (!blocklistData || blocklistData.length === 0) {
+      console.warn('⚠️  No blocklist data received from any source');
+      return;
+    }
 
     let addedCount = 0;
     let updatedCount = 0;

@@ -29,6 +29,7 @@ const ImpersonationSession = require('./models/ImpersonationSession');
 // NEW: Add Module 3 models
 const BlocklistIP = require('./models/BlocklistIP');
 const ActivityLog = require('./models/ActivityLog');
+const ThreatBlockerSettings = require('./models/ThreatBlockerSettings');
 
 // NEW: Set up associations
 require('./models/associations');
@@ -230,13 +231,50 @@ app.listen(PORT, () => {
     
     // Start automatic threat blocker scheduler
     // Wait a bit for database to be ready
-    setTimeout(() => {
+    setTimeout(async () => {
         try {
-            const { startScheduler } = require('./services/threatBlockerScheduler');
-            // Start with daily updates by default (can be changed via settings)
-            const frequency = process.env.THREAT_BLOCKER_UPDATE_FREQUENCY || 'daily';
-            startScheduler(frequency);
-            console.log(`✅ Automatic Threat Blocker scheduler started (frequency: ${frequency})`);
+            const { startScheduler, stopScheduler } = require('./services/threatBlockerScheduler');
+            
+            // Get settings from database dynamically
+            let enabled = true;
+            let frequency = 'daily';
+            
+            try {
+                const ThreatBlockerSettings = require('./models/ThreatBlockerSettings');
+                const enabledSetting = await ThreatBlockerSettings.findOne({ where: { key: 'enabled' } });
+                const frequencySetting = await ThreatBlockerSettings.findOne({ where: { key: 'updateFrequency' } });
+                
+                if (enabledSetting && enabledSetting.value !== null) {
+                    try {
+                        enabled = JSON.parse(enabledSetting.value);
+                    } catch {
+                        enabled = enabledSetting.value === 'true' || enabledSetting.value === true;
+                    }
+                }
+                
+                if (frequencySetting && frequencySetting.value !== null) {
+                    try {
+                        frequency = JSON.parse(frequencySetting.value);
+                    } catch {
+                        frequency = frequencySetting.value || 'daily';
+                    }
+                } else {
+                    // Fallback to environment variable
+                    frequency = process.env.THREAT_BLOCKER_UPDATE_FREQUENCY || 'daily';
+                }
+            } catch (settingsError) {
+                console.warn('⚠️  Could not load threat blocker settings from database, using defaults:', settingsError.message);
+                frequency = process.env.THREAT_BLOCKER_UPDATE_FREQUENCY || 'daily';
+            }
+            
+            // Start or stop scheduler based on enabled status
+            if (enabled !== false) {
+                startScheduler(frequency);
+                console.log(`✅ Automatic Threat Blocker scheduler started (frequency: ${frequency})`);
+            } else {
+                stopScheduler();
+                console.log('🛑 Automatic Threat Blocker scheduler is disabled');
+            }
         } catch (error) {
             console.error('⚠️  Failed to start threat blocker scheduler:', error.message);
         }

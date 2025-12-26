@@ -99,7 +99,8 @@ const connectDB = async () => {
             'mfa_settings',
             'impersonation_sessions',
             'blocklist_ips',
-            'activity_logs'
+            'activity_logs',
+            'threat_blocker_settings'
         ];
 
         const missingTables = await getMissingTables(tablesToCheck);

@@ -7,6 +7,7 @@ const Profile = require('../models/Profile');
 const Notification = require('../models/Notification');
 const DataTransfer = require('../models/DataTransfer');
 const ActivityLog = require('../models/ActivityLog');
+const BlocklistIP = require('../models/BlocklistIP');
 const GroupMember = require('../models/GroupMember');
 const Device = require('../models/Device');
 const LoginHistory = require('../models/LoginHistory');
@@ -347,11 +348,16 @@ const getDashboard = async (req, res) => {
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
     const lastWeekAgo = new Date();
     lastWeekAgo.setDate(lastWeekAgo.getDate() - 14);
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
     let threatsThisWeek = 0;
     let threatsLastWeek = 0;
+    let last24HoursThreats = 0;
+    let totalThreats = 0;
     
     try {
+      // Count from Threat table (actual blocked threats)
       threatsThisWeek = await Threat.count({
         where: {
           userId: userId,
@@ -372,6 +378,63 @@ const getDashboard = async (req, res) => {
           }
         }
       });
+
+      last24HoursThreats = await Threat.count({
+        where: {
+          userId: userId,
+          blocked: true,
+          createdAt: {
+            [Op.gte]: oneDayAgo
+          }
+        }
+      });
+
+      totalThreats = await Threat.count({
+        where: {
+          userId: userId,
+          blocked: true
+        }
+      });
+
+      // Also count from ActivityLog for more accurate blocking stats
+      // This includes blocks even when user wasn't authenticated
+      const activityLogThreatsThisWeek = await ActivityLog.count({
+        where: {
+          eventType: 'Blocked Threat',
+          status: 'Blocked',
+          createdAt: {
+            [Op.gte]: oneWeekAgo
+          },
+          // Include system blocks (userId is null) or user-specific blocks
+          [Op.or]: [
+            { userId: userId },
+            { userId: null } // System-wide blocks
+          ]
+        }
+      });
+
+      // Use the higher count (ActivityLog is more comprehensive)
+      if (activityLogThreatsThisWeek > threatsThisWeek) {
+        threatsThisWeek = activityLogThreatsThisWeek;
+      }
+
+      const activityLogThreatsLast24h = await ActivityLog.count({
+        where: {
+          eventType: 'Blocked Threat',
+          status: 'Blocked',
+          createdAt: {
+            [Op.gte]: oneDayAgo
+          },
+          [Op.or]: [
+            { userId: userId },
+            { userId: null }
+          ]
+        }
+      });
+
+      if (activityLogThreatsLast24h > last24HoursThreats) {
+        last24HoursThreats = activityLogThreatsLast24h;
+      }
     } catch (threatError) {
       console.error('Error counting threats:', threatError);
       // Continue with zero values
@@ -382,9 +445,12 @@ const getDashboard = async (req, res) => {
       ? Math.round(((threatsThisWeek - threatsLastWeek) / threatsLastWeek) * 100)
       : threatsThisWeek > 0 ? 100 : 0;
 
-    // Get total unique blocked IPs
+    // Get total unique blocked IPs from both Threat table and BlocklistIP table
     let uniqueBlockedIPs = [];
+    let totalBlocklistIPs = 0;
+    
     try {
+      // Get unique IPs from Threat table (actually blocked)
       uniqueBlockedIPs = await Threat.findAll({
         where: {
           userId: userId,
@@ -394,6 +460,9 @@ const getDashboard = async (req, res) => {
         attributes: ['sourceIp'],
         group: ['sourceIp']
       });
+
+      // Also get total IPs in blocklist (available to block)
+      totalBlocklistIPs = await BlocklistIP.count();
     } catch (uniqueIPsError) {
       console.error('Error getting unique blocked IPs:', uniqueIPsError);
       // Continue with empty array
@@ -537,34 +606,7 @@ const getDashboard = async (req, res) => {
     const sentPercentage = Math.min((gbSent / maxGB) * 100, 100);
     const receivedPercentage = Math.min((gbReceived / maxGB) * 100, 100);
 
-    // Calculate additional threat counts
-    let last24HoursThreats = 0;
-    let totalThreats = 0;
-    
-    try {
-      last24HoursThreats = await Threat.count({
-        where: {
-          userId: userId,
-          blocked: true,
-          createdAt: {
-            [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000)
-          }
-        }
-      });
-    } catch (err) {
-      console.error('Error counting last24Hours threats:', err);
-    }
-    
-    try {
-      totalThreats = await Threat.count({
-        where: {
-          userId: userId,
-          blocked: true
-        }
-      });
-    } catch (err) {
-      console.error('Error counting total threats:', err);
-    }
+    // Note: last24HoursThreats and totalThreats are already calculated above
 
     // Get client IP address (actual connection IP when VPN is active)
     let clientIP = null;
@@ -614,6 +656,7 @@ const getDashboard = async (req, res) => {
           thisWeek: threatsThisWeek,
           percentageChange: percentageChange,
           totalBlockedIPs: uniqueBlockedIPs.length || 0,
+          totalBlocklistIPs: totalBlocklistIPs, // Total IPs in blocklist (available to block)
           last24Hours: last24HoursThreats,
           total: totalThreats
         },
