@@ -42,6 +42,9 @@ const ThreatBlocker = ({ theme = 'dark', palette }) => {
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [filterSource, setFilterSource] = useState('all');
+  const [availableSources, setAvailableSources] = useState([]);
+  const [availableThreatTypes, setAvailableThreatTypes] = useState([]);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState(null);
   const [autoBlockingEnabled, setAutoBlockingEnabled] = useState(true);
@@ -55,6 +58,14 @@ const ThreatBlocker = ({ theme = 'dark', palette }) => {
       if (response.success) {
         setStatus(response.data);
         setAutoBlockingEnabled(response.data.enabled);
+        // Extract unique sources from status
+        if (response.data.sources && Array.isArray(response.data.sources)) {
+          setAvailableSources(response.data.sources);
+        }
+        // Extract unique threat types from status
+        if (response.data.threatTypes && Array.isArray(response.data.threatTypes)) {
+          setAvailableThreatTypes(response.data.threatTypes.sort());
+        }
       }
     } catch (err) {
       setError(getErrorMessage(err));
@@ -70,21 +81,50 @@ const ThreatBlocker = ({ theme = 'dark', palette }) => {
         limit: 10,
         search: searchQuery || undefined,
         threatType: filterType !== 'all' ? filterType : undefined,
+        source: filterSource !== 'all' ? filterSource : undefined,
       };
       const response = await threatBlockerAPI.getBlocklist(params);
       if (response.success) {
         setBlocklist(response.data.blocklist || []);
         setPagination(response.data.pagination);
+        
+        // Extract unique sources and threat types from blocklist data dynamically
+        const sources = new Set();
+        const threatTypes = new Set();
+        if (response.data.blocklist && Array.isArray(response.data.blocklist)) {
+          response.data.blocklist.forEach(item => {
+            if (item.source) {
+              sources.add(item.source);
+            }
+            if (item.threatType) {
+              threatTypes.add(item.threatType);
+            }
+          });
+        }
+        // Merge with existing sources and update if new sources found
+        if (sources.size > 0) {
+          setAvailableSources(prev => {
+            const combined = new Set([...prev, ...sources]);
+            return Array.from(combined).sort();
+          });
+        }
+        // Merge with existing threat types and update if new threat types found
+        if (threatTypes.size > 0) {
+          setAvailableThreatTypes(prev => {
+            const combined = new Set([...prev, ...threatTypes]);
+            return Array.from(combined).sort();
+          });
+        }
       }
     } catch (err) {
       setError(getErrorMessage(err));
     }
-  }, [page, filterType, searchQuery]);
+  }, [page, filterType, filterSource, searchQuery]);
 
   useEffect(() => {
     loadStatus();
     loadBlocklist();
-  }, [loadStatus, loadBlocklist, page, filterType, searchQuery]);
+  }, [loadStatus, loadBlocklist, page, filterType, filterSource, searchQuery]);
 
   // Auto-refresh status every 30 seconds to show dynamic updates
   useEffect(() => {
@@ -93,13 +133,13 @@ const ThreatBlocker = ({ theme = 'dark', palette }) => {
     const interval = setInterval(() => {
       loadStatus();
       // Only refresh blocklist if we're on first page and no filters
-      if (page === 1 && filterType === 'all' && !searchQuery) {
+      if (page === 1 && filterType === 'all' && filterSource === 'all' && !searchQuery) {
         loadBlocklist();
       }
     }, 30000); // Refresh every 30 seconds
 
     return () => clearInterval(interval);
-  }, [autoBlockingEnabled, page, filterType, searchQuery, loadStatus, loadBlocklist]);
+  }, [autoBlockingEnabled, page, filterType, filterSource, searchQuery, loadStatus, loadBlocklist]);
 
   const handleForceUpdate = async () => {
     setUpdating(true);
@@ -149,11 +189,13 @@ const ThreatBlocker = ({ theme = 'dark', palette }) => {
     return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
   };
 
+  // Note: Filtering is now done on the backend, but keeping this for client-side search if needed
   const filteredBlocklist = blocklist.filter(item => {
-    const matchesSearch = item.ipAddress.includes(searchQuery) ||
+    const matchesSearch = !searchQuery || item.ipAddress.includes(searchQuery) ||
       item.threatType.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFilter = filterType === 'all' || item.threatType === filterType;
-    return matchesSearch && matchesFilter;
+    const matchesSource = filterSource === 'all' || item.source === filterSource;
+    return matchesSearch && matchesFilter && matchesSource;
   });
 
   if (loading && !status) {
@@ -468,7 +510,10 @@ const ThreatBlocker = ({ theme = 'dark', palette }) => {
                 type="text"
                 placeholder="Search IP address or threat type..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPage(1); // Reset to first page on search
+                }}
                 className="filter-input"
                 style={{
                   backgroundColor: colors.inputBg,
@@ -480,7 +525,10 @@ const ThreatBlocker = ({ theme = 'dark', palette }) => {
             <select
               className="filter-select"
               value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
+              onChange={(e) => {
+                setFilterType(e.target.value);
+                setPage(1); // Reset to first page on filter change
+              }}
               style={{
                 backgroundColor: colors.inputBg,
                 borderColor: colors.inputBorder,
@@ -488,11 +536,55 @@ const ThreatBlocker = ({ theme = 'dark', palette }) => {
               }}
             >
               <option value="all">All Types</option>
-              <option value="Malware C&C">Malware C&C</option>
-              <option value="Botnet">Botnet</option>
-              <option value="Phishing">Phishing</option>
-              <option value="DDoS">DDoS</option>
-              <option value="Spam">Spam</option>
+              {availableThreatTypes.length > 0 ? (
+                availableThreatTypes.map((threatType) => (
+                  <option key={threatType} value={threatType}>
+                    {threatType}
+                  </option>
+                ))
+              ) : (
+                // Fallback options if no threat types loaded yet
+                <>
+                  <option value="Malware C&C">Malware C&C</option>
+                  <option value="Botnet">Botnet</option>
+                  <option value="Malware Host">Malware Host</option>
+                  <option value="Brute Force">Brute Force</option>
+                  <option value="Phishing">Phishing</option>
+                  <option value="DDoS">DDoS</option>
+                  <option value="Spam">Spam</option>
+                  <option value="Exploit">Exploit</option>
+                  <option value="Suspicious">Suspicious</option>
+                  <option value="Other">Other</option>
+                </>
+              )}
+            </select>
+            <select
+              className="filter-select"
+              value={filterSource}
+              onChange={(e) => {
+                setFilterSource(e.target.value);
+                setPage(1); // Reset to first page on filter change
+              }}
+              style={{
+                backgroundColor: colors.inputBg,
+                borderColor: colors.inputBorder,
+                color: colors.text
+              }}
+            >
+              <option value="all">All Sources</option>
+              {availableSources.length > 0 ? (
+                availableSources.map((source) => (
+                  <option key={source} value={source}>
+                    {source}
+                  </option>
+                ))
+              ) : (
+                <>
+                  <option value="AbuseIPDB">AbuseIPDB</option>
+                  <option value="Blocklist.de">Blocklist.de</option>
+                  <option value="Tor Exit Nodes">Tor Exit Nodes</option>
+                </>
+              )}
             </select>
           </div>
 

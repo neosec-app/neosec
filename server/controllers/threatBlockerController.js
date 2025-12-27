@@ -124,6 +124,13 @@ exports.getStatus = async (req, res) => {
       raw: true
     });
 
+    // Get unique threat types
+    const threatTypes = await BlocklistIP.findAll({
+      attributes: ['threatType'],
+      group: ['threatType'],
+      raw: true
+    });
+
     // Get actual scheduler status dynamically
     const schedulerStatus = getSchedulerStatus();
     
@@ -142,6 +149,7 @@ exports.getStatus = async (req, res) => {
         blockedToday,
         blockedThisWeek,
         sources: sources.map(s => s.source),
+        threatTypes: threatTypes.map(t => t.threatType),
         updateFrequency: updateFrequency || schedulerStatus.frequency || 'daily',
         autoApply: autoApply !== false,
         notificationsEnabled: notificationsEnabled !== false
@@ -277,6 +285,11 @@ exports.forceUpdate = async (req, res) => {
     const apiKey = process.env.ABUSEIPDB_API_KEY;
     const useFreeSources = process.env.USE_FREE_BLOCKLIST_SOURCES !== 'false'; // Default to true
     
+    // Debug logging for environment variables
+    console.log('🔍 Blocklist source configuration (forceUpdate):');
+    console.log(`   - ABUSEIPDB_API_KEY: ${apiKey ? '✅ Set (' + apiKey.substring(0, 8) + '...)' : '❌ NOT SET'}`);
+    console.log(`   - USE_FREE_BLOCKLIST_SOURCES: ${useFreeSources ? '✅ Enabled' : '❌ Disabled'}`);
+    
     let blocklistData = [];
     let sourceUsed = '';
 
@@ -329,10 +342,19 @@ exports.forceUpdate = async (req, res) => {
           console.log(`✅ Added ${abuseIPDBData.length} IPs from AbuseIPDB (total: ${blocklistData.length})`);
         }
       } catch (abuseError) {
-        console.warn('⚠️  AbuseIPDB fetch failed:', abuseError.message);
+        console.error('❌ AbuseIPDB fetch failed:', abuseError.message);
+        if (abuseError.response) {
+          console.error('   Response status:', abuseError.response.status);
+          console.error('   Response data:', JSON.stringify(abuseError.response.data));
+        }
         // Continue with free sources if available
       }
-    } else if (blocklistData.length === 0) {
+    } else {
+      console.log('⚠️  AbuseIPDB API key not set - skipping AbuseIPDB fetch');
+      console.log('   💡 To enable AbuseIPDB, set ABUSEIPDB_API_KEY environment variable in your hosting platform');
+    }
+    
+    if (!apiKey && blocklistData.length === 0) {
       // No API key and no free sources data
       return res.status(200).json({
         success: true,

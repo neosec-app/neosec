@@ -6,29 +6,68 @@ const axios = require('axios');
 
 /**
  * Fetch blocklist from Blocklist.de (FREE - No API key needed)
- * @returns {Promise<Array>} Array of IP objects
+ * Blocklist.de provides categorized lists for different attack types
+ * @returns {Promise<Array>} Array of IP objects with proper threat types
  */
 async function fetchBlocklistDE() {
   try {
-    // Blocklist.de provides free IP lists via HTTP
-    const response = await axios.get('https://lists.blocklist.de/lists/all.txt', {
-      timeout: 30000,
-      headers: {
-        'User-Agent': 'NeoSec-ThreatBlocker/1.0'
+    const allIPs = [];
+    const ipMap = new Map(); // Track IPs and their threat types (in case IP appears in multiple lists)
+    
+    // Blocklist.de provides categorized lists - fetch from multiple sources for better categorization
+    const blocklistSources = [
+      { url: 'https://lists.blocklist.de/lists/bruteforcelogin.txt', threatType: 'Brute Force' },
+      { url: 'https://lists.blocklist.de/lists/ssh.txt', threatType: 'Brute Force' },
+      { url: 'https://lists.blocklist.de/lists/mail.txt', threatType: 'Spam' },
+      { url: 'https://lists.blocklist.de/lists/apache.txt', threatType: 'DDoS' },
+      { url: 'https://lists.blocklist.de/lists/strongips.txt', threatType: 'DDoS' },
+      { url: 'https://lists.blocklist.de/lists/all.txt', threatType: 'Suspicious' } // Fallback for any other IPs
+    ];
+
+    // Fetch from all sources in parallel
+    const fetchPromises = blocklistSources.map(async ({ url, threatType }) => {
+      try {
+        const response = await axios.get(url, {
+          timeout: 30000,
+          headers: {
+            'User-Agent': 'NeoSec-ThreatBlocker/1.0'
+          }
+        });
+
+        if (response.data && typeof response.data === 'string') {
+          const ips = response.data
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line && !line.startsWith('#') && /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(line));
+
+          // Store IPs with their threat types (prioritize more specific types)
+          ips.forEach(ip => {
+            if (!ipMap.has(ip)) {
+              ipMap.set(ip, threatType);
+            } else {
+              // If IP already exists, keep the more specific type (not "Suspicious")
+              const existingType = ipMap.get(ip);
+              if (existingType === 'Suspicious' && threatType !== 'Suspicious') {
+                ipMap.set(ip, threatType);
+              }
+            }
+          });
+        }
+      } catch (error) {
+        // Continue if one list fails
+        console.warn(`Failed to fetch Blocklist.de list from ${url}:`, error.message);
       }
     });
 
-    if (response.data && typeof response.data === 'string') {
-      const ips = response.data
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line && !line.startsWith('#') && /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(line));
+    await Promise.allSettled(fetchPromises);
 
-      return ips.map(ip => ({
-        ipAddress: ip,
-        threatType: 'Suspicious', // Blocklist.de doesn't specify types
+    // Convert map to array
+    for (const [ipAddress, threatType] of ipMap.entries()) {
+      allIPs.push({
+        ipAddress,
+        threatType,
         source: 'Blocklist.de',
-        abuseConfidenceScore: 75, // Default confidence
+        abuseConfidenceScore: threatType === 'Suspicious' ? 50 : 75, // Higher confidence for categorized threats
         countryCode: null,
         usageType: null,
         isp: null,
@@ -37,10 +76,11 @@ async function fetchBlocklistDE() {
         totalReports: 0,
         numDistinctUsers: 0,
         lastReportedAt: new Date().toISOString()
-      }));
+      });
     }
 
-    return [];
+    console.log(`✅ Fetched ${allIPs.length} IPs from Blocklist.de (categorized by attack type)`);
+    return allIPs;
   } catch (error) {
     console.error('Blocklist.de fetch error:', error.message);
     return [];

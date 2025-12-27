@@ -18,6 +18,11 @@ async function updateBlocklist() {
     const apiKey = process.env.ABUSEIPDB_API_KEY;
     const useFreeSources = process.env.USE_FREE_BLOCKLIST_SOURCES !== 'false'; // Default to true
     
+    // Debug logging for environment variables
+    console.log('🔍 Blocklist source configuration:');
+    console.log(`   - ABUSEIPDB_API_KEY: ${apiKey ? '✅ Set (' + apiKey.substring(0, 8) + '...)' : '❌ NOT SET'}`);
+    console.log(`   - USE_FREE_BLOCKLIST_SOURCES: ${useFreeSources ? '✅ Enabled' : '❌ Disabled'}`);
+    
     if (!apiKey && !useFreeSources) {
       console.warn('⚠️  No blocklist sources configured. Set ABUSEIPDB_API_KEY or USE_FREE_BLOCKLIST_SOURCES=true');
       return;
@@ -49,6 +54,8 @@ async function updateBlocklist() {
         const confidenceMinimum = parseInt(process.env.ABUSEIPDB_CONFIDENCE_MIN || '75', 10);
         const limit = parseInt(process.env.ABUSEIPDB_LIMIT || '10000', 10);
         
+        console.log(`🔄 Fetching from AbuseIPDB (maxAge: ${maxAgeInDays} days, confidence: ${confidenceMinimum}%, limit: ${limit})`);
+        
         const abuseIPDBData = await abuseIPDBService.fetchBlocklist(
           apiKey,
           maxAgeInDays,
@@ -66,10 +73,20 @@ async function updateBlocklist() {
             }
           }
           sourceUsed = sourceUsed ? `${sourceUsed} + AbuseIPDB` : 'AbuseIPDB';
+          console.log(`✅ Added ${abuseIPDBData.length} IPs from AbuseIPDB (total: ${blocklistData.length})`);
+        } else {
+          console.log('⚠️  AbuseIPDB returned no data (empty response)');
         }
       } catch (abuseError) {
-        console.warn('⚠️  AbuseIPDB fetch failed:', abuseError.message);
+        console.error('❌ AbuseIPDB fetch failed:', abuseError.message);
+        if (abuseError.response) {
+          console.error('   Response status:', abuseError.response.status);
+          console.error('   Response data:', JSON.stringify(abuseError.response.data));
+        }
       }
+    } else {
+      console.log('⚠️  AbuseIPDB API key not set - skipping AbuseIPDB fetch');
+      console.log('   💡 To enable AbuseIPDB, set ABUSEIPDB_API_KEY environment variable in your hosting platform');
     }
     
     if (!blocklistData || blocklistData.length === 0) {
