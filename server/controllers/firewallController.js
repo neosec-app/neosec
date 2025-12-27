@@ -56,7 +56,7 @@ const getRules = async (req, res) => {
     
     const rules = await FirewallRule.findAll({
       where: { userId: req.user.id },
-      order: [['createdAt', 'ASC']],
+      order: [['createdAt', 'DESC']], // Newest rules first
       raw: false // Get model instances to ensure proper field mapping
     });
 
@@ -201,14 +201,19 @@ const createRule = async (req, res) => {
     
     let rule;
     try {
-      rule = await FirewallRule.create({
+      // Always include direction with default value 'inbound'
+      // If column doesn't exist, error handling will retry without it
+      const createData = {
         ip_address: ip_address.trim(),
         port_start,
         port_end,
         protocol: protocol, // Always integer
         action: action, // Always integer
-        userId: req.user.id
-      });
+        userId: req.user.id,
+        direction: 'inbound' // Default direction (required if column exists and is NOT NULL)
+      };
+      
+      rule = await FirewallRule.create(createData);
       console.log('Successfully created firewall rule:', rule.id);
     } catch (createError) {
       console.error('FirewallRule.create failed:', createError.message);
@@ -220,26 +225,66 @@ const createRule = async (req, res) => {
         stack: createError.stack
       });
       
-      // Check if it's an ENUM error - database needs migration
-      const isEnumError = createError.original && createError.original.message && 
-        (createError.original.message.includes('invalid input value for enum') ||
-         createError.original.message.includes('enum') ||
-         createError.original.code === '22P02');
+      // Check if it's a missing column error (like direction)
+      const isMissingColumnError = createError.original && createError.original.message && 
+        (createError.original.message.includes('column') && 
+         createError.original.message.includes('does not exist'));
       
-      if (isEnumError) {
-        return res.status(500).json({
-          success: false,
-          message: 'Database schema error: protocol and action columns are ENUM types but should be INTEGER. Please run the migration script: node server/scripts/fixFirewallRulesColumns.js',
-          error: process.env.NODE_ENV === 'development' ? {
-            message: createError.message,
-            original: createError.original?.message,
-            code: createError.original?.code
-          } : undefined
-        });
+      // If direction column doesn't exist, retry without it
+      if (isMissingColumnError && createError.original.message.includes('direction')) {
+        console.log('Retrying without direction column...');
+        const createDataWithoutDirection = {
+          ip_address: ip_address.trim(),
+          port_start,
+          port_end,
+          protocol: protocol,
+          action: action,
+          userId: req.user.id
+        };
+        rule = await FirewallRule.create(createDataWithoutDirection);
+        console.log('Successfully created firewall rule (without direction):', rule.id);
+      } else {
+        // Check if it's an ENUM error - database needs migration
+        const isEnumError = createError.original && createError.original.message && 
+          (createError.original.message.includes('invalid input value for enum') ||
+           createError.original.message.includes('enum') ||
+           createError.original.code === '22P02');
+        
+        if (isEnumError) {
+          return res.status(500).json({
+            success: false,
+            message: 'Database schema error: protocol and action columns are ENUM types but should be INTEGER. Please run the migration script: node server/scripts/fixFirewallRulesColumns.js',
+            error: process.env.NODE_ENV === 'development' ? {
+              message: createError.message,
+              original: createError.original?.message,
+              code: createError.original?.code
+            } : undefined
+          });
+        }
+        
+        // Check if it's a NOT NULL constraint error for direction
+        const isNotNullError = createError.original && createError.original.message && 
+          createError.original.message.includes('null value in column "direction"');
+        
+        if (isNotNullError) {
+          // Retry with direction value
+          console.log('Retrying with direction value...');
+          const createDataWithDirection = {
+            ip_address: ip_address.trim(),
+            port_start,
+            port_end,
+            protocol: protocol,
+            action: action,
+            userId: req.user.id,
+            direction: 'inbound'
+          };
+          rule = await FirewallRule.create(createDataWithDirection);
+          console.log('Successfully created firewall rule (with direction):', rule.id);
+        } else {
+          // Re-throw other errors to be handled by outer catch
+          throw createError;
+        }
       }
-      
-      // Re-throw other errors to be handled by outer catch
-      throw createError;
     }
 
     // Log firewall rule creation

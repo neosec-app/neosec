@@ -58,6 +58,12 @@ const FirewallRule = sequelize.define('FirewallRule', {
       model: 'users',
       key: 'id'
     }
+  },
+  direction: {
+    type: DataTypes.STRING,
+    allowNull: true, // Optional field - only used if column exists in database
+    field: 'direction',
+    defaultValue: 'inbound' // Default value if column exists
   }
 }, {
   tableName: 'firewall_rules',
