@@ -34,7 +34,8 @@ const Notification = sequelize.define('Notification', {
             'critical_threat_detected',
             'scheduled_profile_failed',
             'system_error',
-            'log_export_ready'
+            'log_export_ready',
+            'generic_notification'
         ),
         allowNull: false
     },
