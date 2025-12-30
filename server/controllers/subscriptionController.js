@@ -123,13 +123,26 @@ const createCheckoutSession = async (req, res) => {
   }
 };
 
-console.log('Stripe configuration:', {
-  keyLoaded: !!process.env.STRIPE_SECRET_KEY,
-  webhookSecretLoaded: !!process.env.STRIPE_WEBHOOK_SECRET,
-  priceBasic: PRICE_MAP.basic,
-  pricePro: PRICE_MAP.pro,
-  priceEnterprise: PRICE_MAP.enterprise,
-});
+// Log Stripe configuration (only in development or if keys are missing)
+if (process.env.NODE_ENV !== 'production' || !process.env.STRIPE_SECRET_KEY) {
+  console.log('Stripe configuration:', {
+    keyLoaded: !!process.env.STRIPE_SECRET_KEY,
+    webhookSecretLoaded: !!process.env.STRIPE_WEBHOOK_SECRET,
+    priceBasic: PRICE_MAP.basic,
+    pricePro: PRICE_MAP.pro,
+    priceEnterprise: PRICE_MAP.enterprise,
+  });
+  
+  if (!process.env.STRIPE_SECRET_KEY) {
+    console.warn('⚠️  STRIPE_SECRET_KEY is not set. Subscription features will not work.');
+  }
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    console.warn('⚠️  STRIPE_WEBHOOK_SECRET is not set. Webhook verification will fail.');
+  }
+  if (PRICE_MAP.basic.includes('placeholder') || PRICE_MAP.pro.includes('placeholder') || PRICE_MAP.enterprise.includes('placeholder')) {
+    console.warn('⚠️  Stripe Price IDs are using placeholders. Set STRIPE_PRICE_BASIC, STRIPE_PRICE_PRO, and STRIPE_PRICE_ENTERPRISE environment variables.');
+  }
+}
 
 module.exports = {
   createCheckoutSession,

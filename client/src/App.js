@@ -23,6 +23,7 @@ import ScanDashboard from './components/ScanDashboard';
 import ProfileManager from './components/ProfileManager';
 import FirewallRuleManagement from './components/FirewallRuleManagement';
 import AdminAuditTrail from './components/AdminAuditTrail';
+import ActivityLogAndNotification from './components/ActivityLogAndNotification';
 import SystemHealthMetrics from './components/SystemHealthMetrics';
 import MFASettings from './components/MFASettings';
 import DeviceInventory from './components/DeviceInventory';
@@ -162,28 +163,41 @@ function App() {
     }, [currentView, user]);
 
     // Fetch dashboard data when user is logged in
-    useEffect(() => {
-        const fetchDashboard = async () => {
-            if (user && currentView === 'dashboard') {
-                try {
-                    setDashboardLoading(true);
-                    setDashboardError(null);
-                    const response = await dashboardAPI.getDashboard();
-                    if (response.success) {
-                        setDashboardData(response.data);
-                    } else {
-                        setDashboardError(response.message || 'Failed to load dashboard data');
-                    }
-                } catch (error) {
-                    console.error('Dashboard fetch error:', error);
-                    setDashboardError(getErrorMessage(error, 'Failed to load dashboard data'));
-                } finally {
-                    setDashboardLoading(false);
+    const fetchDashboard = useCallback(async () => {
+        if (user && currentView === 'dashboard') {
+            try {
+                setDashboardLoading(true);
+                setDashboardError(null);
+                const response = await dashboardAPI.getDashboard();
+                if (response.success) {
+                    setDashboardData(response.data);
+                } else {
+                    setDashboardError(response.message || 'Failed to load dashboard data');
                 }
+            } catch (error) {
+                console.error('Dashboard fetch error:', error);
+                setDashboardError(getErrorMessage(error, 'Failed to load dashboard data'));
+            } finally {
+                setDashboardLoading(false);
             }
-        };
-        fetchDashboard();
+        }
     }, [user, currentView]);
+
+    // Initial load and when dependencies change
+    useEffect(() => {
+        fetchDashboard();
+    }, [fetchDashboard]);
+
+    // Auto-refresh dashboard every 30 seconds when on dashboard view
+    useEffect(() => {
+        if (!user || currentView !== 'dashboard') return;
+
+        const interval = setInterval(() => {
+            fetchDashboard();
+        }, 30000); // Refresh every 30 seconds
+
+        return () => clearInterval(interval);
+    }, [user, currentView, fetchDashboard]);
 
     // Admin Data Fetch
     useEffect(() => {
@@ -460,6 +474,11 @@ if (isShareManagementPage) {
                         {/* Audit View */}
                         {currentView === 'audit' && user.role === 'admin' && (
                             <AdminAuditTrail theme={theme} palette={palette} />
+                        )}
+
+                        {/* Activity Log and Notification View - Only for non-admin users */}
+                        {currentView === 'activity-log-notification' && user.role !== 'admin' && (
+                            <ActivityLogAndNotification theme={theme} palette={palette} />
                         )}
 
                         {/* System Health View */}

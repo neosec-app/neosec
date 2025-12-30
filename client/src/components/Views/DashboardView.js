@@ -1,6 +1,7 @@
 import React from 'react';
 import { SiAlwaysdata } from 'react-icons/si';
 import { GoAlertFill } from 'react-icons/go';
+import { FiUsers } from 'react-icons/fi';
 import { getCardBaseStyle } from '../../utils/styles';
 import { vpnAPI } from '../../services/api';
 
@@ -378,6 +379,120 @@ function DashboardView({ user, theme, palette, dashboardData, dashboardLoading, 
                             >
                                 Create one
                             </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Active Users Card - 3rd column, same row as Active Profile */}
+                <div style={{ ...cardBase, padding: isMobile ? '16px' : '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: isMobile ? '16px' : '20px' }}>
+                        <FiUsers style={{ fontSize: isMobile ? '18px' : '20px', color: palette.accent }} />
+                        <h2 style={{ fontSize: isMobile ? '16px' : '18px', margin: 0, color: palette.text, fontWeight: 600 }}>
+                            {user?.role === 'admin' ? 'Active Users' : 'Group Members'}
+                        </h2>
+                    </div>
+                    {dashboardLoading ? (
+                        <div style={{ fontSize: '14px', color: palette.textMuted }}>Loading...</div>
+                    ) : dashboardData?.activeUsers && dashboardData.activeUsers.length > 0 ? (
+                        <div style={{
+                            maxHeight: isMobile ? '200px' : '280px',
+                            overflowY: 'auto',
+                            overflowX: 'hidden',
+                            paddingRight: '8px',
+                            // Custom scrollbar styling for Firefox
+                            scrollbarWidth: 'thin',
+                            scrollbarColor: `${palette.border} transparent`
+                        }}
+                        className="active-users-scroll"
+                        >
+                            <style>{`
+                                .active-users-scroll::-webkit-scrollbar {
+                                    width: 6px;
+                                }
+                                .active-users-scroll::-webkit-scrollbar-track {
+                                    background: transparent;
+                                }
+                                .active-users-scroll::-webkit-scrollbar-thumb {
+                                    background: ${palette.border};
+                                    border-radius: 3px;
+                                }
+                                .active-users-scroll::-webkit-scrollbar-thumb:hover {
+                                    background: ${palette.textMuted};
+                                }
+                            `}</style>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {dashboardData.activeUsers.map((activeUser) => (
+                                    <div
+                                        key={activeUser.id}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '10px',
+                                            padding: '10px',
+                                            borderRadius: '8px',
+                                            backgroundColor: 'transparent',
+                                            transition: 'background-color 0.2s ease'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = theme === 'light' ? '#f9fafb' : palette.bgPanel;
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'transparent';
+                                        }}
+                                    >
+                                        <div style={{
+                                            width: '10px',
+                                            height: '10px',
+                                            borderRadius: '50%',
+                                            backgroundColor: activeUser.isActive ? '#10b981' : '#f59e0b',
+                                            flexShrink: 0,
+                                            boxShadow: activeUser.isActive 
+                                                ? `0 0 6px #10b981` 
+                                                : `0 0 6px #f59e0b`
+                                        }}></div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <p style={{
+                                                    margin: 0,
+                                                    fontSize: '14px',
+                                                    color: palette.text,
+                                                    fontWeight: 500,
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap',
+                                                    flex: 1
+                                                }}>
+                                                    {activeUser.email}
+                                                </p>
+                                                <p style={{
+                                                    margin: 0,
+                                                    fontSize: '11px',
+                                                    color: activeUser.isActive ? '#10b981' : '#f59e0b',
+                                                    fontWeight: 500,
+                                                    whiteSpace: 'nowrap'
+                                                }}>
+                                                    {activeUser.statusText || 'now'}
+                                                </p>
+                                            </div>
+                                            {activeUser.role === 'admin' && (
+                                                <p style={{
+                                                    margin: '2px 0 0 0',
+                                                    fontSize: '11px',
+                                                    color: palette.textMuted
+                                                }}>
+                                                    Admin
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <div style={{ fontSize: '14px', color: palette.textMuted, textAlign: 'center', padding: '20px' }}>
+                            {user?.role === 'admin' 
+                                ? 'No active users' 
+                                : 'No active group members'}
                         </div>
                     )}
                 </div>

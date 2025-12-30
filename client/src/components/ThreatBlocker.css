@@ -409,6 +409,7 @@ input:checked + .slider:before {
 .blocklist-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed; /* Fixed table layout to prevent column shifting */
 }
 
 .blocklist-table thead {
@@ -424,10 +425,45 @@ input:checked + .slider:before {
   border-bottom: 1px solid;
 }
 
+.blocklist-table th:nth-child(1) {
+  width: 20%; /* IP Address */
+}
+
+.blocklist-table th:nth-child(2) {
+  width: 25%; /* Threat Type */
+}
+
+.blocklist-table th:nth-child(3) {
+  width: 20%; /* Added Date */
+}
+
+.blocklist-table th:nth-child(4) {
+  width: 35%; /* Source */
+}
+
 .blocklist-table td {
   padding: 12px;
   font-size: 14px;
   border-bottom: 1px solid;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.blocklist-table td:nth-child(1) {
+  white-space: nowrap; /* IP Address - no wrap */
+}
+
+.blocklist-table td:nth-child(2) {
+  white-space: normal; /* Threat Type - allow wrap for badge */
+  overflow: visible;
+}
+
+.blocklist-table td:nth-child(3) {
+  white-space: nowrap; /* Added Date - no wrap */
+}
+
+.blocklist-table td:nth-child(4) {
+  white-space: nowrap; /* Source - no wrap */
 }
 
 .blocklist-table tbody tr:hover {
@@ -437,6 +473,9 @@ input:checked + .slider:before {
 .ip-address {
   font-family: 'Courier New', monospace;
   font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .threat-badge {

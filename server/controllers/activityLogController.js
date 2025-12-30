@@ -268,40 +268,5 @@ exports.exportLogs = async (req, res) => {
   }
 };
 
-/**
- * Clear logs (admin only)
- */
-exports.clearLogs = async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Only admins can clear logs'
-      });
-    }
-
-    const { days = 90 } = req.query;
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - parseInt(days));
-
-    const deletedCount = await ActivityLog.destroy({
-      where: {
-        createdAt: {
-          [Op.lt]: cutoffDate
-        }
-      }
-    });
-
-    res.status(200).json({
-      success: true,
-      message: `Cleared ${deletedCount} log entries older than ${days} days`
-    });
-  } catch (error) {
-    console.error('Clear logs error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to clear logs'
-    });
-  }
-};
+// Clear logs functionality removed - logs are kept permanently
 

@@ -44,11 +44,8 @@ const Notification = sequelize.define('Notification', {
         defaultValue: 'medium',
         allowNull: false
     },
-    severity: {
-        type: DataTypes.ENUM('critical', 'warning', 'info'),
-        allowNull: true,
-        defaultValue: null
-    },
+    // severity: Removed - column doesn't exist in database
+    // If needed in future, add column to database first
     status: {
         type: DataTypes.ENUM('unread', 'read', 'archived'),
         defaultValue: 'unread'
@@ -75,7 +72,8 @@ const Notification = sequelize.define('Notification', {
     }
 }, {
     timestamps: true,
-    tableName: 'notifications'
+    tableName: 'notifications',
+    underscored: false // Override global setting - use camelCase for timestamps
 });
 
 // Association

@@ -402,10 +402,6 @@ export const activityLogAPI = {
       responseType: format === 'csv' ? 'blob' : 'json'
     });
     return response.data;
-  },
-  clearLogs: async (days = 90) => {
-    const response = await api.delete('/activity-logs', { params: { days } });
-    return response.data;
   }
 };
 

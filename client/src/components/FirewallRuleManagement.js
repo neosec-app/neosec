@@ -162,7 +162,22 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
             closeFirewallModal();
         } catch (error) {
             console.error('Save firewall rule error:', error);
-            const msg = error.response?.data?.message || 'Failed to save firewall rule';
+            console.error('Error response:', error.response?.data);
+            console.error('Error details:', error.response?.data?.error);
+            
+            // Get detailed error message
+            let msg = error.response?.data?.message || 'Failed to save firewall rule';
+            
+            // Include error details if available (for debugging)
+            if (error.response?.data?.error) {
+                const errorDetails = error.response.data.error;
+                if (errorDetails.original) {
+                    msg += `: ${errorDetails.original}`;
+                } else if (errorDetails.message) {
+                    msg += `: ${errorDetails.message}`;
+                }
+            }
+            
             setFirewallError(msg);
             showToast(msg, 'error');
         } finally {
@@ -910,9 +925,8 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
                             fontSize: '14px',
                             fontWeight: 500,
                             animation: t.visible !== false 
-                                ? 'toastSlideIn 0.3s ease-out' 
-                                : 'toastFadeOut 0.3s ease-in',
-                            animationFillMode: 'forwards',
+                                ? 'toastSlideIn 0.3s ease-out forwards' 
+                                : 'toastFadeOut 0.3s ease-in forwards',
                             pointerEvents: 'auto',
                             transition: 'opacity 0.3s ease, transform 0.3s ease'
                         }}

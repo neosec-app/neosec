@@ -89,6 +89,23 @@ const getAuditLogs = async (req, res) => {
     });
 
     // Get statistics
+    // For distinct count of active admins, use a raw query since Sequelize count doesn't support distinct properly
+    let activeAdminsCount = 0;
+    try {
+      const [activeAdminsResult] = await AuditLog.sequelize.query(
+        `SELECT COUNT(DISTINCT "adminUserId") as count FROM audit_logs WHERE "createdAt" >= :startDate AND "createdAt" <= :endDate`,
+        {
+          replacements: { startDate, endDate },
+          type: AuditLog.sequelize.QueryTypes.SELECT
+        }
+      );
+      activeAdminsCount = parseInt(activeAdminsResult[0]?.count || 0);
+    } catch (err) {
+      console.error('Error counting active admins:', err);
+      // Fallback to simple count if distinct query fails
+      activeAdminsCount = await AuditLog.count({ where });
+    }
+    
     const stats = {
       totalActions: total,
       successCount: await AuditLog.count({
@@ -97,11 +114,7 @@ const getAuditLogs = async (req, res) => {
       failureCount: await AuditLog.count({
         where: { ...where, result: 'failure' }
       }),
-      activeAdmins: await AuditLog.count({
-        where,
-        distinct: true,
-        col: 'adminUserId'
-      }),
+      activeAdmins: activeAdminsCount,
       criticalActions: await AuditLog.count({
         where: { ...where, category: 'Security' }
       })
@@ -120,10 +133,17 @@ const getAuditLogs = async (req, res) => {
     });
   } catch (error) {
     console.error('Get audit logs error:', error);
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Server error fetching audit logs',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        original: error.original?.message,
+        code: error.original?.code,
+        stack: error.stack
+      } : undefined
     });
   }
 };
