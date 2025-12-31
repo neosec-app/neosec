@@ -16,9 +16,9 @@
     "i18n-iso-countries": "^7.14.0"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "vercel-build": "react-scripts build",
+    "start": "react-scripts --max-old-space-size=4096 start",
+    "build": "react-scripts --max-old-space-size=4096 build",
+    "vercel-build": "react-scripts --max-old-space-size=4096 build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
