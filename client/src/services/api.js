@@ -56,10 +56,14 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/';
+      // Token expired or invalid - only redirect for non-subscription endpoints
+      const url = error.config?.url || '';
+      if (!url.includes('/subscription/')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/';
+      }
+      // For subscription endpoints, let the component handle the 401 error
     }
     return Promise.reject(error);
   }
