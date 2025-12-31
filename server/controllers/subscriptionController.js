@@ -204,10 +204,13 @@ const upgradeTestUser = async (req, res) => {
       });
     }
 
-    // Update user to leader
+    // Update user to leader and subscription tier
     const User = require('../models/User');
     await User.update(
-      { accountType: 'leader' },
+      {
+        accountType: 'leader',
+        subscriptionTier: tier
+      },
       { where: { id: req.user.id } }
     );
 
