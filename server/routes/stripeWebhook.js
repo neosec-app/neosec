@@ -42,9 +42,12 @@ router.post(
         await sub.update({ tier, status: 'active' });
       }
 
-      // Update user account type to "leader" when they pay
+      // Update user account type and subscription tier when they pay
       await User.update(
-        { accountType: 'leader' },
+        {
+          accountType: 'leader',
+          subscriptionTier: tier
+        },
         { where: { id: userId } }
       );
 
