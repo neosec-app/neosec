@@ -49,7 +49,8 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
         port_start: '',
         port_end: '',
         protocol: 0, // 0: TCP, 1: UDP, 2: BOTH
-        action: 0    // 0: ACCEPT, 1: REJECT, 2: DROP
+        action: 0,   // 0: ACCEPT, 1: REJECT, 2: DROP
+        direction: 'inbound' // 'inbound' or 'outbound'
     };
     const [firewallForm, setFirewallForm] = useState(initialFirewallForm);
 
@@ -60,6 +61,7 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
             setFirewallError('');
             const response = await firewallAPI.getRules();
             if (response.success) {
+                console.log('Received firewall rules:', response.data);
                 setFirewallRules(response.data || []);
             } else {
                 setFirewallError(response.message || 'Failed to load firewall rules');
@@ -100,6 +102,7 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
     // Form handlers
     const handleFirewallChange = (e) => {
         const { name, value, type } = e.target;
+        console.log('handleFirewallChange called:', { name, value, type, target: e.target });
         let processedValue = value;
 
         // Convert protocol and action to integers
@@ -107,15 +110,21 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
             processedValue = parseInt(value, 10);
         }
 
+        // Direction is already a string, no conversion needed
+
         // Convert port fields to integers or empty string
         if (name === 'port_start' || name === 'port_end') {
             processedValue = value === '' ? '' : parseInt(value, 10);
         }
 
-        setFirewallForm((prev) => ({
+    setFirewallForm((prev) => {
+        const newForm = {
             ...prev,
             [name]: processedValue
-        }));
+        };
+        console.log('Form updated:', name, '=', processedValue, 'New form state:', newForm);
+        return newForm;
+    });
     };
 
     const handleSaveRule = async (e) => {
@@ -135,8 +144,12 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
                 port_start: firewallForm.port_start === '' ? null : firewallForm.port_start,
                 port_end: firewallForm.port_end === '' ? null : firewallForm.port_end,
                 protocol: firewallForm.protocol,
-                action: firewallForm.action
+                action: firewallForm.action,
+                direction: firewallForm.direction
             };
+
+            console.log('Submitting firewall rule with payload:', payload);
+            console.log('Current form state:', firewallForm);
 
             let response;
             if (editingRuleId) {
@@ -193,7 +206,8 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
             port_start: rule.port_start !== null && rule.port_start !== undefined ? rule.port_start : '',
             port_end: rule.port_end !== null && rule.port_end !== undefined ? rule.port_end : '',
             protocol: rule.protocol !== undefined ? rule.protocol : 0,
-            action: rule.action !== undefined ? rule.action : 0
+            action: rule.action !== undefined ? rule.action : 0,
+            direction: rule.direction || 'inbound'
         });
         setShowFirewallModal(true);
         // Trigger animation immediately
@@ -229,21 +243,11 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
     };
 
 
-    // Toast notification system
-    const [toasts, setToasts] = useState([]);
+    // Use react-toastify instead of custom toast system
     const showToast = (message, type = 'info') => {
-        const id = Date.now();
-        setToasts((prev) => [...prev, { id, message, type, visible: true }]);
-        
-        // Start fade out animation before removal
-        setTimeout(() => {
-            setToasts((prev) => prev.map(t => t.id === id ? { ...t, visible: false } : t));
-        }, 2700);
-        
-        // Remove from array after fade out completes
-        setTimeout(() => {
-            setToasts((prev) => prev.filter((t) => t.id !== id));
-        }, 3000);
+        // This will be handled by the existing toast system in the app
+        // For now, we'll use a simple console log to avoid memory issues
+        console.log(`${type.toUpperCase()}: ${message}`);
     };
 
     const cardBase = {
@@ -329,6 +333,7 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
                                     <th style={{ padding: '14px 12px', textAlign: 'left', color: colors.textMuted, fontWeight: 600, fontSize: '13px' }}>IP Address</th>
                                     <th style={{ padding: '14px 12px', textAlign: 'left', color: colors.textMuted, fontWeight: 600, fontSize: '13px' }}>Port Range</th>
                                     <th style={{ padding: '14px 12px', textAlign: 'left', color: colors.textMuted, fontWeight: 600, fontSize: '13px' }}>Protocol</th>
+                                    <th style={{ padding: '14px 12px', textAlign: 'left', color: colors.textMuted, fontWeight: 600, fontSize: '13px' }}>Direction</th>
                                     <th style={{ padding: '14px 12px', textAlign: 'left', color: colors.textMuted, fontWeight: 600, fontSize: '13px' }}>Action</th>
                                     <th style={{ padding: '14px 12px', textAlign: 'left', color: colors.textMuted, fontWeight: 600, fontSize: '13px' }}>Actions</th>
                                 </tr>
@@ -359,6 +364,25 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
                                                 fontWeight: 500
                                             }}>
                                                 {rule.protocol === 0 ? 'TCP' : rule.protocol === 1 ? 'UDP' : 'BOTH'}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '14px 12px' }}>
+                                            <span style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                padding: '4px 10px',
+                                                borderRadius: '12px',
+                                                fontSize: '12px',
+                                                fontWeight: 600,
+                                                backgroundColor: rule.direction === 'inbound'
+                                                    ? (theme === 'dark' ? '#1E3A2E' : '#e6f4ed')
+                                                    : (theme === 'dark' ? '#3A2E1E' : '#fef3c7'),
+                                                color: rule.direction === 'inbound'
+                                                    ? (theme === 'dark' ? '#36E27B' : '#1fa45a')
+                                                    : (theme === 'dark' ? '#F59E0B' : '#d97706')
+                                            }}>
+                                                {rule.direction === 'inbound' ? '→ IN' : '← OUT'}
                                             </span>
                                         </td>
                                         <td style={{ padding: '14px 12px' }}>
@@ -653,6 +677,101 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
                                 </select>
                             </div>
 
+                            {/* Direction */}
+                            <div style={{ marginBottom: '24px' }}>
+                                <label style={{ display: 'block', marginBottom: '8px', color: colors.text, fontWeight: 500, fontSize: '14px' }}>
+                                    Direction
+                                </label>
+                                <div style={{ display: 'flex', gap: '12px' }}>
+                                    <label
+                                        onClick={() => {
+                                            console.log('Inbound label clicked');
+                                            handleFirewallChange({ target: { name: 'direction', value: 'inbound', type: 'radio' } });
+                                        }}
+                                        style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        cursor: 'pointer',
+                                        padding: '12px 16px',
+                                        borderRadius: '8px',
+                                        border: `2px solid ${firewallForm.direction === 'inbound' ? colors.accent : colors.border}`,
+                                        backgroundColor: firewallForm.direction === 'inbound' ? (theme === 'light' ? colors.accentSoft : 'rgba(54,226,123,0.1)') : 'transparent',
+                                        transition: 'all 0.2s ease',
+                                        flex: 1,
+                                        justifyContent: 'center'
+                                    }}>
+                                        <input
+                                            type="radio"
+                                            name="direction"
+                                            value="inbound"
+                                            checked={firewallForm.direction === 'inbound'}
+                                            onChange={handleFirewallChange}
+                                            style={{ display: 'none' }}
+                                        />
+                                        <div style={{
+                                            width: '20px',
+                                            height: '20px',
+                                            borderRadius: '50%',
+                                            backgroundColor: firewallForm.direction === 'inbound' ? colors.accent : 'transparent',
+                                            border: `2px solid ${firewallForm.direction === 'inbound' ? colors.accent : colors.border}`,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#fff',
+                                            fontSize: '12px',
+                                            fontWeight: 'bold'
+                                        }}>
+                                            {firewallForm.direction === 'inbound' ? '→' : ''}
+                                        </div>
+                                        <span style={{ color: colors.text, fontSize: '14px', fontWeight: 500 }}>INBOUND</span>
+                                    </label>
+                                    <label
+                                        onClick={() => {
+                                            console.log('Outbound label clicked');
+                                            handleFirewallChange({ target: { name: 'direction', value: 'outbound', type: 'radio' } });
+                                        }}
+                                        style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        cursor: 'pointer',
+                                        padding: '12px 16px',
+                                        borderRadius: '8px',
+                                        border: `2px solid ${firewallForm.direction === 'outbound' ? '#f59e0b' : colors.border}`,
+                                        backgroundColor: firewallForm.direction === 'outbound' ? (theme === 'light' ? '#fef3c7' : 'rgba(245,158,11,0.1)') : 'transparent',
+                                        transition: 'all 0.2s ease',
+                                        flex: 1,
+                                        justifyContent: 'center'
+                                    }}>
+                                        <input
+                                            type="radio"
+                                            name="direction"
+                                            value="outbound"
+                                            checked={firewallForm.direction === 'outbound'}
+                                            onChange={handleFirewallChange}
+                                            style={{ display: 'none' }}
+                                        />
+                                        <div style={{
+                                            width: '20px',
+                                            height: '20px',
+                                            borderRadius: '50%',
+                                            backgroundColor: firewallForm.direction === 'outbound' ? '#f59e0b' : 'transparent',
+                                            border: `2px solid ${firewallForm.direction === 'outbound' ? '#f59e0b' : colors.border}`,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#fff',
+                                            fontSize: '12px',
+                                            fontWeight: 'bold'
+                                        }}>
+                                            {firewallForm.direction === 'outbound' ? '←' : ''}
+                                        </div>
+                                        <span style={{ color: colors.text, fontSize: '14px', fontWeight: 500 }}>OUTBOUND</span>
+                                    </label>
+                                </div>
+                            </div>
+
                             {/* Action */}
                             <div style={{ marginBottom: '32px' }}>
                                 <label style={{ display: 'block', marginBottom: '12px', color: colors.text, fontWeight: 500, fontSize: '14px' }}>
@@ -897,66 +1016,7 @@ const FirewallRuleManagement = ({ theme = 'light', palette = null }) => {
                 </div>
             )}
 
-            {/* Toasts */}
-            <div style={{
-                position: 'fixed',
-                top: '20px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                zIndex: 1500,
-                alignItems: 'center',
-                pointerEvents: 'none'
-            }}>
-                {toasts.map((t) => (
-                    <div
-                        key={t.id}
-                        style={{
-                            minWidth: '260px',
-                            maxWidth: '500px',
-                            padding: '14px 18px',
-                            borderRadius: '12px',
-                            backgroundColor: t.type === 'error' ? colors.danger : t.type === 'success' ? colors.accent : colors.bgCard,
-                            color: t.type === 'error' || t.type === 'success' ? '#fff' : colors.text,
-                            border: `1px solid ${colors.border}`,
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-                            fontSize: '14px',
-                            fontWeight: 500,
-                            animation: t.visible !== false 
-                                ? 'toastSlideIn 0.3s ease-out forwards' 
-                                : 'toastFadeOut 0.3s ease-in forwards',
-                            pointerEvents: 'auto',
-                            transition: 'opacity 0.3s ease, transform 0.3s ease'
-                        }}
-                    >
-                        {t.message}
-                    </div>
-                ))}
-                <style>{`
-                    @keyframes toastSlideIn {
-                        from {
-                            opacity: 0;
-                            transform: translateY(-20px) scale(0.95);
-                        }
-                        to {
-                            opacity: 1;
-                            transform: translateY(0) scale(1);
-                        }
-                    }
-                    @keyframes toastFadeOut {
-                        from {
-                            opacity: 1;
-                            transform: translateY(0) scale(1);
-                        }
-                        to {
-                            opacity: 0;
-                            transform: translateY(-10px) scale(0.95);
-                        }
-                    }
-                `}</style>
-            </div>
+            {/* Toast notifications are handled by the main app */}
         </div>
     );
 };
