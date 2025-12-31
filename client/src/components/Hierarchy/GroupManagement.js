@@ -5,6 +5,12 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
     const [groups, setGroups] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [createForm, setCreateForm] = useState({
+        name: '',
+        description: ''
+    });
+    const [createLoading, setCreateLoading] = useState(false);
 
     useEffect(() => {
         if (user?.accountType === 'leader') {
@@ -41,6 +47,45 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
         }
     };
 
+    const handleCreateGroup = async (e) => {
+        e.preventDefault();
+        console.log('handleCreateGroup called with form:', createForm);
+        if (!createForm.name.trim()) {
+            alert('Group name is required');
+            return;
+        }
+
+        setCreateLoading(true);
+        try {
+            const response = await hierarchyAPI.createGroup({
+                name: createForm.name.trim(),
+                description: createForm.description.trim()
+            });
+
+            if (response.success) {
+                setShowCreateModal(false);
+                setCreateForm({ name: '', description: '' });
+                await fetchGroups(); // Refresh the groups list
+                alert('Group created successfully!');
+            } else {
+                alert(response.message || 'Failed to create group');
+            }
+        } catch (error) {
+            console.error('Create group error:', error);
+            alert('Failed to create group');
+        } finally {
+            setCreateLoading(false);
+        }
+    };
+
+    const handleCreateFormChange = (e) => {
+        const { name, value } = e.target;
+        setCreateForm(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
     if (user?.accountType !== 'leader') {
         return (
             <div style={{
@@ -65,7 +110,6 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
                         Leader Access Required
                     </h2>
                     <p style={{ color: palette.textMuted, marginBottom: '24px' }}>
-                        You need to upgrade to a Leader account to create and manage groups.
                     </p>
                     <button
                         onClick={() => window.location.href = '#subscription'}
@@ -114,8 +158,8 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
                     </div>
                     <button
                         onClick={() => {
-                            // TODO: Implement create group modal
-                            alert('Create group functionality coming soon');
+                            console.log('Create Group button clicked');
+                            setShowCreateModal(true);
                         }}
                         style={{
                             padding: '12px 24px',
@@ -168,11 +212,8 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
                         <p style={{ color: palette.textMuted, marginBottom: '24px' }}>
                             Create your first group to start inviting members and managing configurations.
                         </p>
-                        <button
-                            onClick={() => {
-                                // TODO: Implement create group modal
-                                alert('Create group functionality coming soon');
-                            }}
+                                <button
+                                    onClick={() => setShowCreateModal(true)}
                             style={{
                                 padding: '12px 24px',
                                 backgroundColor: palette.accent,
@@ -260,8 +301,156 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
                     </div>
                 )}
 
-                {/* Modals would go here - Create Group, Invite Member, Group Details */}
-                {/* Implementation continues with modals styled similarly */}
+                {/* Create Group Modal */}
+                {console.log('showCreateModal:', showCreateModal) || (showCreateModal && (
+                    <div style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000
+                    }}>
+                        <div style={{
+                            backgroundColor: theme === 'light' ? '#fff' : palette.bgCard,
+                            padding: '32px',
+                            borderRadius: '12px',
+                            border: theme === 'light' ? '1px solid #e5e7eb' : `1px solid ${palette.border}`,
+                            width: '90%',
+                            maxWidth: '500px',
+                            maxHeight: '90vh',
+                            overflowY: 'auto'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                                <h2 style={{ margin: 0, color: palette.text, fontSize: '24px', fontWeight: '600' }}>
+                                    Create New Group
+                                </h2>
+                                <button
+                                    onClick={() => setShowCreateModal(false)}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: palette.textMuted,
+                                        fontSize: '24px',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        borderRadius: '4px'
+                                    }}
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleCreateGroup}>
+                                <div style={{ marginBottom: '20px' }}>
+                                    <label style={{
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        color: palette.text,
+                                        fontWeight: '500',
+                                        fontSize: '14px'
+                                    }}>
+                                        Group Name *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="name"
+                                        value={createForm.name}
+                                        onChange={handleCreateFormChange}
+                                        placeholder="Enter group name"
+                                        required
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 16px',
+                                            border: `1px solid ${palette.border}`,
+                                            borderRadius: '8px',
+                                            backgroundColor: theme === 'light' ? '#fff' : palette.bgPanel,
+                                            color: palette.text,
+                                            fontSize: '14px',
+                                            boxSizing: 'border-box'
+                                        }}
+                                    />
+                                </div>
+
+                                <div style={{ marginBottom: '24px' }}>
+                                    <label style={{
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        color: palette.text,
+                                        fontWeight: '500',
+                                        fontSize: '14px'
+                                    }}>
+                                        Description
+                                    </label>
+                                    <textarea
+                                        name="description"
+                                        value={createForm.description}
+                                        onChange={handleCreateFormChange}
+                                        placeholder="Enter group description (optional)"
+                                        rows={3}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px 16px',
+                                            border: `1px solid ${palette.border}`,
+                                            borderRadius: '8px',
+                                            backgroundColor: theme === 'light' ? '#fff' : palette.bgPanel,
+                                            color: palette.text,
+                                            fontSize: '14px',
+                                            boxSizing: 'border-box',
+                                            resize: 'vertical'
+                                        }}
+                                    />
+                                </div>
+
+                                <div style={{
+                                    display: 'flex',
+                                    gap: '12px',
+                                    justifyContent: 'flex-end',
+                                    paddingTop: '16px',
+                                    borderTop: theme === 'light' ? '1px solid #e5e7eb' : `1px solid ${palette.border}`
+                                }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCreateModal(false)}
+                                        style={{
+                                            padding: '10px 20px',
+                                            backgroundColor: theme === 'light' ? '#fff' : 'transparent',
+                                            color: palette.text,
+                                            border: theme === 'light' ? '1px solid #e5e7eb' : `1px solid ${palette.border}`,
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            fontWeight: '500'
+                                        }}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={createLoading}
+                                        style={{
+                                            padding: '10px 20px',
+                                            backgroundColor: palette.accent,
+                                            color: theme === 'dark' ? '#000' : '#fff',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            cursor: createLoading ? 'not-allowed' : 'pointer',
+                                            fontSize: '14px',
+                                            fontWeight: '600',
+                                            opacity: createLoading ? 0.6 : 1
+                                        }}
+                                    >
+                                        {createLoading ? 'Creating...' : 'Create Group'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
