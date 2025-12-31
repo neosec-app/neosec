@@ -17,6 +17,14 @@ const {
     updateMemberPermissions,
     updateMemberConfig,
 
+    // Member Security Management (Leader only)
+    getMemberProfiles,
+    updateMemberProfile,
+    getMemberFirewallRules,
+    updateMemberFirewallRule,
+    getMemberVPNConfigs,
+    updateMemberVPNConfig,
+
     // Invitation Management
     getMyInvitations,
     acceptInvitation,
@@ -69,6 +77,28 @@ router.put('/groups/:groupId/members/:memberId/permissions', protect, requireLea
 
 // Update member's VPN/Firewall config (leader managing member's config)
 router.put('/groups/:groupId/members/:memberId/config', protect, requireLeader, updateMemberConfig);
+
+// ============================================
+// MEMBER SECURITY MANAGEMENT ROUTES (Leader only)
+// ============================================
+
+// Get member's security profiles
+router.get('/members/:memberId/profiles', protect, requireLeader, getMemberProfiles);
+
+// Update member's security profile
+router.put('/members/:memberId/profiles/:profileId', protect, requireLeader, updateMemberProfile);
+
+// Get member's firewall rules
+router.get('/members/:memberId/firewall', protect, requireLeader, getMemberFirewallRules);
+
+// Update member's firewall rule
+router.put('/members/:memberId/firewall/:ruleId', protect, requireLeader, updateMemberFirewallRule);
+
+// Get member's VPN configurations
+router.get('/members/:memberId/vpn', protect, requireLeader, getMemberVPNConfigs);
+
+// Update member's VPN configuration
+router.put('/members/:memberId/vpn/:configId', protect, requireLeader, updateMemberVPNConfig);
 
 // ============================================
 // INVITATION ROUTES (All users)

@@ -39,6 +39,7 @@ import VpnManagement from './components/VpnManagement';
 // Hierarchy Components
 import Subscription from './components/Hierarchy/Subscription';
 import GroupManagement from './components/Hierarchy/GroupManagement';
+import MemberSecurityManagement from './components/Hierarchy/MemberSecurityManagement';
 import Invitations from './components/Hierarchy/Invitations';
 
 // Share Profile Components
@@ -468,6 +469,7 @@ if (isShareManagementPage) {
                         )}
 
                         {currentView === "groups" && <GroupManagement user={user} theme={theme} palette={palette} isMobile={isMobile} isTablet={isTablet} />}
+                        {currentView === "member-security" && <MemberSecurityManagement user={user} theme={theme} palette={palette} isMobile={isMobile} isTablet={isTablet} />}
                         {currentView === "invitations" && <Invitations />}
 
 
