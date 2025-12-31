@@ -66,14 +66,21 @@ const Subscription = () => {
   const [processingTier, setProcessingTier] = useState(null);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
+  const [selectedTier, setSelectedTier] = useState(() => {
+    // Load from localStorage if available
+    return localStorage.getItem('selectedTier') || 'basic';
+  });
+
 
   useEffect(() => {
     fetchData();
     checkURLParams();
   }, []);
 
+
   const checkURLParams = () => {
     const params = new URLSearchParams(window.location.search);
+
     if (params.get('success')) {
       // Show congratulations and refresh data to check leader status
       handlePaymentSuccess();
@@ -90,12 +97,17 @@ const Subscription = () => {
   const handlePaymentSuccess = async () => {
     try {
       console.log('=== PAYMENT SUCCESS HANDLING ===');
+      console.log('Current selectedTier state:', selectedTier);
       setMessage('🎉 Congratulations! Payment successful!');
+
+      // First, try manual upgrade (this creates subscription and billing history)
+      console.log('Attempting manual upgrade for tier:', selectedTier);
+      await manuallyUpgradeUser(selectedTier);
 
       // Refresh user data to check if they became a leader
       const token = localStorage.getItem('token');
       if (token) {
-        console.log('Checking user status...');
+        console.log('Refreshing user data...');
         const response = await fetch('http://localhost:5000/api/auth/me', {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -104,22 +116,25 @@ const Subscription = () => {
 
         if (response.ok) {
           const userData = await response.json();
-          console.log('User data after payment:', userData);
+          console.log('Updated user data:', userData);
+
+          // Update localStorage with fresh user data
+          localStorage.setItem('user', JSON.stringify(userData.user));
 
           if (userData.user?.accountType === 'leader') {
-            console.log('User is already a leader');
+            console.log('User is now a leader!');
             setMessage('🎉 Congratulations! You are now a Leader! You can create and manage groups.');
             setTimeout(() => {
               alert('🎉 Welcome to Leader status! You can now access group management features.');
+              // Refresh the page to ensure all components get updated user data
+              window.location.reload();
             }, 1000);
           } else {
-            console.log('User not upgraded yet, attempting manual upgrade...');
-            // Fallback: try to manually upgrade user if webhook didn't process
-            await manuallyUpgradeUser();
+            console.log('User still not a leader after upgrade - this is unexpected');
+            setMessage('🎉 Payment successful! Your leader status is being processed.');
           }
         } else {
-          console.log('Failed to fetch user data, trying manual upgrade...');
-          await manuallyUpgradeUser();
+          console.log('Failed to refresh user data');
         }
       }
 
@@ -133,27 +148,42 @@ const Subscription = () => {
     }
   };
 
-  const manuallyUpgradeUser = async () => {
+  const manuallyUpgradeUser = async (selectedTier = 'basic') => {
     try {
+      console.log('=== CALLING MANUAL UPGRADE ===');
+      console.log('Selected tier:', selectedTier);
       // This is a fallback for test mode when webhook doesn't fire
-      const response = await api.post('/subscription/upgrade-test');
+      console.log('Making API call to /subscription/upgrade-test with tier:', selectedTier);
+      const response = await api.post('/subscription/upgrade-test', { tier: selectedTier });
+      console.log('Manual upgrade response:', response);
+      console.log('Response data:', response.data);
+
       if (response.data.success) {
-        setMessage('🎉 Congratulations! You are now a Leader! You can create and manage groups.');
+        console.log('Manual upgrade successful');
+        setMessage(`🎉 Congratulations! You are now a Leader with ${selectedTier.toUpperCase()} plan! You can create and manage groups.`);
         setTimeout(() => {
-          alert('🎉 Welcome to Leader status! You can now access group management features.');
+          alert(`🎉 Welcome to Leader status with ${selectedTier.toUpperCase()} plan! You can now access group management features.`);
         }, 1000);
+
+        // Clear the stored tier after successful upgrade
+        localStorage.removeItem('selectedTier');
+
         // Refresh data
+        console.log('Refreshing data after manual upgrade...');
         await fetchData();
+      } else {
+        console.log('Manual upgrade response not successful:', response.data);
       }
     } catch (error) {
       console.error('Manual upgrade failed:', error);
+      console.error('Error details:', error.response?.data || error.message);
       setMessage('🎉 Payment successful! Your leader status may take a moment to update. Please refresh the page.');
     }
   };
 
   const fetchData = async () => {
     const token = localStorage.getItem('token');
-    
+
     if (!token) {
       setError('No authentication token found');
       setLoading(false);
@@ -165,22 +195,17 @@ const Subscription = () => {
       setError(null);
 
       // Fetch subscription
-      console.log('Fetching subscription data...');
       const subData = await api.get('/subscription/me');
-      console.log('Raw subscription response:', subData);
-      console.log('Subscription data:', subData?.subscription);
-      console.log('Subscription tier:', subData?.subscription?.tier);
-      setCurrentPlan(subData?.subscription?.tier || 'free');
-      console.log('Setting current plan to:', subData?.subscription?.tier || 'free');
+      const newPlan = subData?.data?.subscription?.tier || 'free';
+      setCurrentPlan(newPlan);
 
       // Fetch billing history
       const billData = await api.get('/subscription/billing');
-      console.log('Billing data:', billData);
-      setBillingHistory(billData.history || []);
+      setBillingHistory(billData?.data?.history || []);
 
     } catch (err) {
-      console.error('Fetch error:', err);
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to load subscription data';
+      console.error('Failed to load subscription data:', err?.response?.data?.message || err?.message);
+      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to load subscription data';
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -196,6 +221,9 @@ const Subscription = () => {
       return;
     }
 
+    setSelectedTier(tier); // Store the selected tier
+    localStorage.setItem('selectedTier', tier); // Persist across page reloads
+    console.log('Set selectedTier to:', tier);
     setProcessingTier(tier);
     setError(null);
 
@@ -309,6 +337,7 @@ const Subscription = () => {
         </div>
       )}
 
+
       {/* Current Plan Card */}
       <div
         style={{
@@ -319,6 +348,7 @@ const Subscription = () => {
           marginBottom: 32,
         }}
       >
+        {console.log('=== RENDERING CURRENT PLAN ===', currentPlan)}
         <h3 style={{ margin: 0, fontSize: 18, marginBottom: 8 }}>
           Current Plan:{' '}
           <span style={{ color: colors.accent, fontSize: 22, fontWeight: 700 }}>

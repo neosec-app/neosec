@@ -110,7 +110,6 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
                         Leader Access Required
                     </h2>
                     <p style={{ color: palette.textMuted, marginBottom: '24px' }}>
-                        You need to upgrade to a Leader account to create and manage groups.
                     </p>
                     <button
                         onClick={() => window.location.href = '#subscription'}
