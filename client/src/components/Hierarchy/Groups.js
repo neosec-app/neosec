@@ -7,7 +7,7 @@ const Groups = ({ user, theme, palette, isMobile, isTablet }) => {
     const [memberships, setMemberships] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState('owned'); // owned, member
+    const [activeTab, setActiveTab] = useState('member'); // Default to member view
     const [inviteModalOpen, setInviteModalOpen] = useState(false);
     const [selectedGroupForInvite, setSelectedGroupForInvite] = useState(null);
     const [inviteEmail, setInviteEmail] = useState('');
@@ -17,6 +17,21 @@ const Groups = ({ user, theme, palette, isMobile, isTablet }) => {
     useEffect(() => {
         fetchAllData();
     }, [user]);
+
+    // Set default tab based on loaded data
+    useEffect(() => {
+        if (!loading && user) {
+            if (user.accountType === 'leader' && ownedGroups.length > 0 && memberships.length === 0) {
+                setActiveTab('owned');
+            } else if (memberships.length > 0) {
+                setActiveTab('member');
+            } else if (ownedGroups.length > 0) {
+                setActiveTab('owned');
+            } else {
+                setActiveTab('member'); // Default fallback
+            }
+        }
+    }, [loading, user, ownedGroups.length, memberships.length]);
 
     const fetchAllData = async () => {
         try {
@@ -506,29 +521,31 @@ const Groups = ({ user, theme, palette, isMobile, isTablet }) => {
                     </div>
                 )}
 
-                {/* Tab Navigation for Leaders */}
-                {user?.accountType === 'leader' && (ownedGroups.length > 0 || memberships.length > 0) ? (
+                {/* Tab Navigation */}
+                {(user?.accountType === 'leader' && ownedGroups.length > 0) || memberships.length > 0 ? (
                     <div style={{
                         display: 'flex',
                         marginBottom: '24px',
                         borderBottom: `1px solid ${palette.border}`,
                         gap: '24px'
                     }}>
-                        <button
-                            onClick={() => setActiveTab('owned')}
-                            style={{
-                                padding: '12px 0',
-                                border: 'none',
-                                borderBottom: activeTab === 'owned' ? `2px solid ${palette.accent}` : 'none',
-                                backgroundColor: 'transparent',
-                                color: activeTab === 'owned' ? palette.accent : palette.textMuted,
-                                fontWeight: activeTab === 'owned' ? '600' : '500',
-                                cursor: 'pointer',
-                                fontSize: '16px'
-                            }}
-                        >
-                            Managing ({ownedGroups.length})
-                        </button>
+                        {user?.accountType === 'leader' && ownedGroups.length > 0 && (
+                            <button
+                                onClick={() => setActiveTab('owned')}
+                                style={{
+                                    padding: '12px 0',
+                                    border: 'none',
+                                    borderBottom: activeTab === 'owned' ? `2px solid ${palette.accent}` : 'none',
+                                    backgroundColor: 'transparent',
+                                    color: activeTab === 'owned' ? palette.accent : palette.textMuted,
+                                    fontWeight: activeTab === 'owned' ? '600' : '500',
+                                    cursor: 'pointer',
+                                    fontSize: '16px'
+                                }}
+                            >
+                                Managing ({ownedGroups.length})
+                            </button>
+                        )}
                         <button
                             onClick={() => setActiveTab('member')}
                             style={{
@@ -555,19 +572,21 @@ const Groups = ({ user, theme, palette, isMobile, isTablet }) => {
                     </div>
                 ) : (
                     <>
-                        {/* Owned Groups Tab */}
-                        {activeTab === 'owned' && renderOwnedGroups()}
+                        {/* Content based on tabs or default view */}
+                        {user?.accountType === 'leader' && ownedGroups.length > 0 && activeTab === 'owned' && renderOwnedGroups()}
 
-                        {/* Memberships Tab */}
-                        {activeTab === 'member' && renderMemberships()}
+                        {((user?.accountType === 'leader' && memberships.length > 0) || user?.accountType !== 'leader') && activeTab === 'member' && renderMemberships()}
 
-                        {/* Default view for non-leaders */}
-                        {user?.accountType !== 'leader' && renderMemberships()}
-
-                        {/* Default view for leaders with no tabs shown */}
-                        {user?.accountType === 'leader' && ownedGroups.length === 0 && memberships.length === 0 && (
+                        {/* Default view when no tabs are shown */}
+                        {memberships.length === 0 && ownedGroups.length === 0 && (
                             <div style={{ textAlign: 'center', padding: '48px 0', color: palette.textMuted }}>
+                                <div style={{ fontSize: '48px', marginBottom: '16px' }}>👥</div>
                                 <p>You don't have any groups yet.</p>
+                                {user?.accountType === 'leader' && (
+                                    <p style={{ fontSize: '14px', marginTop: '8px' }}>
+                                        Create your first group or ask to be invited to existing groups!
+                                    </p>
+                                )}
                             </div>
                         )}
                     </>

@@ -1,7 +1,5 @@
 // server/controllers/hierarchyController.js
 const { User, Group, GroupMember, Invitation, Subscription } = require('../models/associations');
-const crypto = require('crypto');
-const { Op } = require('sequelize');
 
 // ============================================
 // GROUP MANAGEMENT
@@ -58,6 +56,140 @@ const createGroup = async (req, res) => {
     }
 };
 
+// @desc    Invite a user to join group
+// @route   POST /api/hierarchy/groups/:groupId/invite
+// @access  Private (Leader only)
+const inviteMember = async (req, res) => {
+    try {
+        const { groupId } = req.params;
+        const { email } = req.body;
+
+        console.log('Invite member request:', { groupId, email, userId: req.user.id });
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email is required'
+            });
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid email format'
+            });
+        }
+
+        // Check if group exists and user is leader
+        const group = await Group.findByPk(groupId);
+        if (!group) {
+            return res.status(404).json({
+                success: false,
+                message: 'Group not found'
+            });
+        }
+
+        if (group.leaderId !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({
+                success: false,
+                message: 'Only group leaders can send invitations'
+            });
+        }
+
+        // Check if user is trying to invite themselves
+        if (email === req.user.email) {
+            return res.status(400).json({
+                success: false,
+                message: 'You cannot invite yourself to the group'
+            });
+        }
+
+        // Find the user by email (optional - user might not exist yet)
+        const UserModel = require('../models/User');
+        const invitee = await UserModel.findOne({ where: { email } });
+
+        // Check if the invitee is already a member of this group
+        if (invitee) {
+            const existingMember = await GroupMember.findOne({
+                where: { groupId, userId: invitee.id }
+            });
+
+            if (existingMember) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'This user is already a member of the group'
+                });
+            }
+
+            // Check if invitation already exists
+            const existingInvitation = await Invitation.findOne({
+                where: {
+                    groupId,
+                    inviteeId: invitee.id,
+                    status: 'pending'
+                }
+            });
+
+            if (existingInvitation) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invitation already sent to this user'
+                });
+            }
+        } else {
+            // Check if invitation already exists by email for non-registered users
+            const existingInvitation = await Invitation.findOne({
+                where: {
+                    groupId,
+                    inviteeEmail: email,
+                    status: 'pending'
+                }
+            });
+
+            if (existingInvitation) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invitation already sent to this email'
+                });
+            }
+        }
+
+        // Generate a unique token for the invitation
+        const crypto = require('crypto');
+        const token = crypto.randomBytes(32).toString('hex');
+
+        // Create invitation
+        const invitationData = {
+            groupId,
+            inviterId: req.user.id,
+            inviteeEmail: email,
+            inviteeId: invitee ? invitee.id : null,
+            status: 'pending',
+            token: token,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+        };
+
+        console.log('Creating invitation with data:', invitationData);
+
+        const invitation = await Invitation.create(invitationData);
+
+        res.status(201).json({
+            success: true,
+            message: 'Invitation sent successfully',
+            invitation
+        });
+
+    } catch (error) {
+        console.error('Invite member error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error sending invitation'
+        });
+    }
+};
+
 // @desc    Get all groups led by current user
 // @route   GET /api/hierarchy/groups/my-groups
 // @access  Private (Leader only)
@@ -69,64 +201,35 @@ const getMyGroups = async (req, res) => {
                 {
                     model: GroupMember,
                     as: 'members',
-                    include: [
-                        {
-                            model: User,
-                            as: 'user',
-                            attributes: ['id', 'email', 'accountType']
-                        }
-                    ],
                     where: { status: 'accepted' },
-                    required: false
+                    required: false,
+                    include: [{ model: User, as: 'user' }]
                 }
             ],
             order: [['createdAt', 'DESC']]
         });
 
-        res.status(200).json({
+        res.json({
             success: true,
-            count: groups.length,
             groups
         });
     } catch (error) {
         console.error('Get my groups error:', error);
         res.status(500).json({
             success: false,
-            message: 'Error fetching groups',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            message: 'Error fetching groups'
         });
     }
 };
 
-// @desc    Get specific group details
-// @route   GET /api/hierarchy/groups/:groupId
+// @desc    Get all members of a group
+// @route   GET /api/hierarchy/groups/:groupId/members
 // @access  Private
-const getGroupDetails = async (req, res) => {
+const getGroupMembers = async (req, res) => {
     try {
         const { groupId } = req.params;
 
-        const group = await Group.findByPk(groupId, {
-            include: [
-                {
-                    model: User,
-                    as: 'leader',
-                    attributes: ['id', 'email', 'accountType']
-                },
-                {
-                    model: GroupMember,
-                    as: 'members',
-                    include: [
-                        {
-                            model: User,
-                            as: 'user',
-                            attributes: ['id', 'email', 'accountType']
-                        }
-                    ],
-                    where: { status: 'accepted' },
-                    required: false
-                }
-            ]
-        });
+        const group = await Group.findByPk(groupId);
 
         if (!group) {
             return res.status(404).json({
@@ -137,144 +240,43 @@ const getGroupDetails = async (req, res) => {
 
         // Check if user is leader or member
         const isLeader = group.leaderId === req.user.id;
-        const isMember = group.members.some(m => m.userId === req.user.id);
+        const isMember = await GroupMember.findOne({
+            where: {
+                groupId,
+                userId: req.user.id,
+                status: 'accepted'
+            }
+        });
 
         if (!isLeader && !isMember && req.user.role !== 'admin') {
             return res.status(403).json({
                 success: false,
-                message: 'Access denied. You are not a member of this group.'
+                message: 'Access denied'
             });
         }
+
+        const members = await GroupMember.findAll({
+            where: { groupId },
+            include: [
+                {
+                    model: User,
+                    as: 'user',
+                    attributes: ['id', 'email', 'accountType']
+                }
+            ],
+            order: [['joinedAt', 'ASC']]
+        });
 
         res.status(200).json({
             success: true,
-            group,
-            permissions: {
-                isLeader,
-                isMember,
-                canManage: isLeader || req.user.role === 'admin'
-            }
+            count: members.length,
+            members
         });
     } catch (error) {
-        console.error('Get group details error:', error);
+        console.error('Get group members error:', error);
         res.status(500).json({
             success: false,
-            message: 'Error fetching group details',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
-};
-
-// ============================================
-// MEMBER MANAGEMENT
-// ============================================
-
-// @desc    Invite a user to join group
-// @route   POST /api/hierarchy/groups/:groupId/invite
-// @access  Private (Leader only)
-const inviteMember = async (req, res) => {
-    try {
-        const { groupId } = req.params;
-        const { email } = req.body;
-
-        if (!email) {
-            return res.status(400).json({
-                success: false,
-                message: 'Email is required'
-            });
-        }
-
-        // Check if group exists and user is the leader
-        const group = await Group.findByPk(groupId, {
-            include: [{ model: GroupMember, as: 'members', where: { status: 'accepted' }, required: false }]
-        });
-
-        if (!group) {
-            return res.status(404).json({
-                success: false,
-                message: 'Group not found'
-            });
-        }
-
-        if (group.leaderId !== req.user.id && req.user.role !== 'admin') {
-            return res.status(403).json({
-                success: false,
-                message: 'Only the group leader can invite members'
-            });
-        }
-
-        // Check if group is full
-        if (group.members.length >= group.maxMembers) {
-            return res.status(400).json({
-                success: false,
-                message: `Group is full. Maximum members: ${group.maxMembers}`
-            });
-        }
-
-        // Find user by email
-        const invitee = await User.findOne({ where: { email } });
-
-        if (!invitee) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found with this email'
-            });
-        }
-
-        // Check if already a member
-        const existingMembership = await GroupMember.findOne({
-            where: {
-                groupId,
-                userId: invitee.id,
-                status: { [Op.in]: ['pending', 'accepted'] }
-            }
-        });
-
-        if (existingMembership) {
-            return res.status(400).json({
-                success: false,
-                message: 'User is already a member or has a pending invitation'
-            });
-        }
-
-        // Create invitation
-        const token = crypto.randomBytes(32).toString('hex');
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-
-        const invitation = await Invitation.create({
-            groupId,
-            inviterId: req.user.id,
-            inviteeEmail: email,
-            inviteeId: invitee.id,
-            token,
-            expiresAt
-        });
-
-        // Create pending membership
-        await GroupMember.create({
-            groupId,
-            userId: invitee.id,
-            invitedBy: req.user.id,
-            status: 'pending'
-        });
-
-        // TODO: Send email notification to invitee
-
-        res.status(201).json({
-            success: true,
-            message: 'Invitation sent successfully',
-            invitation: {
-                id: invitation.id,
-                email: invitation.inviteeEmail,
-                expiresAt: invitation.expiresAt
-            }
-        });
-    } catch (error) {
-        console.error('Invite member error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error sending invitation',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            message: 'Error fetching members'
         });
     }
 };
@@ -283,53 +285,6 @@ const inviteMember = async (req, res) => {
 // INVITATION MANAGEMENT
 // ============================================
 
-// @desc    Get all invitations for current user
-// @route   GET /api/hierarchy/invitations
-// @access  Private
-const getMyInvitations = async (req, res) => {
-    try {
-        const invitations = await Invitation.findAll({
-            where: {
-                inviteeId: req.user.id,
-                status: 'pending',
-                expiresAt: { [Op.gt]: new Date() }
-            },
-            include: [
-                {
-                    model: Group,
-                    as: 'group',
-                    include: [
-                        {
-                            model: User,
-                            as: 'leader',
-                            attributes: ['id', 'email']
-                        }
-                    ]
-                },
-                {
-                    model: User,
-                    as: 'inviter',
-                    attributes: ['id', 'email']
-                }
-            ],
-            order: [['createdAt', 'DESC']]
-        });
-
-        res.status(200).json({
-            success: true,
-            count: invitations.length,
-            invitations
-        });
-    } catch (error) {
-        console.error('Get invitations error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error fetching invitations',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
-};
-
 // @desc    Accept invitation
 // @route   POST /api/hierarchy/invitations/:invitationId/accept
 // @access  Private
@@ -337,7 +292,16 @@ const acceptInvitation = async (req, res) => {
     try {
         const { invitationId } = req.params;
 
+        console.log('Accept invitation request:', { invitationId, userId: req.user.id, userEmail: req.user.email });
+
         const invitation = await Invitation.findByPk(invitationId);
+        console.log('Found invitation:', invitation ? {
+            id: invitation.id,
+            inviteeId: invitation.inviteeId,
+            inviteeEmail: invitation.inviteeEmail,
+            status: invitation.status,
+            groupId: invitation.groupId
+        } : 'null');
 
         if (!invitation) {
             return res.status(404).json({
@@ -346,47 +310,63 @@ const acceptInvitation = async (req, res) => {
             });
         }
 
-        if (invitation.inviteeId !== req.user.id) {
+        // Check if user can accept this invitation
+        // For registered users: inviteeId should match user ID
+        // For email-based invitations: check if invitation email matches user email
+        const canAccept = invitation.inviteeId === req.user.id ||
+                          (invitation.inviteeId === null && invitation.inviteeEmail === req.user.email);
+
+        console.log('Permission check:', {
+            inviteeId: invitation.inviteeId,
+            userId: req.user.id,
+            inviteeEmail: invitation.inviteeEmail,
+            userEmail: req.user.email,
+            canAccept
+        });
+
+        if (!canAccept) {
+            console.log('Permission denied for invitation acceptance');
             return res.status(403).json({
                 success: false,
-                message: 'This invitation is not for you'
+                message: 'You can only accept invitations sent to your email'
             });
         }
 
         if (invitation.status !== 'pending') {
             return res.status(400).json({
                 success: false,
-                message: 'Invitation has already been responded to'
+                message: 'Invitation is no longer pending'
             });
         }
 
-        if (new Date() > invitation.expiresAt) {
-            invitation.status = 'expired';
-            await invitation.save();
+        // Check if user is already a member
+        const existingMembership = await GroupMember.findOne({
+            where: {
+                groupId: invitation.groupId,
+                userId: req.user.id
+            }
+        });
+
+        if (existingMembership) {
             return res.status(400).json({
                 success: false,
-                message: 'Invitation has expired'
+                message: 'You are already a member of this group'
             });
         }
+
+        // Add user to group
+        await GroupMember.create({
+            groupId: invitation.groupId,
+            userId: req.user.id,
+            invitedBy: invitation.inviterId,
+            role: 'member',
+            status: 'accepted',
+            joinedAt: new Date()
+        });
 
         // Update invitation status
         invitation.status = 'accepted';
-        invitation.acceptedAt = new Date();
         await invitation.save();
-
-        // Update membership status
-        await GroupMember.update(
-            {
-                status: 'accepted',
-                joinedAt: new Date()
-            },
-            {
-                where: {
-                    groupId: invitation.groupId,
-                    userId: req.user.id
-                }
-            }
-        );
 
         res.status(200).json({
             success: true,
@@ -402,6 +382,465 @@ const acceptInvitation = async (req, res) => {
     }
 };
 
+// @desc    Reject invitation
+// @route   POST /api/hierarchy/invitations/:invitationId/reject
+// @access  Private
+const rejectInvitation = async (req, res) => {
+    try {
+        const { invitationId } = req.params;
+
+        const invitation = await Invitation.findByPk(invitationId);
+
+        if (!invitation) {
+            return res.status(404).json({
+                success: false,
+                message: 'Invitation not found'
+            });
+        }
+
+        // Check if user can reject this invitation
+        // For registered users: inviteeId should match user ID
+        // For email-based invitations: check if invitation email matches user email
+        const canReject = invitation.inviteeId === req.user.id ||
+                          (invitation.inviteeId === null && invitation.inviteeEmail === req.user.email);
+
+        if (!canReject) {
+            return res.status(403).json({
+                success: false,
+                message: 'You can only reject invitations sent to your email'
+            });
+        }
+
+        if (invitation.status !== 'pending') {
+            return res.status(400).json({
+                success: false,
+                message: 'Invitation is no longer pending'
+            });
+        }
+
+        // Update invitation status
+        invitation.status = 'rejected';
+        await invitation.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Invitation rejected successfully'
+        });
+    } catch (error) {
+        console.error('Reject invitation error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error rejecting invitation',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+// @desc    Get all invitations received by current user
+// @route   GET /api/hierarchy/invitations
+// @access  Private
+const getMyInvitations = async (req, res) => {
+    try {
+        const invitations = await Invitation.findAll({
+            where: {
+                inviteeId: req.user.id,
+                status: 'pending'
+            },
+            include: [
+                {
+                    model: Group,
+                    as: 'group'
+                },
+                {
+                    model: User,
+                    as: 'inviter'
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+
+        res.json({
+            success: true,
+            invitations
+        });
+    } catch (error) {
+        console.error('Get my invitations error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching invitations'
+        });
+    }
+};
+
+// ============================================
+// MEMBERSHIP MANAGEMENT
+// ============================================
+
+// @desc    Get all groups current user is a member of
+// @route   GET /api/hierarchy/memberships
+// @access  Private
+const getMyMemberships = async (req, res) => {
+    try {
+        const memberships = await GroupMember.findAll({
+            where: {
+                userId: req.user.id,
+                status: 'accepted'
+            },
+            include: [
+                {
+                    model: Group,
+                    as: 'group',
+                    include: [
+                        {
+                            model: GroupMember,
+                            as: 'members',
+                            where: { status: 'accepted' },
+                            required: false
+                        }
+                    ]
+                }
+            ],
+            order: [['joinedAt', 'DESC']]
+        });
+
+        res.json({
+            success: true,
+            memberships
+        });
+    } catch (error) {
+        console.error('Get my memberships error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching memberships'
+        });
+    }
+};
+
+// ============================================
+// MEMBER SECURITY MANAGEMENT (Leader only)
+// ============================================
+
+// @desc    Get member's security profiles
+// @route   GET /api/hierarchy/members/:memberId/profiles
+// @access  Private (Leader only)
+const getMemberProfiles = async (req, res) => {
+    try {
+        const { memberId } = req.params;
+
+        // Verify the member belongs to one of the leader's groups
+        const memberRecord = await GroupMember.findOne({
+            where: { userId: memberId },
+            include: [{
+                model: Group,
+                where: { leaderId: req.user.id },
+                required: true
+            }]
+        });
+
+        if (!memberRecord) {
+            return res.status(403).json({
+                success: false,
+                message: 'You can only view profiles of your group members'
+            });
+        }
+
+        // Get member's profiles
+        const Profile = require('../models/Profile');
+        const profiles = await Profile.findAll({
+            where: { userId: memberId },
+            order: [['createdAt', 'DESC']]
+        });
+
+        res.json({
+            success: true,
+            profiles
+        });
+    } catch (error) {
+        console.error('Get member profiles error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error retrieving member profiles'
+        });
+    }
+};
+
+// @desc    Update member's security profile
+// @route   PUT /api/hierarchy/members/:memberId/profiles/:profileId
+// @access  Private (Leader only)
+const updateMemberProfile = async (req, res) => {
+    try {
+        const { memberId, profileId } = req.params;
+        const updates = req.body;
+
+        // Verify the member belongs to one of the leader's groups
+        const memberRecord = await GroupMember.findOne({
+            where: { userId: memberId },
+            include: [{
+                model: Group,
+                where: { leaderId: req.user.id },
+                required: true
+            }]
+        });
+
+        if (!memberRecord) {
+            return res.status(403).json({
+                success: false,
+                message: 'You can only update profiles of your group members'
+            });
+        }
+
+        // Update the profile
+        const Profile = require('../models/Profile');
+        const [updatedRows] = await Profile.update(updates, {
+            where: { id: profileId, userId: memberId }
+        });
+
+        if (updatedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Profile not found'
+            });
+        }
+
+        // Get updated profile
+        const updatedProfile = await Profile.findByPk(profileId);
+
+        res.json({
+            success: true,
+            message: 'Profile updated successfully',
+            profile: updatedProfile
+        });
+    } catch (error) {
+        console.error('Update member profile error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error updating member profile'
+        });
+    }
+};
+
+// @desc    Get member's firewall rules
+// @route   GET /api/hierarchy/members/:memberId/firewall
+// @access  Private (Leader only)
+const getMemberFirewallRules = async (req, res) => {
+    try {
+        const { memberId } = req.params;
+
+        // Verify the member belongs to one of the leader's groups
+        const memberRecord = await GroupMember.findOne({
+            where: { userId: memberId },
+            include: [{
+                model: Group,
+                where: { leaderId: req.user.id },
+                required: true
+            }]
+        });
+
+        if (!memberRecord) {
+            return res.status(403).json({
+                success: false,
+                message: 'You can only view firewall rules of your group members'
+            });
+        }
+
+        // Get member's firewall rules
+        const FirewallRule = require('../models/FirewallRule');
+        const rules = await FirewallRule.findAll({
+            where: { userId: memberId },
+            order: [['createdAt', 'DESC']]
+        });
+
+        res.json({
+            success: true,
+            rules
+        });
+    } catch (error) {
+        console.error('Get member firewall rules error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error retrieving member firewall rules'
+        });
+    }
+};
+
+// @desc    Update member's firewall rule
+// @route   PUT /api/hierarchy/members/:memberId/firewall/:ruleId
+// @access  Private (Leader only)
+const updateMemberFirewallRule = async (req, res) => {
+    try {
+        const { memberId, ruleId } = req.params;
+        const updates = req.body;
+
+        // Verify the member belongs to one of the leader's groups
+        const memberRecord = await GroupMember.findOne({
+            where: { userId: memberId },
+            include: [{
+                model: Group,
+                where: { leaderId: req.user.id },
+                required: true
+            }]
+        });
+
+        if (!memberRecord) {
+            return res.status(403).json({
+                success: false,
+                message: 'You can only update firewall rules of your group members'
+            });
+        }
+
+        // Update the firewall rule
+        const FirewallRule = require('../models/FirewallRule');
+        const [updatedRows] = await FirewallRule.update(updates, {
+            where: { id: ruleId, userId: memberId }
+        });
+
+        if (updatedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Firewall rule not found'
+            });
+        }
+
+        // Get updated rule
+        const updatedRule = await FirewallRule.findByPk(ruleId);
+
+        res.json({
+            success: true,
+            message: 'Firewall rule updated successfully',
+            rule: updatedRule
+        });
+    } catch (error) {
+        console.error('Update member firewall rule error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error updating member firewall rule'
+        });
+    }
+};
+
+// @desc    Get member's VPN configurations
+// @route   GET /api/hierarchy/members/:memberId/vpn
+// @access  Private (Leader only)
+const getMemberVPNConfigs = async (req, res) => {
+    try {
+        const { memberId } = req.params;
+
+        // Verify the member belongs to one of the leader's groups
+        const memberRecord = await GroupMember.findOne({
+            where: { userId: memberId },
+            include: [{
+                model: Group,
+                where: { leaderId: req.user.id },
+                required: true
+            }]
+        });
+
+        if (!memberRecord) {
+            return res.status(403).json({
+                success: false,
+                message: 'You can only view VPN configs of your group members'
+            });
+        }
+
+        // Get member's VPN configs
+        const VpnConfig = require('../models/VpnConfig');
+        const configs = await VpnConfig.findAll({
+            where: { userId: memberId },
+            order: [['createdAt', 'DESC']]
+        });
+
+        res.json({
+            success: true,
+            configs
+        });
+    } catch (error) {
+        console.error('Get member VPN configs error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error retrieving member VPN configurations'
+        });
+    }
+};
+
+// @desc    Update member's VPN configuration
+// @route   PUT /api/hierarchy/members/:memberId/vpn/:configId
+// @access  Private (Leader only)
+const updateMemberVPNConfig = async (req, res) => {
+    try {
+        const { memberId, configId } = req.params;
+        const updates = req.body;
+
+        // Verify the member belongs to one of the leader's groups
+        const memberRecord = await GroupMember.findOne({
+            where: { userId: memberId },
+            include: [{
+                model: Group,
+                where: { leaderId: req.user.id },
+                required: true
+            }]
+        });
+
+        if (!memberRecord) {
+            return res.status(403).json({
+                success: false,
+                message: 'You can only update VPN configs of your group members'
+            });
+        }
+
+        // Update the VPN config
+        const VpnConfig = require('../models/VpnConfig');
+        const [updatedRows] = await VpnConfig.update(updates, {
+            where: { id: configId, userId: memberId }
+        });
+
+        if (updatedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'VPN configuration not found'
+            });
+        }
+
+        // Get updated config
+        const updatedConfig = await VpnConfig.findByPk(configId);
+
+        res.json({
+            success: true,
+            message: 'VPN configuration updated successfully',
+            config: updatedConfig
+        });
+    } catch (error) {
+        console.error('Update member VPN config error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error updating member VPN configuration'
+        });
+    }
+};
+
+module.exports = {
+    // Group management
+    createGroup,
+    inviteMember,
+    getMyGroups,
+    getGroupMembers,
+
+    // Invitation management
+    getMyInvitations,
+    acceptInvitation,
+    rejectInvitation,
+
+    // Membership management
+    getMyMemberships,
+
+    // Member security management
+    getMemberProfiles,
+    updateMemberProfile,
+    getMemberFirewallRules,
+    updateMemberFirewallRule,
+    getMemberVPNConfigs,
+    updateMemberVPNConfig
+};
+
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
@@ -414,535 +853,4 @@ const getMaxGroupsForTier = (tier) => {
         enterprise: 999
     };
     return limits[tier] || 0;
-};
-
-// ============================================
-// EXPORTS
-// ============================================
-
-module.exports = {
-    createGroup,
-    getMyGroups,
-    getGroupDetails,
-    inviteMember,
-    getMyInvitations,
-    acceptInvitation,
-
-    // TODO: Implement these functions
-    // @desc    Update group
-    // @route   PUT /api/hierarchy/groups/:groupId
-    // @access  Private (Leader only)
-    updateGroup: async (req, res) => {
-        try {
-            const { groupId } = req.params;
-            const { name, description, maxMembers } = req.body;
-
-            const group = await Group.findByPk(groupId);
-
-            if (!group) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Group not found'
-                });
-            }
-
-            if (group.leaderId !== req.user.id && req.user.role !== 'admin') {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Only the group leader can update this group'
-                });
-            }
-
-            if (name) group.name = name;
-            if (description !== undefined) group.description = description;
-            if (maxMembers) group.maxMembers = maxMembers;
-
-            await group.save();
-
-            res.status(200).json({
-                success: true,
-                message: 'Group updated successfully',
-                group
-            });
-        } catch (error) {
-            console.error('Update group error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error updating group',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
-            });
-        }
-    },
-
-    // @desc    Delete group
-    // @route   DELETE /api/hierarchy/groups/:groupId
-    // @access  Private (Leader only)
-    deleteGroup: async (req, res) => {
-        try {
-            const { groupId } = req.params;
-
-            const group = await Group.findByPk(groupId);
-
-            if (!group) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Group not found'
-                });
-            }
-
-            if (group.leaderId !== req.user.id && req.user.role !== 'admin') {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Only the group leader can delete this group'
-                });
-            }
-
-            // Soft delete - mark as inactive
-            group.isActive = false;
-            await group.save();
-
-            res.status(200).json({
-                success: true,
-                message: 'Group deleted successfully'
-            });
-        } catch (error) {
-            console.error('Delete group error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error deleting group',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
-            });
-        }
-    },
-
-    // @desc    Get group members
-    // @route   GET /api/hierarchy/groups/:groupId/members
-    // @access  Private
-    getGroupMembers: async (req, res) => {
-        try {
-            const { groupId } = req.params;
-
-            const group = await Group.findByPk(groupId);
-
-            if (!group) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Group not found'
-                });
-            }
-
-            // Check if user is leader or member
-            const isLeader = group.leaderId === req.user.id;
-            const isMember = await GroupMember.findOne({
-                where: {
-                    groupId,
-                    userId: req.user.id,
-                    status: 'accepted'
-                }
-            });
-
-            if (!isLeader && !isMember && req.user.role !== 'admin') {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Access denied'
-                });
-            }
-
-            const members = await GroupMember.findAll({
-                where: { groupId },
-                include: [
-                    {
-                        model: User,
-                        as: 'user',
-                        attributes: ['id', 'email', 'accountType']
-                    }
-                ],
-                order: [['joinedAt', 'ASC']]
-            });
-
-            res.status(200).json({
-                success: true,
-                count: members.length,
-                members
-            });
-        } catch (error) {
-            console.error('Get group members error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error fetching members',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
-            });
-        }
-    },
-
-    // @desc    Remove member from group
-    // @route   DELETE /api/hierarchy/groups/:groupId/members/:memberId
-    // @access  Private (Leader only)
-    removeMember: async (req, res) => {
-        try {
-            const { groupId, memberId } = req.params;
-
-            const group = await Group.findByPk(groupId);
-
-            if (!group) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Group not found'
-                });
-            }
-
-            if (group.leaderId !== req.user.id && req.user.role !== 'admin') {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Only the group leader can remove members'
-                });
-            }
-
-            const member = await GroupMember.findByPk(memberId);
-
-            if (!member || member.groupId !== groupId) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Member not found in this group'
-                });
-            }
-
-            member.status = 'removed';
-            await member.save();
-
-            res.status(200).json({
-                success: true,
-                message: 'Member removed successfully'
-            });
-        } catch (error) {
-            console.error('Remove member error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error removing member',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
-            });
-        }
-    },
-
-    // @desc    Update member permissions
-    // @route   PUT /api/hierarchy/groups/:groupId/members/:memberId/permissions
-    // @access  Private (Leader only)
-    updateMemberPermissions: async (req, res) => {
-        try {
-            const { groupId, memberId } = req.params;
-            const { canLeaderManageConfigs } = req.body;
-
-            const group = await Group.findByPk(groupId);
-
-            if (!group) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Group not found'
-                });
-            }
-
-            if (group.leaderId !== req.user.id && req.user.role !== 'admin') {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Only the group leader can update permissions'
-                });
-            }
-
-            const member = await GroupMember.findByPk(memberId);
-
-            if (!member || member.groupId !== groupId) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Member not found in this group'
-                });
-            }
-
-            member.canLeaderManageConfigs = canLeaderManageConfigs;
-            await member.save();
-
-            res.status(200).json({
-                success: true,
-                message: 'Permissions updated successfully',
-                member
-            });
-        } catch (error) {
-            console.error('Update permissions error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error updating permissions',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
-            });
-        }
-    },
-
-    // @desc    Update member config
-    // @route   PUT /api/hierarchy/groups/:groupId/members/:memberId/config
-    // @access  Private (Leader only)
-    updateMemberConfig: async (req, res) => {
-        try {
-            res.status(501).json({
-                success: false,
-                message: 'Config management not implemented yet. Coming soon!'
-            });
-        } catch (error) {
-            console.error('Update member config error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error updating member config',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
-            });
-        }
-    },
-    // @desc    Reject invitation
-    // @route   POST /api/hierarchy/invitations/:invitationId/reject
-    // @access  Private
-    rejectInvitation: async (req, res) => {
-        try {
-            const { invitationId } = req.params;
-
-            const invitation = await Invitation.findByPk(invitationId);
-
-            if (!invitation) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Invitation not found'
-                });
-            }
-
-            if (invitation.inviteeId !== req.user.id) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'This invitation is not for you'
-                });
-            }
-
-            if (invitation.status !== 'pending') {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Invitation has already been responded to'
-                });
-            }
-
-            // Update invitation status
-            invitation.status = 'rejected';
-            await invitation.save();
-
-            // Update membership status
-            await GroupMember.update(
-                { status: 'rejected' },
-                {
-                    where: {
-                        groupId: invitation.groupId,
-                        userId: req.user.id
-                    }
-                }
-            );
-
-            res.status(200).json({
-                success: true,
-                message: 'Invitation rejected'
-            });
-        } catch (error) {
-            console.error('Reject invitation error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error rejecting invitation',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
-            });
-        }
-    },
-
-    // @desc    Get my memberships
-    // @route   GET /api/hierarchy/memberships
-    // @access  Private
-    getMyMemberships: async (req, res) => {
-        try {
-            const memberships = await GroupMember.findAll({
-                where: {
-                    userId: req.user.id,
-                    status: 'accepted'
-                },
-                include: [
-                    {
-                        model: Group,
-                        as: 'group',
-                        include: [
-                            {
-                                model: User,
-                                as: 'leader',
-                                attributes: ['id', 'email', 'accountType']
-                            },
-                            {
-                                model: GroupMember,
-                                as: 'members',
-                                where: { status: 'accepted' },
-                                required: false
-                            }
-                        ]
-                    }
-                ],
-                order: [['joinedAt', 'DESC']]
-            });
-
-            res.status(200).json({
-                success: true,
-                count: memberships.length,
-                memberships
-            });
-        } catch (error) {
-            console.error('Get memberships error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error fetching memberships',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
-            });
-        }
-    },
-
-    // @desc    Leave a group
-    // @route   POST /api/hierarchy/memberships/:membershipId/leave
-    // @access  Private
-    leaveGroup: async (req, res) => {
-        try {
-            const { membershipId } = req.params;
-
-            const membership = await GroupMember.findByPk(membershipId);
-
-            if (!membership) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Membership not found'
-                });
-            }
-
-            if (membership.userId !== req.user.id) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'This is not your membership'
-                });
-            }
-
-            // Update status to removed
-            membership.status = 'removed';
-            await membership.save();
-
-            res.status(200).json({
-                success: true,
-                message: 'Successfully left the group'
-            });
-        } catch (error) {
-            console.error('Leave group error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error leaving group',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
-            });
-        }
-    },
-    // @desc    Upgrade user to leader
-    // @route   POST /api/hierarchy/subscription/upgrade
-    // @access  Private
-    upgradeToLeader: async (req, res) => {
-        try {
-            const { tier } = req.body;
-
-            if (!['basic', 'pro', 'enterprise'].includes(tier)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Invalid subscription tier'
-                });
-            }
-
-            // Update user
-            await User.update(
-                {
-                    accountType: 'leader',
-                    subscriptionTier: tier,
-                    isPaid: true
-                },
-                { where: { id: req.user.id } }
-            );
-
-            // Create subscription record
-            await Subscription.create({
-                userId: req.user.id,
-                tier,
-                status: 'active',
-                startDate: new Date(),
-                endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-                autoRenew: true
-            });
-
-            res.status(200).json({
-                success: true,
-                message: 'Successfully upgraded to leader!',
-                user: {
-                    ...req.user.toJSON(),
-                    accountType: 'leader',
-                    subscriptionTier: tier,
-                    isPaid: true
-                }
-            });
-        } catch (error) {
-            console.error('Upgrade error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error upgrading account',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
-            });
-        }
-    },
-
-    // @desc    Get current subscription
-    // @route   GET /api/hierarchy/subscription
-    // @access  Private
-    getMySubscription: async (req, res) => {
-        try {
-            const subscription = await Subscription.findOne({
-                where: { userId: req.user.id },
-                order: [['createdAt', 'DESC']]
-            });
-
-            res.status(200).json({
-                success: true,
-                subscription: subscription || null,
-                user: {
-                    accountType: req.user.accountType,
-                    subscriptionTier: req.user.subscriptionTier,
-                    isPaid: req.user.isPaid
-                }
-            });
-        } catch (error) {
-            console.error('Get subscription error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error fetching subscription',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
-            });
-        }
-    },
-
-    // @desc    Cancel subscription
-    // @route   POST /api/hierarchy/subscription/cancel
-    // @access  Private
-    cancelSubscription: async (req, res) => {
-        try {
-            await Subscription.update(
-                { status: 'canceled', autoRenew: false },
-                { where: { userId: req.user.id } }
-            );
-
-            res.status(200).json({
-                success: true,
-                message: 'Subscription canceled successfully'
-            });
-        } catch (error) {
-            console.error('Cancel subscription error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Error canceling subscription',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
-            });
-        }
-    }
 };

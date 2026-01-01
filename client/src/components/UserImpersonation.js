@@ -236,7 +236,6 @@ const UserImpersonation = ({ theme = 'dark', palette = null }) => {
           </div>
         )}
       </div>
-      )}
     </div>
   );
 };

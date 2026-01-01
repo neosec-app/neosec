@@ -46,7 +46,8 @@ router.post(
       await User.update(
         {
           accountType: 'leader',
-          subscriptionTier: tier
+          subscriptionTier: tier,
+          isPaid: true
         },
         { where: { id: userId } }
       );
