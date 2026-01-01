@@ -7,6 +7,7 @@ const {
     createGroup,
     getMyGroups,
     getGroupMembers,
+    getMyGroupMembers,
 
     // Invitation management
     inviteMember,
@@ -16,6 +17,7 @@ const {
 
     // Membership management
     getMyMemberships,
+    leaveGroup,
 
     // Member security management
     getMemberProfiles,
@@ -39,6 +41,9 @@ router.get('/groups/my-groups', protect, requireLeader, getMyGroups);
 // Get all members of a group
 router.get('/groups/:groupId/members', protect, getGroupMembers);
 
+// Get all members of all groups led by current user
+router.get('/my-group-members', protect, requireLeader, getMyGroupMembers);
+
 // Invite a user to join group
 router.post('/groups/:groupId/invite', protect, requireLeader, inviteMember);
 
@@ -61,6 +66,9 @@ router.post('/invitations/:invitationId/reject', protect, rejectInvitation);
 
 // Get all groups current user is a member of
 router.get('/memberships', protect, getMyMemberships);
+
+// Leave a group (remove membership)
+router.post('/memberships/:membershipId/leave', protect, leaveGroup);
 
 // ============================================
 // MEMBER SECURITY MANAGEMENT ROUTES (Leader only)

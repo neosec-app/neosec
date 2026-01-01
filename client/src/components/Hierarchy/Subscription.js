@@ -1,7 +1,6 @@
 // src/components/Hierarchy/Subscription.js
 import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
-import { hierarchyAPI } from '../../services/hierarchyAPI';
 
 const darkPalette = {
   bgMain: '#121212',
@@ -63,7 +62,6 @@ const Subscription = () => {
 
   const [currentPlan, setCurrentPlan] = useState('free');
   const [billingHistory, setBillingHistory] = useState([]);
-  const [memberships, setMemberships] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingTier, setProcessingTier] = useState(null);
   const [message, setMessage] = useState(null);
@@ -205,15 +203,6 @@ const Subscription = () => {
       const billData = await api.get('/subscription/billing');
       setBillingHistory(billData?.data?.history || []);
 
-      // Fetch user's group memberships
-      try {
-        const membershipsResponse = await hierarchyAPI.getMyMemberships();
-        if (membershipsResponse.success) {
-          setMemberships(membershipsResponse.memberships || []);
-        }
-      } catch (membershipsError) {
-        console.error('Fetch memberships error:', membershipsError);
-      }
 
     } catch (err) {
       console.error('Failed to load subscription data:', err?.response?.data?.message || err?.message);
@@ -487,74 +476,6 @@ const Subscription = () => {
         })}
       </div>
 
-      {/* My Groups */}
-      <div
-        style={{
-          backgroundColor: colors.bgCard,
-          border: `1px solid ${colors.border}`,
-          borderRadius: 12,
-          padding: 24,
-          marginBottom: 32,
-        }}
-      >
-        <h3 style={{ margin: 0, marginBottom: 20, fontSize: 20 }}>My Groups</h3>
-        {memberships.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '24px 0' }}>
-            <div style={{ fontSize: '32px', marginBottom: '16px' }}>👥</div>
-            <p style={{ color: colors.textMuted, margin: 0 }}>You're not a member of any groups yet.</p>
-            <p style={{ color: colors.textMuted, margin: '8px 0 0 0', fontSize: '14px' }}>
-              Ask a group leader to invite you, or upgrade to become a leader yourself!
-            </p>
-          </div>
-        ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: 16,
-          }}>
-            {memberships.map((membership) => (
-              <div
-                key={membership.id}
-                style={{
-                  padding: '16px',
-                  backgroundColor: colors.bgMain,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: 8,
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: colors.text }}>
-                    {membership.group?.name || 'Unknown Group'}
-                  </h4>
-                  <span style={{
-                    padding: '2px 6px',
-                    backgroundColor: colors.accentSoft,
-                    color: colors.accent,
-                    fontSize: '11px',
-                    fontWeight: '600',
-                    borderRadius: '4px',
-                  }}>
-                    Member
-                  </span>
-                </div>
-                <p style={{ color: colors.textMuted, fontSize: '14px', marginBottom: '8px' }}>
-                  {membership.group?.description || 'No description'}
-                </p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: colors.textMuted, fontSize: '12px' }}>
-                    Role: <span style={{ color: colors.text, fontWeight: '600' }}>
-                      {membership.role || 'Member'}
-                    </span>
-                  </span>
-                  <span style={{ color: colors.textMuted, fontSize: '12px' }}>
-                    Joined: {new Date(membership.joinedAt || membership.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* Billing History */}
       <div

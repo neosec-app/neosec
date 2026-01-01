@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { impersonationAPI, adminAPI, getErrorMessage } from '../services/api';
+import { hierarchyAPI } from '../services/hierarchyAPI';
 import { FiLogIn, FiLogOut, FiAlertCircle } from 'react-icons/fi';
 
-const UserImpersonation = ({ theme = 'dark', palette = null }) => {
+const UserImpersonation = ({ theme = 'dark', palette = null, user }) => {
   const darkPalette = {
     bgMain: '#121212', bgCard: '#181818', text: '#ffffff', textMuted: '#9aa3b5',
     border: '#242424', accent: '#36E27B', warning: '#f0a500'
@@ -27,9 +28,18 @@ const UserImpersonation = ({ theme = 'dark', palette = null }) => {
 
   const fetchUsers = async () => {
     try {
-      const response = await adminAPI.getAllUsers();
-      if (response.success) {
-        setUsers(response.data || []);
+      if (user.role === 'admin') {
+        // Admin can impersonate any user
+        const response = await adminAPI.getAllUsers();
+        if (response.success) {
+          setUsers(response.data || []);
+        }
+      } else if (user.accountType === 'leader') {
+        // Leader can only impersonate their group members
+        const response = await hierarchyAPI.getMyGroupMembers();
+        if (response.success) {
+          setUsers(response.data || []);
+        }
       }
     } catch (err) {
       setError(getErrorMessage(err));
@@ -82,7 +92,9 @@ const UserImpersonation = ({ theme = 'dark', palette = null }) => {
 
   return (
     <div style={{ padding: '24px', backgroundColor: colors.bgMain, minHeight: '100vh', color: colors.text }}>
-      <h1 style={{ marginBottom: '24px', fontSize: '28px', fontWeight: 700 }}>User Impersonation</h1>
+      <h1 style={{ marginBottom: '24px', fontSize: '28px', fontWeight: 700 }}>
+        {user.role === 'admin' ? 'User Impersonation' : 'Member Impersonation'}
+      </h1>
       
       {loading && (
         <div style={{ padding: '20px', textAlign: 'center', color: colors.textMuted }}>
@@ -114,7 +126,10 @@ const UserImpersonation = ({ theme = 'dark', palette = null }) => {
         marginBottom: '24px'
       }}>
         <p style={{ margin: 0, fontSize: '14px', color: colors.text }}>
-          <strong>Warning:</strong> Impersonation allows you to view the system as another user. All actions will be logged.
+          <strong>Warning:</strong> {user.role === 'admin'
+            ? 'Impersonation allows you to view the system as another user. All actions will be logged.'
+            : 'Impersonation allows you to view the system as your group members. All actions will be logged.'
+          }
         </p>
       </div>
 
