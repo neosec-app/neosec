@@ -94,9 +94,10 @@ const Subscription = ({ theme, palette }) => {
 
       // Refresh user data to check if they became a leader
       const token = localStorage.getItem('token');
+      const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000"; 
       if (token) {
         console.log('Refreshing user data...');
-        const response = await fetch('http://localhost:5000/api/auth/me', {
+        const response = await fetch(`${API_BASE}/api/auth/me`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
