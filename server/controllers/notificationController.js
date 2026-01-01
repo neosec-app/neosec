@@ -152,94 +152,74 @@ exports.createNotification = async (req, res) => {
     }
 };
 
-// Simulate event-based notification (VPN tunnel down example)
-exports.simulateVpnTunnelDown = async (req, res) => {
+// Generic notification simulation
+exports.simulateNotification = async (req, res) => {
     try {
-        const { serverName, siteId } = req.body;
+        const { message, priority = 'medium' } = req.body;
+
+        // Validate inputs
+        if (!message || message.trim() === '') {
+            return res.status(400).json({
+                success: false,
+                message: 'Message is required'
+            });
+        }
+
+        if (!['low', 'medium', 'high', 'critical'].includes(priority.toLowerCase())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Priority must be one of: low, medium, high, critical'
+            });
+        }
+
+        const normalizedPriority = priority.toLowerCase();
+
+        // Create appropriate notification based on priority
+        let title, eventLog, consoleMessage;
+
+        switch (normalizedPriority) {
+            case 'critical':
+                title = 'Critical System Alert';
+                eventLog = `Critical alert: ${message}`;
+                consoleMessage = '🚨 CRITICAL ALERT';
+                break;
+            case 'high':
+                title = 'High Priority Alert';
+                eventLog = `High priority alert: ${message}`;
+                consoleMessage = '⚠️ HIGH PRIORITY ALERT';
+                break;
+            case 'medium':
+                title = 'System Notification';
+                eventLog = `System notification: ${message}`;
+                consoleMessage = 'ℹ️ SYSTEM NOTIFICATION';
+                break;
+            case 'low':
+                title = 'Information';
+                eventLog = `Information: ${message}`;
+                consoleMessage = '📝 INFORMATION';
+                break;
+        }
 
         const notification = await createNotification(req.user.id, {
-            title: 'WireGuard Tunnel Down',
-            message: `WireGuard tunnel to ${serverName || 'Site A'} is Down`,
-            eventType: 'vpn_tunnel_down',
-            priority: 'critical',
-            emailRecipients: JSON.stringify([
-                'admin@gmail.com',
-                'user1@hotmail.com',
-                'user2@gmail.com'
-            ]),
-            eventLog: `WireGuard tunnel connection failed. Site: ${siteId || 'Site A'}. Last successful connection: ${new Date(Date.now() - 15 * 60 * 1000).toISOString()}`
+            title,
+            message,
+            eventType: 'generic_notification',
+            priority: normalizedPriority,
+            eventLog
         }, true);
 
-        console.log('🚨 CRITICAL ALERT: VPN Tunnel Down');
+        console.log(consoleMessage);
 
         res.status(201).json({
             success: true,
-            message: 'VPN tunnel down notification created and email sent',
+            message: 'Notification created and email sent',
             data: notification
         });
     } catch (error) {
-        console.error('Simulate VPN error:', error);
+        console.error('Simulate notification error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to create VPN notification'
-        });
-    }
-};
-
-// Simulate certificate expiring notification
-exports.simulateCertificateExpiring = async (req, res) => {
-    try {
-        const { certificateName, daysLeft } = req.body;
-
-        const notification = await createNotification(req.user.id, {
-            title: 'OpenVPN Certificate Expiring',
-            message: `${certificateName || 'OpenVPN'} certificate will expire in ${daysLeft || 7} days`,
-            eventType: 'certificate_expiring',
-            priority: daysLeft <= 3 ? 'high' : 'medium',
-            eventLog: `Certificate expiration warning. Certificate: ${certificateName}. Expires: ${new Date(Date.now() + (daysLeft || 7) * 24 * 60 * 60 * 1000).toISOString()}`
-        }, true);
-
-        console.log('⚠️ REMINDER: Certificate Expiring');
-
-        res.status(201).json({
-            success: true,
-            message: 'Certificate expiring notification created and email sent',
-            data: notification
-        });
-    } catch (error) {
-        console.error('Simulate certificate error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to create certificate notification'
-        });
-    }
-};
-
-// Simulate firewall error
-exports.simulateFirewallError = async (req, res) => {
-    try {
-        const { errorMessage } = req.body;
-
-        const notification = await createNotification(req.user.id, {
-            title: 'Firewall Error',
-            message: errorMessage || 'Critical firewall configuration error detected',
-            eventType: 'firewall_error',
-            priority: 'critical',
-            eventLog: `Firewall error detected at ${new Date().toISOString()}. Error: ${errorMessage}`
-        }, true);
-
-        console.log('🔥 CRITICAL: Firewall Error');
-
-        res.status(201).json({
-            success: true,
-            message: 'Firewall error notification created and email sent',
-            data: notification
-        });
-    } catch (error) {
-        console.error('Simulate firewall error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to create firewall notification'
+            message: 'Failed to create notification'
         });
     }
 };

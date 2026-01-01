@@ -39,6 +39,8 @@ import VpnManagement from './components/VpnManagement';
 // Hierarchy Components
 import Subscription from './components/Hierarchy/Subscription';
 import Groups from './components/Hierarchy/Groups';
+import GroupManagement from './components/Hierarchy/GroupManagement';
+import MemberSecurityManagement from './components/Hierarchy/MemberSecurityManagement';
 import Invitations from './components/Hierarchy/Invitations';
 
 // Share Profile Components
@@ -467,7 +469,8 @@ if (isShareManagementPage) {
                         />
                         )}
 
-                        {currentView === "groups" && <Groups user={user} theme={theme} palette={palette} isMobile={isMobile} isTablet={isTablet} />}
+                        {currentView === "groups" && <GroupManagement user={user} theme={theme} palette={palette} isMobile={isMobile} isTablet={isTablet} />}
+                        {currentView === "member-security" && <MemberSecurityManagement user={user} theme={theme} palette={palette} isMobile={isMobile} isTablet={isTablet} />}
                         {currentView === "invitations" && <Invitations />}
 
 
@@ -512,8 +515,8 @@ if (isShareManagementPage) {
                         )}
 
                         {/* Impersonation View */}
-                        {currentView === 'impersonation' && user.role === 'admin' && (
-                            <UserImpersonation theme={theme} palette={palette} />
+                        {currentView === 'impersonation' && (user.role === 'admin' || user.accountType === 'leader') && (
+                            <UserImpersonation theme={theme} palette={palette} user={user} />
                         )}
 
                         {/* Admin Notifications View */}
