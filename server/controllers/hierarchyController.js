@@ -292,7 +292,16 @@ const acceptInvitation = async (req, res) => {
     try {
         const { invitationId } = req.params;
 
+        console.log('Accept invitation request:', { invitationId, userId: req.user.id, userEmail: req.user.email });
+
         const invitation = await Invitation.findByPk(invitationId);
+        console.log('Found invitation:', invitation ? {
+            id: invitation.id,
+            inviteeId: invitation.inviteeId,
+            inviteeEmail: invitation.inviteeEmail,
+            status: invitation.status,
+            groupId: invitation.groupId
+        } : 'null');
 
         if (!invitation) {
             return res.status(404).json({
@@ -301,10 +310,25 @@ const acceptInvitation = async (req, res) => {
             });
         }
 
-        if (invitation.inviteeId !== req.user.id) {
+        // Check if user can accept this invitation
+        // For registered users: inviteeId should match user ID
+        // For email-based invitations: check if invitation email matches user email
+        const canAccept = invitation.inviteeId === req.user.id ||
+                          (invitation.inviteeId === null && invitation.inviteeEmail === req.user.email);
+
+        console.log('Permission check:', {
+            inviteeId: invitation.inviteeId,
+            userId: req.user.id,
+            inviteeEmail: invitation.inviteeEmail,
+            userEmail: req.user.email,
+            canAccept
+        });
+
+        if (!canAccept) {
+            console.log('Permission denied for invitation acceptance');
             return res.status(403).json({
                 success: false,
-                message: 'You can only accept your own invitations'
+                message: 'You can only accept invitations sent to your email'
             });
         }
 
@@ -334,6 +358,7 @@ const acceptInvitation = async (req, res) => {
         await GroupMember.create({
             groupId: invitation.groupId,
             userId: req.user.id,
+            invitedBy: invitation.inviterId,
             role: 'member',
             status: 'accepted',
             joinedAt: new Date()
@@ -373,10 +398,16 @@ const rejectInvitation = async (req, res) => {
             });
         }
 
-        if (invitation.inviteeId !== req.user.id) {
+        // Check if user can reject this invitation
+        // For registered users: inviteeId should match user ID
+        // For email-based invitations: check if invitation email matches user email
+        const canReject = invitation.inviteeId === req.user.id ||
+                          (invitation.inviteeId === null && invitation.inviteeEmail === req.user.email);
+
+        if (!canReject) {
             return res.status(403).json({
                 success: false,
-                message: 'You can only reject your own invitations'
+                message: 'You can only reject invitations sent to your email'
             });
         }
 
