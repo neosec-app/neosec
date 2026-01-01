@@ -7,7 +7,6 @@ const Groups = ({ user, theme, palette, isMobile, isTablet }) => {
     const [memberships, setMemberships] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState('member'); // Default to member view
     const [inviteModalOpen, setInviteModalOpen] = useState(false);
     const [selectedGroupForInvite, setSelectedGroupForInvite] = useState(null);
     const [inviteEmail, setInviteEmail] = useState('');
@@ -18,20 +17,6 @@ const Groups = ({ user, theme, palette, isMobile, isTablet }) => {
         fetchAllData();
     }, [user]);
 
-    // Set default tab based on loaded data
-    useEffect(() => {
-        if (!loading && user) {
-            if (user.accountType === 'leader' && ownedGroups.length > 0 && memberships.length === 0) {
-                setActiveTab('owned');
-            } else if (memberships.length > 0) {
-                setActiveTab('member');
-            } else if (ownedGroups.length > 0) {
-                setActiveTab('owned');
-            } else {
-                setActiveTab('member'); // Default fallback
-            }
-        }
-    }, [loading, user, ownedGroups.length, memberships.length]);
 
     const fetchAllData = async () => {
         try {
@@ -176,22 +161,6 @@ const Groups = ({ user, theme, palette, isMobile, isTablet }) => {
         }
     };
 
-    const handleLeaveGroup = async (membershipId, groupName) => {
-        if (!window.confirm(`Are you sure you want to leave "${groupName}"?`)) {
-            return;
-        }
-
-        try {
-            const response = await hierarchyAPI.leaveGroup(membershipId);
-            if (response.success) {
-                setMemberships(memberships.filter(m => m.id !== membershipId));
-                alert('You have left the group successfully.');
-            }
-        } catch (error) {
-            console.error('Leave group error:', error || 'Unknown error');
-            alert('Failed to leave group: ' + (error?.message || 'Unknown error'));
-        }
-    };
 
     const isExpired = (expiresAt) => {
         return new Date(expiresAt) < new Date();
@@ -214,9 +183,9 @@ const Groups = ({ user, theme, palette, isMobile, isTablet }) => {
 
     const renderOwnedGroups = () => (
         <div>
-            <h2 style={{ fontSize: '24px', fontWeight: '600', marginBottom: '16px', color: palette.text }}>
-                Groups I Manage
-            </h2>
+            <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px', color: palette.text }}>
+                Groups I Lead
+            </h3>
 
             {ownedGroups.length === 0 ? (
                 <div style={{
@@ -235,7 +204,7 @@ const Groups = ({ user, theme, palette, isMobile, isTablet }) => {
                     </p>
                     <button
                         onClick={() => {
-                            alert('ℹ️ This tab shows groups you\'re a member of.\n\nTo create your own groups, leaders can use the "My Groups" section.');
+                            alert('ℹ️ This tab shows groups you lead/manage.\n\nYou haven\'t created any groups yet. Use the group creation form to start your first group.');
                         }}
                         style={{
                             padding: '12px 24px',
@@ -325,11 +294,258 @@ const Groups = ({ user, theme, palette, isMobile, isTablet }) => {
         </div>
     );
 
+    const renderInvitedMemberships = () => (
+        <div>
+            <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px', color: palette.text }}>
+                Groups I Joined via Invitations
+            </h3>
+
+            {invitedMemberships.length === 0 ? (
+                <div style={{
+                    textAlign: 'center',
+                    padding: isMobile ? '32px 16px' : '48px 32px',
+                    backgroundColor: palette.bgCard,
+                    borderRadius: '12px',
+                    border: `1px solid ${palette.border}`
+                }}>
+                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>📨</div>
+                    <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px', color: palette.text }}>
+                        No Invited Groups
+                    </h3>
+                    <p style={{ color: palette.textMuted, marginBottom: '24px' }}>
+                        You haven't joined any groups via invitations yet.
+                    </p>
+                </div>
+            ) : (
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
+                    gap: '24px'
+                }}>
+                    {invitedMemberships.map((membership) => (
+                        <div
+                            key={membership.id}
+                            style={{
+                                padding: '24px',
+                                backgroundColor: palette.bgCard,
+                                borderRadius: '12px',
+                                border: `1px solid ${palette.border}`,
+                                position: 'relative'
+                            }}
+                        >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                                <h3 style={{ fontSize: '20px', fontWeight: '600', margin: 0, color: palette.text }}>
+                                    {membership.group?.name || 'Unknown Group'}
+                                </h3>
+                                <span style={{
+                                    padding: '4px 8px',
+                                    backgroundColor: theme === 'light' ? 'rgba(34, 197, 94, 0.1)' : palette.accentSoft,
+                                    color: palette.accent,
+                                    fontSize: '11px',
+                                    fontWeight: '600',
+                                    borderRadius: '4px',
+                                    border: `1px solid ${palette.accent}`
+                                }}>
+                                    Invited
+                                </span>
+                            </div>
+                            <p style={{ color: palette.textMuted, fontSize: '14px', marginBottom: '16px' }}>
+                                {membership.group?.description || 'No description'}
+                            </p>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: palette.textMuted, fontSize: '14px' }}>
+                                    Role: <span style={{ color: palette.text, fontWeight: '600' }}>
+                                        {membership.role || 'Member'}
+                                    </span>
+                                </span>
+                                <button
+                                    onClick={() => handleLeaveGroup(membership.id, membership.group?.name)}
+                                    style={{
+                                        padding: '6px 12px',
+                                        backgroundColor: palette.danger,
+                                        color: '#fff',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        fontSize: '12px',
+                                        fontWeight: '600',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Leave
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+
+    const renderAllGroups = () => {
+        // Combine owned groups and memberships into a single array
+        const allGroups = [];
+
+        // Add owned groups (with leader role)
+        ownedGroups.forEach(group => {
+            allGroups.push({
+                ...group,
+                type: 'owned',
+                role: 'Leader',
+                displayRole: 'Leader',
+                badgeColor: palette.accent,
+                badgeText: 'LEAD'
+            });
+        });
+
+        // Add memberships
+        memberships.forEach(membership => {
+            allGroups.push({
+                ...membership.group,
+                membershipId: membership.id,
+                type: 'member',
+                role: membership.role || 'Member',
+                displayRole: membership.role || 'Member',
+                badgeColor: theme === 'light' ? 'rgba(34, 197, 94, 0.8)' : palette.accentSoft,
+                badgeText: membership.invitedBy ? 'JOINED' : 'MEMBER',
+                invitedBy: membership.invitedBy
+            });
+        });
+
+        return (
+            <div>
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '16px'
+                }}>
+                    <h3 style={{ fontSize: '20px', fontWeight: '600', margin: 0, color: palette.text }}>
+                        All My Groups ({allGroups.length})
+                    </h3>
+                    {user?.accountType === 'leader' && (
+                        <div style={{ fontSize: '14px', color: palette.textMuted }}>
+                            Leading: {ownedGroups.length} • Member: {memberships.length}
+                        </div>
+                    )}
+                </div>
+
+                {allGroups.length === 0 ? (
+                    <div style={{
+                        textAlign: 'center',
+                        padding: isMobile ? '32px 16px' : '48px 32px',
+                        backgroundColor: palette.bgMain,
+                        borderRadius: '12px',
+                        border: `1px solid ${palette.border}`
+                    }}>
+                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>👥</div>
+                        <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px', color: palette.text }}>
+                            No Groups Yet
+                        </h3>
+                        <p style={{ color: palette.textMuted, marginBottom: '24px' }}>
+                            You don't have any groups yet.
+                        </p>
+                        {user?.accountType === 'leader' ? (
+                            <p style={{ color: palette.textMuted, fontSize: '14px' }}>
+                                Create your first group to start inviting members!
+                            </p>
+                        ) : (
+                            <p style={{ color: palette.textMuted, fontSize: '14px' }}>
+                                Ask a group leader to invite you to their group.
+                            </p>
+                        )}
+                    </div>
+                ) : (
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
+                        gap: '24px'
+                    }}>
+                        {allGroups.map((group, index) => (
+                            <div
+                                key={`${group.type}-${group.id}-${index}`}
+                                style={{
+                                    padding: '24px',
+                                    backgroundColor: palette.bgMain,
+                                    borderRadius: '12px',
+                                    border: `1px solid ${palette.border}`,
+                                    position: 'relative'
+                                }}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                                    <h3 style={{ fontSize: '20px', fontWeight: '600', margin: 0, color: palette.text }}>
+                                        {group.name || 'Unknown Group'}
+                                    </h3>
+                                    <span style={{
+                                        padding: '4px 8px',
+                                        backgroundColor: group.badgeColor,
+                                        color: group.type === 'owned' ? (theme === 'dark' ? '#000' : '#fff') : palette.accent,
+                                        fontSize: '11px',
+                                        fontWeight: '600',
+                                        borderRadius: '4px',
+                                        border: group.type === 'member' ? `1px solid ${palette.accent}` : 'none'
+                                    }}>
+                                        {group.badgeText}
+                                    </span>
+                                </div>
+                                <p style={{ color: palette.textMuted, fontSize: '14px', marginBottom: '16px' }}>
+                                    {group.description || 'No description'}
+                                </p>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ color: palette.textMuted, fontSize: '14px' }}>
+                                        Role: <span style={{ color: palette.text, fontWeight: '600' }}>
+                                            {group.displayRole}
+                                        </span>
+                                    </span>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        {group.type === 'owned' && (
+                                            <button
+                                                onClick={() => handleInviteMember(group)}
+                                                style={{
+                                                    padding: '6px 12px',
+                                                    backgroundColor: palette.accent,
+                                                    color: theme === 'dark' ? '#000' : '#fff',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    fontSize: '12px',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                Invite
+                                            </button>
+                                        )}
+                                        {group.type === 'member' && (
+                                            <button
+                                                onClick={() => handleLeaveGroup(group.membershipId, group.name)}
+                                                style={{
+                                                    padding: '6px 12px',
+                                                    backgroundColor: palette.danger,
+                                                    color: '#fff',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    fontSize: '12px',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                Leave
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     const renderMemberships = () => (
         <div>
-            <h2 style={{ fontSize: '24px', fontWeight: '600', marginBottom: '16px', color: palette.text }}>
-                Groups I'm Member Of
-            </h2>
+            <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px', color: palette.text }}>
+                All Groups I'm Member Of
+            </h3>
 
             {memberships.length === 0 ? (
                 <div style={{
@@ -521,75 +737,56 @@ const Groups = ({ user, theme, palette, isMobile, isTablet }) => {
                     </div>
                 )}
 
-                {/* Tab Navigation */}
-                {(user?.accountType === 'leader' && ownedGroups.length > 0) || memberships.length > 0 ? (
-                    <div style={{
-                        display: 'flex',
-                        marginBottom: '24px',
-                        borderBottom: `1px solid ${palette.border}`,
-                        gap: '24px'
+                {/* My Groups */}
+                <div style={{
+                    marginBottom: '32px',
+                    padding: '24px',
+                    backgroundColor: palette.bgCard,
+                    borderRadius: '12px',
+                    border: `1px solid ${palette.border}`
+                }}>
+                    <h2 style={{
+                        fontSize: '24px',
+                        fontWeight: '600',
+                        marginBottom: '20px',
+                        color: palette.text
                     }}>
-                        {user?.accountType === 'leader' && ownedGroups.length > 0 && (
-                            <button
-                                onClick={() => setActiveTab('owned')}
-                                style={{
-                                    padding: '12px 0',
-                                    border: 'none',
-                                    borderBottom: activeTab === 'owned' ? `2px solid ${palette.accent}` : 'none',
-                                    backgroundColor: 'transparent',
-                                    color: activeTab === 'owned' ? palette.accent : palette.textMuted,
-                                    fontWeight: activeTab === 'owned' ? '600' : '500',
-                                    cursor: 'pointer',
-                                    fontSize: '16px'
-                                }}
-                            >
-                                Managing ({ownedGroups.length})
-                            </button>
-                        )}
-                        <button
-                            onClick={() => setActiveTab('member')}
-                            style={{
-                                padding: '12px 0',
-                                border: 'none',
-                                borderBottom: activeTab === 'member' ? `2px solid ${palette.accent}` : 'none',
-                                backgroundColor: 'transparent',
-                                color: activeTab === 'member' ? palette.accent : palette.textMuted,
-                                fontWeight: activeTab === 'member' ? '600' : '500',
-                                cursor: 'pointer',
-                                fontSize: '16px'
-                            }}
-                        >
-                            Member Of ({memberships.length})
-                        </button>
-                    </div>
-                )}
+                        My Groups
+                    </h2>
+
+                    {/* Combined view of all groups */}
+                    {renderAllGroups()}
+                </div>
 
                 {/* Loading State */}
-                {loading ? (
+                {loading && (
                     <div style={{ textAlign: 'center', padding: '48px 0', color: palette.textMuted }}>
                         <div style={{ fontSize: '32px', marginBottom: '16px' }}>⏳</div>
                         <p>Loading groups...</p>
                     </div>
-                ) : (
-                    <>
-                        {/* Content based on tabs or default view */}
-                        {user?.accountType === 'leader' && ownedGroups.length > 0 && activeTab === 'owned' && renderOwnedGroups()}
+                )}
 
-                        {((user?.accountType === 'leader' && memberships.length > 0) || user?.accountType !== 'leader') && activeTab === 'member' && renderMemberships()}
-
-                        {/* Default view when no tabs are shown */}
-                        {memberships.length === 0 && ownedGroups.length === 0 && (
-                            <div style={{ textAlign: 'center', padding: '48px 0', color: palette.textMuted }}>
-                                <div style={{ fontSize: '48px', marginBottom: '16px' }}>👥</div>
-                                <p>You don't have any groups yet.</p>
-                                {user?.accountType === 'leader' && (
-                                    <p style={{ fontSize: '14px', marginTop: '8px' }}>
-                                        Create your first group or ask to be invited to existing groups!
-                                    </p>
-                                )}
-                            </div>
+                {/* Empty state when no tabs are shown */}
+                {!loading && memberships.length === 0 && (!user?.accountType || user.accountType !== 'leader' || ownedGroups.length === 0) && (
+                    <div style={{
+                        textAlign: 'center',
+                        padding: '48px 32px',
+                        backgroundColor: palette.bgCard,
+                        borderRadius: '12px',
+                        border: `1px solid ${palette.border}`,
+                        color: palette.textMuted
+                    }}>
+                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>👥</div>
+                        <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px', color: palette.text }}>
+                            No Groups Yet
+                        </h3>
+                        <p>You don't have any groups yet.</p>
+                        {user?.accountType === 'leader' && (
+                            <p style={{ fontSize: '14px', marginTop: '8px' }}>
+                                Create your first group or ask to be invited to existing groups!
+                            </p>
                         )}
-                    </>
+                    </div>
                 )}
 
                 {/* Pending Invitations Section */}
@@ -711,8 +908,8 @@ const Groups = ({ user, theme, palette, isMobile, isTablet }) => {
                                                 >
                                                     Accept
                                                 </button>
-                                            </div>
-                                        ) : (
+                    </div>
+                ) : (
                                             <span style={{
                                                 padding: '8px 16px',
                                                 backgroundColor: palette.danger + '20',
@@ -864,8 +1061,8 @@ const Groups = ({ user, theme, palette, isMobile, isTablet }) => {
                                                     The group leader can manage your security configurations.
                                                 </p>
                                             </div>
-                                        </div>
-                                    )}
+                                    </div>
+                                )}
 
                                     <button
                                         onClick={() => handleLeaveGroup(membership.id, membership.group?.name)}
@@ -885,8 +1082,8 @@ const Groups = ({ user, theme, palette, isMobile, isTablet }) => {
                                 </div>
                             ))}
                         </div>
-                    </div>
-                )}
+                            </div>
+                        )}
 
                 {/* Invite Member Modal */}
                 {inviteModalOpen && selectedGroupForInvite && (
