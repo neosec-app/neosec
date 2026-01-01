@@ -3,7 +3,8 @@ const router = express.Router();
 const {
   register,
   login,
-  getMe
+  getMe,
+  updateProfile
 } = require('../controllers/authController');
 const { validateRegister, validateLogin } = require('../validations/authValidation');
 const { protect } = require('../middleware/auth');
@@ -14,6 +15,7 @@ router.post('/login', validateLogin, login);
 
 // Protected routes
 router.get('/me', protect, getMe);
+router.put('/profile', protect, updateProfile);
 
 // Token validation endpoint for desktop app
 router.get('/verify', protect, (req, res) => {
