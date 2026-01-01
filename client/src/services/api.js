@@ -20,7 +20,7 @@ const getApiUrl = () => {
   
   if (isVercel || isProduction) {
     // Default production URL - update this with your actual Render backend URL
-    return 'https://neosec.onrender.com/api';
+    return 'https://neosec-0vzg.onrender.com/api';
   }
 
   // Priority 3: Development - use localhost
