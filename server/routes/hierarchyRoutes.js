@@ -16,6 +16,7 @@ const {
 
     // Membership management
     getMyMemberships,
+    leaveGroup,
 
     // Member security management
     getMemberProfiles,
@@ -61,6 +62,9 @@ router.post('/invitations/:invitationId/reject', protect, rejectInvitation);
 
 // Get all groups current user is a member of
 router.get('/memberships', protect, getMyMemberships);
+
+// Leave a group (remove membership)
+router.post('/memberships/:membershipId/leave', protect, leaveGroup);
 
 // ============================================
 // MEMBER SECURITY MANAGEMENT ROUTES (Leader only)

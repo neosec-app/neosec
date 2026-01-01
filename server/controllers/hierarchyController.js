@@ -436,6 +436,57 @@ const rejectInvitation = async (req, res) => {
     }
 };
 
+// @desc    Leave a group (remove membership)
+// @route   POST /api/hierarchy/memberships/:membershipId/leave
+// @access  Private
+const leaveGroup = async (req, res) => {
+    try {
+        const { membershipId } = req.params;
+
+        // Find the membership
+        const membership = await GroupMember.findByPk(membershipId);
+
+        if (!membership) {
+            return res.status(404).json({
+                success: false,
+                message: 'Membership not found'
+            });
+        }
+
+        // Check if user owns this membership
+        if (membership.userId !== req.user.id) {
+            return res.status(403).json({
+                success: false,
+                message: 'You can only leave groups you are a member of'
+            });
+        }
+
+        // Check if user is the leader of the group (leaders can't leave)
+        const group = await Group.findByPk(membership.groupId);
+        if (group && group.leaderId === req.user.id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Group leaders cannot leave their own groups. Transfer leadership first or delete the group.'
+            });
+        }
+
+        // Delete the membership
+        await membership.destroy();
+
+        res.status(200).json({
+            success: true,
+            message: 'Successfully left the group'
+        });
+    } catch (error) {
+        console.error('Leave group error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error leaving group',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
 // @desc    Get all invitations received by current user
 // @route   GET /api/hierarchy/invitations
 // @access  Private
@@ -831,6 +882,7 @@ module.exports = {
 
     // Membership management
     getMyMemberships,
+    leaveGroup,
 
     // Member security management
     getMemberProfiles,
