@@ -10,12 +10,25 @@ const abuseIPDBService = require('../services/abuseIPDBService');
 const freeBlocklistService = require('../services/freeBlocklistService');
 const { getSchedulerStatus } = require('../services/threatBlockerScheduler');
 
+// Cache table existence check to avoid repeated queries
+let tableExistsCache = null;
+let tableExistsChecked = false;
+
 // Helper function to get setting value
 async function getSetting(key, defaultValue) {
   try {
-    // Check if table exists first
-    const tableExists = await ThreatBlockerSettings.sequelize.getQueryInterface().tableExists(ThreatBlockerSettings.tableName);
-    if (!tableExists) {
+    // Check table existence only once (cache it)
+    if (!tableExistsChecked) {
+      try {
+        tableExistsCache = await ThreatBlockerSettings.sequelize.getQueryInterface().tableExists(ThreatBlockerSettings.tableName);
+        tableExistsChecked = true;
+      } catch (checkError) {
+        tableExistsCache = false;
+        tableExistsChecked = true;
+      }
+    }
+    
+    if (!tableExistsCache) {
       return defaultValue;
     }
     

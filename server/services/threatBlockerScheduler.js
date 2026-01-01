@@ -200,6 +200,15 @@ async function updateBlocklist() {
     }
 
     console.log(`✅ Automatic blocklist update completed: ${addedCount} added, ${updatedCount} updated`);
+    
+    // Refresh in-memory cache after update
+    try {
+      const { refreshBlocklistCache } = require('../middleware/threatBlocker');
+      await refreshBlocklistCache();
+      console.log('✅ Blocklist cache refreshed after update');
+    } catch (cacheError) {
+      console.warn('⚠️  Could not refresh blocklist cache:', cacheError.message);
+    }
   } catch (error) {
     console.error('❌ Automatic blocklist update failed:', error.message);
     
