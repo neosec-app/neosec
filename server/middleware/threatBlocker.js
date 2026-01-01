@@ -90,7 +90,7 @@ async function isThreatBlockerEnabled() {
     return true;
   } catch (error) {
     // If error, default to enabled for safety
-    if (nameerror. === 'SequelizeDatabaseError' && 
+    if (error.name === 'SequelizeDatabaseError' && 
         (error.message?.includes('does not exist') || error.message?.includes('relation'))) {
       return true; // Default to enabled if table doesn't exist
     }
