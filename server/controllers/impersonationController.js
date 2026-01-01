@@ -103,13 +103,8 @@ const startImpersonation = async (req, res) => {
       if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
         console.error('Database table "impersonation_sessions" does not exist. Attempting to create it...');
         
-        // Try to create the table automatically
-        try {
-          await ImpersonationSession.sync({ force: false, alter: false });
-          console.log('✅ Table impersonation_sessions created successfully. Retrying operation...');
-          
-          // Retry the original operation now that table exists
-          // Extract the original request data
+        // Helper function to retry the impersonation operation
+        const retryImpersonation = async () => {
           const { targetUserId, reason } = req.body;
 
           if (!targetUserId) {
@@ -192,17 +187,62 @@ const startImpersonation = async (req, res) => {
               token
             }
           });
+        };
+        
+        // Try to create the table automatically
+        try {
+          console.log('Attempting to sync ImpersonationSession model...');
+          await ImpersonationSession.sync({ force: false, alter: false });
+          console.log('✅ Table impersonation_sessions created successfully. Retrying operation...');
+          return await retryImpersonation();
         } catch (syncError) {
-          console.error('Failed to create table:', syncError.message);
-          return res.status(500).json({
-            success: false,
-            message: 'Database table not found and could not be created automatically.',
-            error: process.env.NODE_ENV === 'development' ? {
-              message: error.message,
-              syncError: syncError.message,
-              hint: 'Run: node server/scripts/createImpersonationTable.js to create the table manually, or restart your server.'
-            } : undefined
+          console.error('Failed to create table with sync:', syncError.message);
+          console.error('Sync error details:', {
+            name: syncError.name,
+            message: syncError.message,
+            original: syncError.original?.message,
+            sql: syncError.sql
           });
+          
+          // Try creating table with raw SQL as fallback
+          try {
+            console.log('Attempting to create table with raw SQL...');
+            const { sequelize } = require('../config/db');
+            await sequelize.query(`
+              CREATE TABLE IF NOT EXISTS impersonation_sessions (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                admin_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                target_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                ended_at TIMESTAMP,
+                reason TEXT,
+                ip_address VARCHAR(255),
+                is_active BOOLEAN NOT NULL DEFAULT true,
+                created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+              );
+              
+              CREATE INDEX IF NOT EXISTS idx_impersonation_admin_user_id ON impersonation_sessions(admin_user_id);
+              CREATE INDEX IF NOT EXISTS idx_impersonation_target_user_id ON impersonation_sessions(target_user_id);
+              CREATE INDEX IF NOT EXISTS idx_impersonation_is_active ON impersonation_sessions(is_active);
+            `);
+            console.log('✅ Table created successfully with raw SQL. Retrying operation...');
+            
+            // Now retry the operation
+            return await retryImpersonation();
+          } catch (sqlError) {
+            console.error('Failed to create table with raw SQL:', sqlError.message);
+            return res.status(500).json({
+              success: false,
+              message: 'Database table not found and could not be created automatically.',
+              error: process.env.NODE_ENV === 'development' ? {
+                originalError: error.message,
+                syncError: syncError.message,
+                sqlError: sqlError.message,
+                hint: 'The table creation failed. Please check server logs or run: node server/scripts/createImpersonationTable.js manually.'
+              } : undefined
+            });
+          }
         }
       }
     }
