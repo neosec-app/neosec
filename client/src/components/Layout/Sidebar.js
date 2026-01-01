@@ -327,12 +327,47 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                         <SidebarButton label="Subscription" view="subscription" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
 
                         {user.accountType === "leader" && (
-                            <SidebarButton label="My Groups" view="groups" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
+                            <>
+                                <SidebarButton label="My Groups" view="groups" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
+                                <SidebarButton label="Member Security" view="member-security" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
+                            </>
                         )}
 
                         <SidebarButton label="Invitations" view="invitations" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
                     </nav>
 
+                    {/* Leader Section */}
+                    {user.accountType === 'leader' && (
+                        <>
+                            <SidebarButton label="My Groups" view="groups" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
+                            <SidebarButton label="Member Security" view="member-security" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
+                            <button
+                                onMouseEnter={() => setNavHover('impersonation')}
+                                onMouseLeave={() => setNavHover(null)}
+                                onClick={() => setCurrentView('impersonation')}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px 15px',
+                                    marginBottom: '10px',
+                                    backgroundColor: currentView === 'impersonation' || navHover === 'impersonation'
+                                        ? (theme === 'light' ? palette.accentSoft : (currentView === 'impersonation' ? '#1E402C' : 'rgba(255, 255, 255, 0.1)'))
+                                        : 'transparent',
+                                    color: currentView === 'impersonation' || navHover === 'impersonation' ? palette.accent : palette.text,
+                                    border: currentView === 'impersonation' || navHover === 'impersonation' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                    borderRadius: '10px',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: navHover === 'impersonation' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                }}
+                            >
+                                Member Impersonation
+                            </button>
+                        </>
+                    )}
+
+                    {/* Admin Section */}
                     {user.role === 'admin' && (
                         <>
                             <button

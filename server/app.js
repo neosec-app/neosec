@@ -268,7 +268,7 @@ app.listen(PORT, () => {
             }
             
             // Start or stop scheduler based on enabled status
-            if (enabled !== false) {
+            if (enabled !== false && frequency !== 'disabled') {
                 startScheduler(frequency);
                 console.log(`✅ Automatic Threat Blocker scheduler started (frequency: ${frequency})`);
             } else {

@@ -3,37 +3,33 @@ const express = require('express');
 const router = express.Router();
 const { protect, requireLeader } = require('../middleware/auth');
 const {
-    // Group Management (Leader only)
+    // Group management
     createGroup,
     getMyGroups,
-    getGroupDetails,
-    updateGroup,
-    deleteGroup,
-
-    // Member Management (Leader only)
-    inviteMember,
-    removeMember,
     getGroupMembers,
-    updateMemberPermissions,
-    updateMemberConfig,
+    getMyGroupMembers,
 
-    // Invitation Management
+    // Invitation management
+    inviteMember,
     getMyInvitations,
     acceptInvitation,
     rejectInvitation,
 
-    // User's own group memberships
+    // Membership management
     getMyMemberships,
     leaveGroup,
 
-    // Subscription
-    upgradeToLeader,
-    getMySubscription,
-    cancelSubscription
+    // Member security management
+    getMemberProfiles,
+    updateMemberProfile,
+    getMemberFirewallRules,
+    updateMemberFirewallRule,
+    getMemberVPNConfigs,
+    updateMemberVPNConfig
 } = require('../controllers/hierarchyController');
 
 // ============================================
-// GROUP MANAGEMENT ROUTES (Leader only)
+// GROUP MANAGEMENT ROUTES
 // ============================================
 
 // Create a new group (requires paid subscription)
@@ -42,36 +38,17 @@ router.post('/groups', protect, requireLeader, createGroup);
 // Get all groups led by current user
 router.get('/groups/my-groups', protect, requireLeader, getMyGroups);
 
-// Get specific group details
-router.get('/groups/:groupId', protect, getGroupDetails);
+// Get all members of a group
+router.get('/groups/:groupId/members', protect, getGroupMembers);
 
-// Update group info
-router.put('/groups/:groupId', protect, requireLeader, updateGroup);
-
-// Delete/dissolve group
-router.delete('/groups/:groupId', protect, requireLeader, deleteGroup);
-
-// ============================================
-// MEMBER MANAGEMENT ROUTES (Leader only)
-// ============================================
+// Get all members of all groups led by current user
+router.get('/my-group-members', protect, requireLeader, getMyGroupMembers);
 
 // Invite a user to join group
 router.post('/groups/:groupId/invite', protect, requireLeader, inviteMember);
 
-// Get all members of a group
-router.get('/groups/:groupId/members', protect, getGroupMembers);
-
-// Remove a member from group
-router.delete('/groups/:groupId/members/:memberId', protect, requireLeader, removeMember);
-
-// Update member permissions
-router.put('/groups/:groupId/members/:memberId/permissions', protect, requireLeader, updateMemberPermissions);
-
-// Update member's VPN/Firewall config (leader managing member's config)
-router.put('/groups/:groupId/members/:memberId/config', protect, requireLeader, updateMemberConfig);
-
 // ============================================
-// INVITATION ROUTES (All users)
+// INVITATION ROUTES
 // ============================================
 
 // Get all invitations received by current user
@@ -84,26 +61,35 @@ router.post('/invitations/:invitationId/accept', protect, acceptInvitation);
 router.post('/invitations/:invitationId/reject', protect, rejectInvitation);
 
 // ============================================
-// MEMBERSHIP ROUTES (All users)
+// MEMBERSHIP ROUTES
 // ============================================
 
 // Get all groups current user is a member of
 router.get('/memberships', protect, getMyMemberships);
 
-// Leave a group
+// Leave a group (remove membership)
 router.post('/memberships/:membershipId/leave', protect, leaveGroup);
 
 // ============================================
-// SUBSCRIPTION ROUTES
+// MEMBER SECURITY MANAGEMENT ROUTES (Leader only)
 // ============================================
 
-// Upgrade to leader (payment required)
-router.post('/subscription/upgrade', protect, upgradeToLeader);
+// Get member's security profiles
+router.get('/members/:memberId/profiles', protect, requireLeader, getMemberProfiles);
 
-// Get current subscription status
-router.get('/subscription', protect, getMySubscription);
+// Update member's security profile
+router.put('/members/:memberId/profiles/:profileId', protect, requireLeader, updateMemberProfile);
 
-// Cancel subscription
-router.post('/subscription/cancel', protect, cancelSubscription);
+// Get member's firewall rules
+router.get('/members/:memberId/firewall', protect, requireLeader, getMemberFirewallRules);
+
+// Update member's firewall rule
+router.put('/members/:memberId/firewall/:ruleId', protect, requireLeader, updateMemberFirewallRule);
+
+// Get member's VPN configurations
+router.get('/members/:memberId/vpn', protect, requireLeader, getMemberVPNConfigs);
+
+// Update member's VPN configuration
+router.put('/members/:memberId/vpn/:configId', protect, requireLeader, updateMemberVPNConfig);
 
 module.exports = router;
