@@ -91,6 +91,7 @@ const getRules = async (req, res) => {
         port_end: rule.port_end,
         protocol,
         action,
+        direction: rule.direction || 'inbound', // Include direction field
         userId: rule.userId,
         createdAt: rule.createdAt,
         updatedAt: rule.updatedAt
@@ -122,17 +123,19 @@ const getRules = async (req, res) => {
 // Create a new firewall rule
 const createRule = async (req, res) => {
   try {
-    let { ip_address, port_start, port_end, protocol, action } = req.body;
+    let { ip_address, port_start, port_end, protocol, action, direction } = req.body;
     
     // Log received values for debugging
-    console.log('Received firewall rule data:', { 
-      ip_address, 
-      port_start, 
-      port_end, 
-      protocol, 
-      action, 
-      protocolType: typeof protocol, 
+    console.log('Received firewall rule data:', {
+      ip_address,
+      port_start,
+      port_end,
+      protocol,
+      action,
+      direction,
+      protocolType: typeof protocol,
       actionType: typeof action,
+      directionType: typeof direction,
       userId: req.user?.id
     });
     
@@ -201,7 +204,7 @@ const createRule = async (req, res) => {
     
     let rule;
     try {
-      // Always include direction with default value 'inbound'
+      // Always include direction with value from request or default to 'inbound'
       // If column doesn't exist, error handling will retry without it
       const createData = {
         ip_address: ip_address.trim(),
@@ -210,11 +213,12 @@ const createRule = async (req, res) => {
         protocol: protocol, // Always integer
         action: action, // Always integer
         userId: req.user.id,
-        direction: 'inbound' // Default direction (required if column exists and is NOT NULL)
+        direction: direction || 'inbound' // Use direction from request or default
       };
-      
+
+      console.log('Creating firewall rule with data:', createData);
       rule = await FirewallRule.create(createData);
-      console.log('Successfully created firewall rule:', rule.id);
+      console.log('Successfully created firewall rule:', rule.id, 'with direction:', rule.direction);
     } catch (createError) {
       console.error('FirewallRule.create failed:', createError.message);
       console.error('Error details:', {
@@ -233,14 +237,15 @@ const createRule = async (req, res) => {
       // If direction column doesn't exist, retry without it
       if (isMissingColumnError && createError.original.message.includes('direction')) {
         console.log('Retrying without direction column...');
-        const createDataWithoutDirection = {
-          ip_address: ip_address.trim(),
-          port_start,
-          port_end,
-          protocol: protocol,
-          action: action,
-          userId: req.user.id
-        };
+      const createDataWithoutDirection = {
+        ip_address: ip_address.trim(),
+        port_start,
+        port_end,
+        protocol: protocol,
+        action: action,
+        userId: req.user.id
+        // Note: direction column doesn't exist, so we don't include it
+      };
         rule = await FirewallRule.create(createDataWithoutDirection);
         console.log('Successfully created firewall rule (without direction):', rule.id);
       } else {
@@ -267,17 +272,17 @@ const createRule = async (req, res) => {
           createError.original.message.includes('null value in column "direction"');
         
         if (isNotNullError) {
-          // Retry with direction value
-          console.log('Retrying with direction value...');
-          const createDataWithDirection = {
-            ip_address: ip_address.trim(),
-            port_start,
-            port_end,
-            protocol: protocol,
-            action: action,
-            userId: req.user.id,
-            direction: 'inbound'
-          };
+        // Retry with direction value
+        console.log('Retrying with direction value...');
+        const createDataWithDirection = {
+          ip_address: ip_address.trim(),
+          port_start,
+          port_end,
+          protocol: protocol,
+          action: action,
+          userId: req.user.id,
+          direction: direction || 'inbound'
+        };
           rule = await FirewallRule.create(createDataWithDirection);
           console.log('Successfully created firewall rule (with direction):', rule.id);
         } else {
@@ -328,6 +333,7 @@ const createRule = async (req, res) => {
         port_end: rule.port_end,
         protocol: responseProtocol,
         action: responseAction,
+        direction: rule.direction || 'inbound', // Include direction field
         userId: rule.userId,
         createdAt: rule.createdAt,
         updatedAt: rule.updatedAt
@@ -386,7 +392,7 @@ const createRule = async (req, res) => {
 const updateRule = async (req, res) => {
   try {
     const { id } = req.params;
-    let { ip_address, port_start, port_end, protocol, action } = req.body;
+    let { ip_address, port_start, port_end, protocol, action, direction } = req.body;
 
     const rule = await FirewallRule.findOne({
       where: { id, userId: req.user.id }
@@ -502,6 +508,7 @@ const updateRule = async (req, res) => {
     rule.port_end = port_end !== undefined ? port_end : rule.port_end;
     rule.protocol = protocolValue;
     rule.action = actionValue;
+    rule.direction = direction ?? rule.direction ?? 'inbound'; // Update direction field
 
     await rule.save();
 
@@ -550,6 +557,7 @@ const updateRule = async (req, res) => {
         port_end: rule.port_end,
         protocol: responseProtocol,
         action: responseAction,
+        direction: rule.direction || 'inbound', // Include direction field
         userId: rule.userId,
         createdAt: rule.createdAt,
         updatedAt: rule.updatedAt

@@ -65,7 +65,15 @@ const app = express();
 app.set('trust proxy', true);
 
 // Connect to database (async, but don't block server startup)
-connectDB().catch(err => {
+connectDB().then(async () => {
+    // Database connected - load blocklist cache now that DB is ready
+    try {
+        const { loadBlocklistCache } = require('./middleware/threatBlocker');
+        await loadBlocklistCache();
+    } catch (cacheError) {
+        console.warn('⚠️  Could not load blocklist cache after DB connection:', cacheError.message);
+    }
+}).catch(err => {
     console.error('Failed to connect to database:', err);
     // In production, we might want to retry or handle this differently
     // For now, log the error and let the server start
@@ -112,7 +120,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Threat blocker middleware - check IPs against blocklist
 // Add this early to block threats before they reach routes
-const threatBlockerMiddleware = require('./middleware/threatBlocker');
+const { threatBlockerMiddleware } = require('./middleware/threatBlocker');
 app.use(threatBlockerMiddleware);
 
 // Routes
@@ -268,9 +276,17 @@ app.listen(PORT, () => {
             }
             
             // Start or stop scheduler based on enabled status
-            if (enabled !== false) {
+            if (enabled !== false && frequency !== 'disabled') {
                 startScheduler(frequency);
                 console.log(`✅ Automatic Threat Blocker scheduler started (frequency: ${frequency})`);
+                
+                // Load blocklist cache after scheduler starts
+                try {
+                    const { loadBlocklistCache } = require('./middleware/threatBlocker');
+                    await loadBlocklistCache();
+                } catch (cacheError) {
+                    console.warn('⚠️  Could not load initial blocklist cache:', cacheError.message);
+                }
             } else {
                 stopScheduler();
                 console.log('🛑 Automatic Threat Blocker scheduler is disabled');

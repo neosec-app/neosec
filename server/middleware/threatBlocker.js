@@ -5,12 +5,76 @@ const Threat = require('../models/Threat');
 const ThreatBlockerSettings = require('../models/ThreatBlockerSettings');
 const { getClientIP, isLocalOrPrivateIP } = require('../utils/ipUtils');
 
+// In-memory cache for blocklist IPs (loaded once, used for all requests)
+let blocklistCache = new Set(); // Fast O(1) lookup
+let blocklistCacheLoaded = false;
+let blocklistCacheTimestamp = null;
+const CACHE_REFRESH_INTERVAL = 60 * 60 * 1000; // Refresh cache every hour (as backup)
+
+// Load blocklist into memory cache
+async function loadBlocklistCache() {
+  try {
+    const ips = await BlocklistIP.findAll({
+      attributes: ['ipAddress', 'threatType', 'source', 'abuseConfidenceScore'],
+      raw: true
+    });
+    
+    blocklistCache = new Set(ips.map(ip => ip.ipAddress));
+    blocklistCacheLoaded = true;
+    blocklistCacheTimestamp = new Date();
+    
+    console.log(`✅ Blocklist cache loaded: ${blocklistCache.size} IPs in memory`);
+    return blocklistCache.size;
+  } catch (error) {
+    console.error('Error loading blocklist cache:', error);
+    blocklistCacheLoaded = false;
+    return 0;
+  }
+}
+
+// Initialize cache on module load (will retry if database not ready)
+// This is a best-effort attempt - cache will also load after database connects
+loadBlocklistCache().catch(err => {
+  // Silently fail on initial load - cache will load after DB is ready
+  // This prevents errors if middleware loads before database connection
+});
+
+// Refresh cache periodically (backup in case scheduler doesn't trigger refresh)
+setInterval(() => {
+  if (blocklistCacheLoaded) {
+    const age = Date.now() - blocklistCacheTimestamp.getTime();
+    if (age > CACHE_REFRESH_INTERVAL) {
+      console.log('🔄 Refreshing blocklist cache (periodic refresh)...');
+      loadBlocklistCache().catch(console.error);
+    }
+  }
+}, CACHE_REFRESH_INTERVAL);
+
+// Export function to refresh cache (called by scheduler after updates)
+function refreshBlocklistCache() {
+  console.log('🔄 Refreshing blocklist cache (scheduler update)...');
+  return loadBlocklistCache();
+}
+
+// Cache table existence check to avoid repeated queries
+let tableExistsCache = null;
+let tableExistsChecked = false;
+
 // Helper to check if threat blocker is enabled
 async function isThreatBlockerEnabled() {
   try {
-    // Check if table exists first
-    const tableExists = await ThreatBlockerSettings.sequelize.getQueryInterface().tableExists(ThreatBlockerSettings.tableName);
-    if (!tableExists) {
+    // Check table existence only once (cache it)
+    if (!tableExistsChecked) {
+      try {
+        tableExistsCache = await ThreatBlockerSettings.sequelize.getQueryInterface().tableExists(ThreatBlockerSettings.tableName);
+        tableExistsChecked = true;
+      } catch (checkError) {
+        tableExistsCache = false;
+        tableExistsChecked = true;
+      }
+    }
+    
+    if (!tableExistsCache) {
       return true; // Default to enabled if table doesn't exist
     }
     
@@ -69,12 +133,27 @@ const threatBlockerMiddleware = async (req, res, next) => {
       return next();
     }
 
-    // Check if IP is in blocklist
-    const blockedIP = await BlocklistIP.findOne({
-      where: { ipAddress: clientIP }
-    });
+    // Check if IP is in blocklist using in-memory cache (fast O(1) lookup)
+    // If cache not loaded yet, fallback to database query
+    let isBlocked = false;
+    let blockedIP = null;
+    
+    if (blocklistCacheLoaded && blocklistCache.has(clientIP)) {
+      // IP is in cache (blocked) - get full details from database only when needed
+      isBlocked = true;
+      // Get full IP details for logging (only when actually blocked)
+      blockedIP = await BlocklistIP.findOne({
+        where: { ipAddress: clientIP }
+      });
+    } else if (!blocklistCacheLoaded) {
+      // Fallback: if cache not loaded, check database (shouldn't happen normally)
+      blockedIP = await BlocklistIP.findOne({
+        where: { ipAddress: clientIP }
+      });
+      isBlocked = !!blockedIP;
+    }
 
-    if (blockedIP) {
+    if (isBlocked && blockedIP) {
       // Log the blocked attempt
       try {
         // Create ActivityLog entry
@@ -171,5 +250,9 @@ const threatBlockerMiddleware = async (req, res, next) => {
   }
 };
 
-module.exports = threatBlockerMiddleware;
+module.exports = {
+  threatBlockerMiddleware,
+  refreshBlocklistCache,
+  loadBlocklistCache
+};
 

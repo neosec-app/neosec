@@ -107,30 +107,34 @@ const getActiveUsers = async (userId, userRole) => {
           )
         : null;
       
-      // Determine status
+      // Determine status - use MOST RECENT activity (device OR login)
       let isActive = false;
       let inactiveDuration = null;
       let statusText = 'now';
       
-      if (mostRecentDevice) {
-        const deviceMinutesAgo = (now - new Date(mostRecentDevice.lastOnlineAt)) / (1000 * 60);
-        if (deviceMinutesAgo <= 5) {
+      // Get timestamps for both device and login
+      const deviceTime = mostRecentDevice ? new Date(mostRecentDevice.lastOnlineAt) : null;
+      const loginTime = mostRecentLogin ? new Date(mostRecentLogin.createdAt) : null;
+      
+      // Use the most recent activity (whichever is newer)
+      let mostRecentTime = null;
+      if (deviceTime && loginTime) {
+        mostRecentTime = deviceTime > loginTime ? deviceTime : loginTime;
+      } else if (deviceTime) {
+        mostRecentTime = deviceTime;
+      } else if (loginTime) {
+        mostRecentTime = loginTime;
+      }
+      
+      if (mostRecentTime) {
+        const minutesAgo = (now - mostRecentTime) / (1000 * 60);
+        if (minutesAgo <= 5) {
           isActive = true;
           statusText = 'now';
         } else {
           isActive = false;
-          inactiveDuration = deviceMinutesAgo;
-          statusText = formatInactiveTime(deviceMinutesAgo);
-        }
-      } else if (mostRecentLogin) {
-        const loginMinutesAgo = (now - new Date(mostRecentLogin.createdAt)) / (1000 * 60);
-        if (loginMinutesAgo <= 5) {
-          isActive = true;
-          statusText = 'now';
-        } else {
-          isActive = false;
-          inactiveDuration = loginMinutesAgo;
-          statusText = formatInactiveTime(loginMinutesAgo);
+          inactiveDuration = minutesAgo;
+          statusText = formatInactiveTime(minutesAgo);
         }
       }
       
@@ -247,30 +251,34 @@ const getActiveUsers = async (userId, userRole) => {
           )
         : null;
       
-      // Determine status
+      // Determine status - use MOST RECENT activity (device OR login)
       let isActive = false;
       let inactiveDuration = null;
       let statusText = 'now';
       
-      if (mostRecentDevice) {
-        const deviceMinutesAgo = (now - new Date(mostRecentDevice.lastOnlineAt)) / (1000 * 60);
-        if (deviceMinutesAgo <= 5) {
+      // Get timestamps for both device and login
+      const deviceTime = mostRecentDevice ? new Date(mostRecentDevice.lastOnlineAt) : null;
+      const loginTime = mostRecentLogin ? new Date(mostRecentLogin.createdAt) : null;
+      
+      // Use the most recent activity (whichever is newer)
+      let mostRecentTime = null;
+      if (deviceTime && loginTime) {
+        mostRecentTime = deviceTime > loginTime ? deviceTime : loginTime;
+      } else if (deviceTime) {
+        mostRecentTime = deviceTime;
+      } else if (loginTime) {
+        mostRecentTime = loginTime;
+      }
+      
+      if (mostRecentTime) {
+        const minutesAgo = (now - mostRecentTime) / (1000 * 60);
+        if (minutesAgo <= 5) {
           isActive = true;
           statusText = 'now';
         } else {
           isActive = false;
-          inactiveDuration = deviceMinutesAgo;
-          statusText = formatInactiveTime(deviceMinutesAgo);
-        }
-      } else if (mostRecentLogin) {
-        const loginMinutesAgo = (now - new Date(mostRecentLogin.createdAt)) / (1000 * 60);
-        if (loginMinutesAgo <= 5) {
-          isActive = true;
-          statusText = 'now';
-        } else {
-          isActive = false;
-          inactiveDuration = loginMinutesAgo;
-          statusText = formatInactiveTime(loginMinutesAgo);
+          inactiveDuration = minutesAgo;
+          statusText = formatInactiveTime(minutesAgo);
         }
       }
       
@@ -316,6 +324,36 @@ const getDashboard = async (req, res) => {
     
     const userId = req.user.id;
     console.log('dashboard: userId=', userId);
+
+    // Update user activity (heartbeat) - track that user is actively using the app
+    // This ensures users who stay logged in show as active
+    try {
+      // Update or create device activity as heartbeat
+      const [device] = await Device.findOrCreate({
+        where: {
+          userId: userId,
+          deviceId: `web-${userId}` // Use a default web device ID
+        },
+        defaults: {
+          userId: userId,
+          deviceId: `web-${userId}`,
+          deviceName: 'Web Browser',
+          osType: 'Windows', // Default, can be improved with user-agent detection
+          lastOnlineAt: new Date(),
+          isActive: true
+        }
+      });
+
+      // Update lastOnlineAt if device exists (heartbeat)
+      if (!device.isNewRecord) {
+        device.lastOnlineAt = new Date();
+        device.isActive = true;
+        await device.save();
+      }
+    } catch (heartbeatError) {
+      // Don't fail dashboard if heartbeat fails
+      console.error('Error updating user activity heartbeat:', heartbeatError);
+    }
 
     // Get user's active VPN config
     let activeVpn = null;

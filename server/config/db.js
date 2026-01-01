@@ -17,9 +17,9 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
     dialect: 'postgres',
     // from both files: log in dev, disable in prod
     logging: isProd ? false : console.log,
-    // Use snake_case for column names to match database schema
+    // Use camelCase for column names to match database schema
     define: {
-        underscored: true,
+        underscored: false,
     },
     dialectOptions: {
         ssl:
