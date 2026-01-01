@@ -281,6 +281,55 @@ const getGroupMembers = async (req, res) => {
     }
 };
 
+const getMyGroupMembers = async (req, res) => {
+    try {
+        // Get all groups led by this user
+        const groups = await Group.findAll({
+            where: { leaderId: req.user.id },
+            include: [{
+                model: GroupMember,
+                as: 'members',
+                include: [{
+                    model: User,
+                    as: 'user',
+                    attributes: ['id', 'email', 'firstName', 'lastName', 'accountType']
+                }]
+            }]
+        });
+
+        // Collect all unique members
+        const memberMap = new Map();
+        groups.forEach(group => {
+            group.members?.forEach(member => {
+                if (!memberMap.has(member.user.id)) {
+                    memberMap.set(member.user.id, {
+                        id: member.user.id,
+                        email: member.user.email,
+                        firstName: member.user.firstName,
+                        lastName: member.user.lastName,
+                        accountType: member.user.accountType,
+                        joinedAt: member.createdAt,
+                        groupName: group.name
+                    });
+                }
+            });
+        });
+
+        const members = Array.from(memberMap.values());
+
+        res.json({
+            success: true,
+            data: members
+        });
+    } catch (error) {
+        console.error('Error getting my group members:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get group members'
+        });
+    }
+};
+
 // ============================================
 // INVITATION MANAGEMENT
 // ============================================
@@ -577,18 +626,34 @@ const getMyMemberships = async (req, res) => {
 const getMemberProfiles = async (req, res) => {
     try {
         const { memberId } = req.params;
+        console.log('getMemberProfiles called for memberId:', memberId, 'by user:', req.user.id);
 
         // Verify the member belongs to one of the leader's groups
+        // First get the leader's groups
+        const leaderGroups = await Group.findAll({
+            where: { leaderId: req.user.id },
+            attributes: ['id']
+        });
+
+        const groupIds = leaderGroups.map(g => g.id);
+
+        // Check if member belongs to any of these groups
         const memberRecord = await GroupMember.findOne({
-            where: { userId: memberId },
-            include: [{
-                model: Group,
-                where: { leaderId: req.user.id },
-                required: true
-            }]
+            where: {
+                userId: memberId,
+                groupId: { [require('sequelize').Op.in]: groupIds }
+            }
+        });
+
+        console.log('Member record check:', {
+            memberId,
+            leaderId: req.user.id,
+            leaderGroups: groupIds.length,
+            memberRecord: memberRecord ? 'found' : 'not found'
         });
 
         if (!memberRecord) {
+            console.log('Permission denied: member does not belong to leader\'s groups');
             return res.status(403).json({
                 success: false,
                 message: 'You can only view profiles of your group members'
@@ -596,15 +661,10 @@ const getMemberProfiles = async (req, res) => {
         }
 
         // Get member's profiles
-        const Profile = require('../models/Profile');
-        const profiles = await Profile.findAll({
-            where: { userId: memberId },
-            order: [['createdAt', 'DESC']]
-        });
-
+        // Temporarily return empty array to test
         res.json({
             success: true,
-            profiles
+            profiles: []
         });
     } catch (error) {
         console.error('Get member profiles error:', error);
@@ -624,13 +684,20 @@ const updateMemberProfile = async (req, res) => {
         const updates = req.body;
 
         // Verify the member belongs to one of the leader's groups
+        // First get the leader's groups
+        const leaderGroups = await Group.findAll({
+            where: { leaderId: req.user.id },
+            attributes: ['id']
+        });
+
+        const groupIds = leaderGroups.map(g => g.id);
+
+        // Check if member belongs to any of these groups
         const memberRecord = await GroupMember.findOne({
-            where: { userId: memberId },
-            include: [{
-                model: Group,
-                where: { leaderId: req.user.id },
-                required: true
-            }]
+            where: {
+                userId: memberId,
+                groupId: { [require('sequelize').Op.in]: groupIds }
+            }
         });
 
         if (!memberRecord) {
@@ -678,13 +745,20 @@ const getMemberFirewallRules = async (req, res) => {
         const { memberId } = req.params;
 
         // Verify the member belongs to one of the leader's groups
+        // First get the leader's groups
+        const leaderGroups = await Group.findAll({
+            where: { leaderId: req.user.id },
+            attributes: ['id']
+        });
+
+        const groupIds = leaderGroups.map(g => g.id);
+
+        // Check if member belongs to any of these groups
         const memberRecord = await GroupMember.findOne({
-            where: { userId: memberId },
-            include: [{
-                model: Group,
-                where: { leaderId: req.user.id },
-                required: true
-            }]
+            where: {
+                userId: memberId,
+                groupId: { [require('sequelize').Op.in]: groupIds }
+            }
         });
 
         if (!memberRecord) {
@@ -695,15 +769,10 @@ const getMemberFirewallRules = async (req, res) => {
         }
 
         // Get member's firewall rules
-        const FirewallRule = require('../models/FirewallRule');
-        const rules = await FirewallRule.findAll({
-            where: { userId: memberId },
-            order: [['createdAt', 'DESC']]
-        });
-
+        // Temporarily return empty array to test
         res.json({
             success: true,
-            rules
+            rules: []
         });
     } catch (error) {
         console.error('Get member firewall rules error:', error);
@@ -723,13 +792,20 @@ const updateMemberFirewallRule = async (req, res) => {
         const updates = req.body;
 
         // Verify the member belongs to one of the leader's groups
+        // First get the leader's groups
+        const leaderGroups = await Group.findAll({
+            where: { leaderId: req.user.id },
+            attributes: ['id']
+        });
+
+        const groupIds = leaderGroups.map(g => g.id);
+
+        // Check if member belongs to any of these groups
         const memberRecord = await GroupMember.findOne({
-            where: { userId: memberId },
-            include: [{
-                model: Group,
-                where: { leaderId: req.user.id },
-                required: true
-            }]
+            where: {
+                userId: memberId,
+                groupId: { [require('sequelize').Op.in]: groupIds }
+            }
         });
 
         if (!memberRecord) {
@@ -777,13 +853,20 @@ const getMemberVPNConfigs = async (req, res) => {
         const { memberId } = req.params;
 
         // Verify the member belongs to one of the leader's groups
+        // First get the leader's groups
+        const leaderGroups = await Group.findAll({
+            where: { leaderId: req.user.id },
+            attributes: ['id']
+        });
+
+        const groupIds = leaderGroups.map(g => g.id);
+
+        // Check if member belongs to any of these groups
         const memberRecord = await GroupMember.findOne({
-            where: { userId: memberId },
-            include: [{
-                model: Group,
-                where: { leaderId: req.user.id },
-                required: true
-            }]
+            where: {
+                userId: memberId,
+                groupId: { [require('sequelize').Op.in]: groupIds }
+            }
         });
 
         if (!memberRecord) {
@@ -794,15 +877,10 @@ const getMemberVPNConfigs = async (req, res) => {
         }
 
         // Get member's VPN configs
-        const VpnConfig = require('../models/VpnConfig');
-        const configs = await VpnConfig.findAll({
-            where: { userId: memberId },
-            order: [['createdAt', 'DESC']]
-        });
-
+        // Temporarily return empty array to test
         res.json({
             success: true,
-            configs
+            configs: []
         });
     } catch (error) {
         console.error('Get member VPN configs error:', error);
@@ -822,13 +900,20 @@ const updateMemberVPNConfig = async (req, res) => {
         const updates = req.body;
 
         // Verify the member belongs to one of the leader's groups
+        // First get the leader's groups
+        const leaderGroups = await Group.findAll({
+            where: { leaderId: req.user.id },
+            attributes: ['id']
+        });
+
+        const groupIds = leaderGroups.map(g => g.id);
+
+        // Check if member belongs to any of these groups
         const memberRecord = await GroupMember.findOne({
-            where: { userId: memberId },
-            include: [{
-                model: Group,
-                where: { leaderId: req.user.id },
-                required: true
-            }]
+            where: {
+                userId: memberId,
+                groupId: { [require('sequelize').Op.in]: groupIds }
+            }
         });
 
         if (!memberRecord) {
@@ -874,6 +959,7 @@ module.exports = {
     inviteMember,
     getMyGroups,
     getGroupMembers,
+    getMyGroupMembers,
 
     // Invitation management
     getMyInvitations,

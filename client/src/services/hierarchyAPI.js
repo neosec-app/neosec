@@ -202,6 +202,18 @@ export const hierarchyAPI = {
         }
     },
 
+    getMyGroupMembers: async () => {
+        try {
+            const response = await axios.get(`${API_URL}/hierarchy/my-group-members`, {
+                headers: getAuthHeader()
+            });
+            return response.data;
+        } catch (error) {
+            const errorObj = error.response?.data || error;
+            throw new Error(errorObj?.message || errorObj?.error || 'API request failed');
+        }
+    },
+
     leaveGroup: async (membershipId) => {
         try {
             const response = await axios.post(

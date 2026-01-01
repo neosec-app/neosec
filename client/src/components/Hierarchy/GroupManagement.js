@@ -18,6 +18,7 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
         return false;
     };
     const [groups, setGroups] = useState([]);
+    const [memberships, setMemberships] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -33,6 +34,27 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteLoading, setInviteLoading] = useState(false);
 
+    // Handle leaving a group
+    const handleLeaveGroup = async (membershipId, groupName) => {
+        if (!window.confirm(`Are you sure you want to leave "${groupName}"?`)) {
+            return;
+        }
+
+        try {
+            const response = await hierarchyAPI.leaveGroup(membershipId);
+            if (response.success) {
+                setMemberships(memberships.filter(m => m.id !== membershipId));
+                alert('You have left the group successfully.');
+                await fetchAllData(); // Refresh to get updated data
+            } else {
+                alert('Failed to leave group: ' + (response.message || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Leave group error:', error);
+            alert('Failed to leave group: ' + (error.message || 'Unknown error'));
+        }
+    };
+
     // Refresh user data on component mount and when user prop changes
     useEffect(() => {
         console.log('GroupManagement useEffect - user:', user);
@@ -45,8 +67,8 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
                 const parsedUser = JSON.parse(storedUser);
                 console.log('Stored user accountType:', parsedUser?.accountType);
                 if (parsedUser?.accountType === 'leader') {
-                    console.log('User is leader from stored data, fetching groups...');
-                    fetchGroups();
+                    console.log('User is leader from stored data, fetching data...');
+                    fetchAllData();
                     return;
                 }
             } catch (error) {
@@ -57,7 +79,7 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
         // Fallback to prop user
         if (user?.accountType === 'leader') {
             console.log('User is leader from props, fetching groups...');
-            fetchGroups();
+            fetchAllData();
         } else {
             console.log('User is not leader, skipping group fetch');
         }
@@ -68,23 +90,40 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
         setForceRefresh(prev => prev + 1);
     };
 
-    const fetchGroups = async () => {
+    const fetchAllData = async () => {
         try {
-            console.log('Fetching groups...');
+            console.log('Fetching groups and memberships...');
             setLoading(true);
-            const response = await hierarchyAPI.getMyGroups();
-            console.log('Groups response:', response);
-            if (response.success) {
-                setGroups(response.groups || []);
-                console.log('Groups loaded:', response.groups?.length || 0);
+
+            // Fetch groups (owned groups)
+            const groupsResponse = await hierarchyAPI.getMyGroups();
+            console.log('Groups response:', groupsResponse);
+            if (groupsResponse.success) {
+                setGroups(groupsResponse.groups || []);
+                console.log('Groups loaded:', groupsResponse.groups?.length || 0);
             } else {
-                console.error('Groups API returned error:', response?.message || 'Unknown error');
+                console.error('Groups API returned error:', groupsResponse?.message || 'Unknown error');
             }
+
+            // Fetch memberships (groups user is a member of)
+            try {
+                const membershipsResponse = await hierarchyAPI.getMyMemberships();
+                console.log('Memberships response:', membershipsResponse);
+                if (membershipsResponse.success) {
+                    setMemberships(membershipsResponse.memberships || []);
+                    console.log('Memberships loaded:', membershipsResponse.memberships?.length || 0);
+                } else {
+                    console.error('Memberships API returned error:', membershipsResponse?.message || 'Unknown error');
+                }
+            } catch (membershipsError) {
+                console.error('Fetch memberships error:', membershipsError || 'Unknown error');
+            }
+
         } catch (error) {
-            console.error('Fetch groups error:', error || 'Unknown error');
+            console.error('Fetch data error:', error || 'Unknown error');
             console.error('Error details:', error?.response?.data || 'No error details');
             const errorMessage = error?.response?.data?.message || error?.message || 'Unknown error occurred';
-            setError('Failed to load groups: ' + errorMessage);
+            setError('Failed to load data: ' + errorMessage);
         } finally {
             setLoading(false);
         }
@@ -150,7 +189,7 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
                 console.log('Group created successfully');
                 setShowCreateModal(false);
                 setCreateForm({ name: '', description: '', emails: [''] });
-                await fetchGroups(); // Refresh the groups list
+                await fetchAllData(); // Refresh the data
                 alert(`Group created successfully!${validEmails.length > 0 ? ` ${validEmails.length} invitation(s) sent.` : ''}`);
             } else {
                 console.error('API returned success=false:', response?.message || 'No message provided');
@@ -207,7 +246,7 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
                 setInviteEmail('');
                 setSelectedGroupForInvite(null);
                 // Refresh the groups list to show updated member count
-                await fetchGroups();
+                await fetchAllData();
             } else {
                 alert(response.message || 'Failed to send invitation');
             }
@@ -328,7 +367,7 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
                             My Groups
                         </h1>
                         <p style={{ color: palette.textMuted, margin: 0 }}>
-                            Manage your groups and team members • Click "+ Create Group" to create new groups
+                            Manage your groups and memberships • Groups Leading: {groups.length} • Groups Member Of: {memberships.length}
                         </p>
                         <button
                             onClick={refreshUserData}
@@ -343,7 +382,7 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
                                 cursor: 'pointer'
                             }}
                         >
-                            🔄 Refresh Status
+                             Refresh Status
                         </button>
                     </div>
                     <button
@@ -489,6 +528,98 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                )}
+
+                {/* Memberships Section */}
+                {memberships.length > 0 && (
+                    <div style={{ marginTop: '32px' }}>
+                        <h3 style={{
+                            fontSize: '20px',
+                            fontWeight: '600',
+                            marginBottom: '16px',
+                            color: palette.text
+                        }}>
+                            Groups I Am A Member Of ({memberships.length})
+                        </h3>
+
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))',
+                            gap: '16px'
+                        }}>
+                            {memberships.map((membership) => (
+                                <div
+                                    key={membership.id}
+                                    style={{
+                                        padding: '20px',
+                                        backgroundColor: palette.bgCard,
+                                        borderRadius: '8px',
+                                        border: `1px solid ${palette.border}`
+                                    }}
+                                >
+                                    <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        marginBottom: '12px'
+                                    }}>
+                                        <h4 style={{
+                                            margin: 0,
+                                            fontSize: '16px',
+                                            fontWeight: '600',
+                                            color: palette.text
+                                        }}>
+                                            {membership.group?.name || 'Unknown Group'}
+                                        </h4>
+                                        <span style={{
+                                            padding: '4px 8px',
+                                            backgroundColor: theme === 'light' ? 'rgba(34, 197, 94, 0.8)' : palette.accentSoft,
+                                            color: palette.accent,
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: '600'
+                                        }}>
+                                            MEMBER
+                                        </span>
+                                    </div>
+                                    <p style={{
+                                        margin: '0 0 16px 0',
+                                        color: palette.textMuted,
+                                        fontSize: '14px'
+                                    }}>
+                                        {membership.group?.description || 'No description'}
+                                    </p>
+                                    <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center'
+                                    }}>
+                                        <span style={{
+                                            color: palette.textMuted,
+                                            fontSize: '12px'
+                                        }}>
+                                            Joined: {new Date(membership.joinedAt || membership.createdAt).toLocaleDateString()}
+                                        </span>
+                                        <button
+                                            onClick={() => handleLeaveGroup(membership.id, membership.group?.name || 'this group')}
+                                            style={{
+                                                padding: '6px 12px',
+                                                backgroundColor: theme === 'light' ? '#dc2626' : '#ef4444',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                fontSize: '12px',
+                                                fontWeight: '600',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Leave Group
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
 
@@ -733,23 +864,7 @@ const GroupManagement = ({ user, theme, palette, isMobile, isTablet }) => {
                         <div style={{ fontSize: '32px', marginBottom: '16px' }}>⏳</div>
                         <p>Loading groups...</p>
                     </div>
-                ) : (
-                    <div style={{
-                        textAlign: 'center',
-                        padding: isMobile ? '32px 16px' : '48px 32px',
-                        backgroundColor: palette.bgSecondary,
-                        borderRadius: '12px',
-                        border: `1px solid ${palette.border}`
-                    }}>
-                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>👥</div>
-                        <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px', color: palette.text }}>
-                            Group Management
-                        </h3>
-                        <p style={{ color: palette.textMuted, marginBottom: '24px' }}>
-                            Create and manage your groups using the "+ Create Group" button above.
-                        </p>
-                    </div>
-                )}
+                ) : null}
 
             </div>
 

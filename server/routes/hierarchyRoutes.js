@@ -7,6 +7,7 @@ const {
     createGroup,
     getMyGroups,
     getGroupMembers,
+    getMyGroupMembers,
 
     // Invitation management
     inviteMember,
@@ -39,6 +40,9 @@ router.get('/groups/my-groups', protect, requireLeader, getMyGroups);
 
 // Get all members of a group
 router.get('/groups/:groupId/members', protect, getGroupMembers);
+
+// Get all members of all groups led by current user
+router.get('/my-group-members', protect, requireLeader, getMyGroupMembers);
 
 // Invite a user to join group
 router.post('/groups/:groupId/invite', protect, requireLeader, inviteMember);

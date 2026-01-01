@@ -27,6 +27,11 @@ const MemberSecurityManagement = ({ user, theme = 'dark', palette = null }) => {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
 
+  // Editing states
+  const [editingProfile, setEditingProfile] = useState(null);
+  const [editingFirewallRule, setEditingFirewallRule] = useState(null);
+  const [editingVPNConfig, setEditingVPNConfig] = useState(null);
+
   useEffect(() => {
     if (user?.accountType === 'leader') {
       fetchGroupMembers();
@@ -516,6 +521,20 @@ const MemberSecurityManagement = ({ user, theme = 'dark', palette = null }) => {
                                     </p>
                                     <div style={{ display: 'flex', gap: '8px' }}>
                                       <button
+                                        onClick={() => setEditingProfile(editingProfile?.id === profile.id ? null : profile)}
+                                        style={{
+                                          padding: '6px 12px',
+                                          backgroundColor: colors.warning,
+                                          color: '#fff',
+                                          border: 'none',
+                                          borderRadius: '4px',
+                                          cursor: 'pointer',
+                                          fontSize: '12px'
+                                        }}
+                                      >
+                                        {editingProfile?.id === profile.id ? 'Cancel Edit' : 'Edit'}
+                                      </button>
+                                      <button
                                         onClick={() => updateMemberProfile(profile.id, { isActive: !profile.isActive })}
                                         style={{
                                           padding: '6px 12px',
@@ -530,6 +549,96 @@ const MemberSecurityManagement = ({ user, theme = 'dark', palette = null }) => {
                                         {profile.isActive ? 'Deactivate' : 'Activate'}
                                       </button>
                                     </div>
+
+                                    {/* Edit Form */}
+                                    {editingProfile?.id === profile.id && (
+                                      <div style={{
+                                        marginTop: '16px',
+                                        padding: '16px',
+                                        backgroundColor: theme === 'light' ? '#f8fafc' : colors.bgMain,
+                                        borderRadius: '8px',
+                                        border: `1px solid ${colors.border}`
+                                      }}>
+                                        <h5 style={{ margin: '0 0 12px 0', fontSize: '14px' }}>Edit Profile</h5>
+                                        <div style={{ display: 'grid', gap: '12px' }}>
+                                          <div>
+                                            <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', marginBottom: '4px' }}>
+                                              Profile Name
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={editingProfile.name || ''}
+                                              onChange={(e) => setEditingProfile({...editingProfile, name: e.target.value})}
+                                              style={{
+                                                width: '100%',
+                                                padding: '8px',
+                                                border: `1px solid ${colors.border}`,
+                                                borderRadius: '4px',
+                                                backgroundColor: colors.bgMain,
+                                                color: colors.text,
+                                                fontSize: '14px'
+                                              }}
+                                            />
+                                          </div>
+                                          <div>
+                                            <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', marginBottom: '4px' }}>
+                                              Description
+                                            </label>
+                                            <textarea
+                                              value={editingProfile.description || ''}
+                                              onChange={(e) => setEditingProfile({...editingProfile, description: e.target.value})}
+                                              rows={3}
+                                              style={{
+                                                width: '100%',
+                                                padding: '8px',
+                                                border: `1px solid ${colors.border}`,
+                                                borderRadius: '4px',
+                                                backgroundColor: colors.bgMain,
+                                                color: colors.text,
+                                                fontSize: '14px',
+                                                resize: 'vertical'
+                                              }}
+                                            />
+                                          </div>
+                                          <div style={{ display: 'flex', gap: '8px' }}>
+                                            <button
+                                              onClick={() => {
+                                                updateMemberProfile(profile.id, {
+                                                  name: editingProfile.name,
+                                                  description: editingProfile.description
+                                                });
+                                                setEditingProfile(null);
+                                              }}
+                                              style={{
+                                                padding: '8px 16px',
+                                                backgroundColor: colors.accent,
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                fontSize: '12px'
+                                              }}
+                                            >
+                                              Save Changes
+                                            </button>
+                                            <button
+                                              onClick={() => setEditingProfile(null)}
+                                              style={{
+                                                padding: '8px 16px',
+                                                backgroundColor: colors.border,
+                                                color: colors.text,
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                fontSize: '12px'
+                                              }}
+                                            >
+                                              Cancel
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
                               </div>
@@ -578,6 +687,20 @@ const MemberSecurityManagement = ({ user, theme = 'dark', palette = null }) => {
                                     </div>
                                     <div style={{ display: 'flex', gap: '8px' }}>
                                       <button
+                                        onClick={() => setEditingFirewallRule(editingFirewallRule?.id === rule.id ? null : rule)}
+                                        style={{
+                                          padding: '6px 12px',
+                                          backgroundColor: colors.warning,
+                                          color: '#fff',
+                                          border: 'none',
+                                          borderRadius: '4px',
+                                          cursor: 'pointer',
+                                          fontSize: '12px'
+                                        }}
+                                      >
+                                        {editingFirewallRule?.id === rule.id ? 'Cancel Edit' : 'Edit'}
+                                      </button>
+                                      <button
                                         onClick={() => updateMemberFirewallRule(rule.id, { isActive: !rule.isActive })}
                                         style={{
                                           padding: '6px 12px',
@@ -592,6 +715,121 @@ const MemberSecurityManagement = ({ user, theme = 'dark', palette = null }) => {
                                         {rule.isActive ? 'Disable' : 'Enable'}
                                       </button>
                                     </div>
+
+                                    {/* Edit Form */}
+                                    {editingFirewallRule?.id === rule.id && (
+                                      <div style={{
+                                        marginTop: '16px',
+                                        padding: '16px',
+                                        backgroundColor: theme === 'light' ? '#f8fafc' : colors.bgMain,
+                                        borderRadius: '8px',
+                                        border: `1px solid ${colors.border}`
+                                      }}>
+                                        <h5 style={{ margin: '0 0 12px 0', fontSize: '14px' }}>Edit Firewall Rule</h5>
+                                        <div style={{ display: 'grid', gap: '12px' }}>
+                                          <div>
+                                            <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', marginBottom: '4px' }}>
+                                              Rule Name
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={editingFirewallRule.name || ''}
+                                              onChange={(e) => setEditingFirewallRule({...editingFirewallRule, name: e.target.value})}
+                                              style={{
+                                                width: '100%',
+                                                padding: '8px',
+                                                border: `1px solid ${colors.border}`,
+                                                borderRadius: '4px',
+                                                backgroundColor: colors.bgMain,
+                                                color: colors.text,
+                                                fontSize: '14px'
+                                              }}
+                                            />
+                                          </div>
+                                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                            <div>
+                                              <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', marginBottom: '4px' }}>
+                                                Action
+                                              </label>
+                                              <select
+                                                value={editingFirewallRule.action || 'ALLOW'}
+                                                onChange={(e) => setEditingFirewallRule({...editingFirewallRule, action: e.target.value})}
+                                                style={{
+                                                  width: '100%',
+                                                  padding: '8px',
+                                                  border: `1px solid ${colors.border}`,
+                                                  borderRadius: '4px',
+                                                  backgroundColor: colors.bgMain,
+                                                  color: colors.text,
+                                                  fontSize: '14px'
+                                                }}
+                                              >
+                                                <option value="ALLOW">ALLOW</option>
+                                                <option value="DENY">DENY</option>
+                                              </select>
+                                            </div>
+                                            <div>
+                                              <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', marginBottom: '4px' }}>
+                                                Direction
+                                              </label>
+                                              <select
+                                                value={editingFirewallRule.direction || 'INBOUND'}
+                                                onChange={(e) => setEditingFirewallRule({...editingFirewallRule, direction: e.target.value})}
+                                                style={{
+                                                  width: '100%',
+                                                  padding: '8px',
+                                                  border: `1px solid ${colors.border}`,
+                                                  borderRadius: '4px',
+                                                  backgroundColor: colors.bgMain,
+                                                  color: colors.text,
+                                                  fontSize: '14px'
+                                                }}
+                                              >
+                                                <option value="INBOUND">INBOUND</option>
+                                                <option value="OUTBOUND">OUTBOUND</option>
+                                              </select>
+                                            </div>
+                                          </div>
+                                          <div style={{ display: 'flex', gap: '8px' }}>
+                                            <button
+                                              onClick={() => {
+                                                updateMemberFirewallRule(rule.id, {
+                                                  name: editingFirewallRule.name,
+                                                  action: editingFirewallRule.action,
+                                                  direction: editingFirewallRule.direction
+                                                });
+                                                setEditingFirewallRule(null);
+                                              }}
+                                              style={{
+                                                padding: '8px 16px',
+                                                backgroundColor: colors.accent,
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                fontSize: '12px'
+                                              }}
+                                            >
+                                              Save Changes
+                                            </button>
+                                            <button
+                                              onClick={() => setEditingFirewallRule(null)}
+                                              style={{
+                                                padding: '8px 16px',
+                                                backgroundColor: colors.border,
+                                                color: colors.text,
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                fontSize: '12px'
+                                              }}
+                                            >
+                                              Cancel
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
                               </div>
@@ -638,6 +876,20 @@ const MemberSecurityManagement = ({ user, theme = 'dark', palette = null }) => {
                                     </div>
                                     <div style={{ display: 'flex', gap: '8px' }}>
                                       <button
+                                        onClick={() => setEditingVPNConfig(editingVPNConfig?.id === config.id ? null : config)}
+                                        style={{
+                                          padding: '6px 12px',
+                                          backgroundColor: colors.warning,
+                                          color: '#fff',
+                                          border: 'none',
+                                          borderRadius: '4px',
+                                          cursor: 'pointer',
+                                          fontSize: '12px'
+                                        }}
+                                      >
+                                        {editingVPNConfig?.id === config.id ? 'Cancel Edit' : 'Edit'}
+                                      </button>
+                                      <button
                                         onClick={() => updateMemberVPNConfig(config.id, { isActive: !config.isActive })}
                                         style={{
                                           padding: '6px 12px',
@@ -652,6 +904,120 @@ const MemberSecurityManagement = ({ user, theme = 'dark', palette = null }) => {
                                         {config.isActive ? 'Disconnect' : 'Connect'}
                                       </button>
                                     </div>
+
+                                    {/* Edit Form */}
+                                    {editingVPNConfig?.id === config.id && (
+                                      <div style={{
+                                        marginTop: '16px',
+                                        padding: '16px',
+                                        backgroundColor: theme === 'light' ? '#f8fafc' : colors.bgMain,
+                                        borderRadius: '8px',
+                                        border: `1px solid ${colors.border}`
+                                      }}>
+                                        <h5 style={{ margin: '0 0 12px 0', fontSize: '14px' }}>Edit VPN Configuration</h5>
+                                        <div style={{ display: 'grid', gap: '12px' }}>
+                                          <div>
+                                            <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', marginBottom: '4px' }}>
+                                              Configuration Name
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={editingVPNConfig.name || ''}
+                                              onChange={(e) => setEditingVPNConfig({...editingVPNConfig, name: e.target.value})}
+                                              style={{
+                                                width: '100%',
+                                                padding: '8px',
+                                                border: `1px solid ${colors.border}`,
+                                                borderRadius: '4px',
+                                                backgroundColor: colors.bgMain,
+                                                color: colors.text,
+                                                fontSize: '14px'
+                                              }}
+                                            />
+                                          </div>
+                                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                            <div>
+                                              <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', marginBottom: '4px' }}>
+                                                Server Address
+                                              </label>
+                                              <input
+                                                type="text"
+                                                value={editingVPNConfig.serverAddress || ''}
+                                                onChange={(e) => setEditingVPNConfig({...editingVPNConfig, serverAddress: e.target.value})}
+                                                style={{
+                                                  width: '100%',
+                                                  padding: '8px',
+                                                  border: `1px solid ${colors.border}`,
+                                                  borderRadius: '4px',
+                                                  backgroundColor: colors.bgMain,
+                                                  color: colors.text,
+                                                  fontSize: '14px'
+                                                }}
+                                              />
+                                            </div>
+                                            <div>
+                                              <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', marginBottom: '4px' }}>
+                                                Protocol
+                                              </label>
+                                              <select
+                                                value={editingVPNConfig.protocol || 'OpenVPN'}
+                                                onChange={(e) => setEditingVPNConfig({...editingVPNConfig, protocol: e.target.value})}
+                                                style={{
+                                                  width: '100%',
+                                                  padding: '8px',
+                                                  border: `1px solid ${colors.border}`,
+                                                  borderRadius: '4px',
+                                                  backgroundColor: colors.bgMain,
+                                                  color: colors.text,
+                                                  fontSize: '14px'
+                                                }}
+                                              >
+                                                <option value="OpenVPN">OpenVPN</option>
+                                                <option value="WireGuard">WireGuard</option>
+                                                <option value="IKEv2">IKEv2</option>
+                                              </select>
+                                            </div>
+                                          </div>
+                                          <div style={{ display: 'flex', gap: '8px' }}>
+                                            <button
+                                              onClick={() => {
+                                                updateMemberVPNConfig(config.id, {
+                                                  name: editingVPNConfig.name,
+                                                  serverAddress: editingVPNConfig.serverAddress,
+                                                  protocol: editingVPNConfig.protocol
+                                                });
+                                                setEditingVPNConfig(null);
+                                              }}
+                                              style={{
+                                                padding: '8px 16px',
+                                                backgroundColor: colors.accent,
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                fontSize: '12px'
+                                              }}
+                                            >
+                                              Save Changes
+                                            </button>
+                                            <button
+                                              onClick={() => setEditingVPNConfig(null)}
+                                              style={{
+                                                padding: '8px 16px',
+                                                backgroundColor: colors.border,
+                                                color: colors.text,
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                fontSize: '12px'
+                                              }}
+                                            >
+                                              Cancel
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
                               </div>
