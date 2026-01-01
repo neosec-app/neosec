@@ -209,7 +209,8 @@ const upgradeTestUser = async (req, res) => {
     await User.update(
       {
         accountType: 'leader',
-        subscriptionTier: tier
+        subscriptionTier: tier,
+        isPaid: true
       },
       { where: { id: req.user.id } }
     );
