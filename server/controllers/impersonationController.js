@@ -101,15 +101,34 @@ const startImpersonation = async (req, res) => {
     // Check for specific database errors
     if (error.name === 'SequelizeDatabaseError') {
       if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
-        console.error('Database table "impersonation_sessions" might not exist. Please run database migrations.');
-        return res.status(500).json({
-          success: false,
-          message: 'Database table not found. Please ensure the database is properly set up.',
-          error: process.env.NODE_ENV === 'development' ? {
-            message: error.message,
-            hint: 'The impersonation_sessions table might not exist. Restart the server to create tables automatically.'
-          } : undefined
-        });
+        console.error('Database table "impersonation_sessions" does not exist. Attempting to create it...');
+        
+        // Try to create the table automatically
+        try {
+          await ImpersonationSession.sync({ force: false, alter: false });
+          console.log('✅ Table impersonation_sessions created successfully.');
+          
+          // Return a helpful message
+          return res.status(503).json({
+            success: false,
+            message: 'Table was just created. Please try the request again in a moment.',
+            error: process.env.NODE_ENV === 'development' ? {
+              message: 'Table created successfully. Please retry your request.',
+              hint: 'The table has been created. Wait a moment and try starting impersonation again.'
+            } : undefined
+          });
+        } catch (syncError) {
+          console.error('Failed to create table:', syncError.message);
+          return res.status(500).json({
+            success: false,
+            message: 'Database table not found and could not be created automatically.',
+            error: process.env.NODE_ENV === 'development' ? {
+              message: error.message,
+              syncError: syncError.message,
+              hint: 'Run: node server/scripts/createImpersonationTable.js to create the table manually, or restart your server.'
+            } : undefined
+          });
+        }
       }
     }
     

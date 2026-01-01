@@ -112,6 +112,11 @@ const connectDB = async () => {
                 `Missing tables detected (${missingTables.join(', ')}). Creating database tables...`
             );
             // Sync will create missing tables and update schema
+            // Make sure all models are loaded before syncing
+            require('../models/ImpersonationSession');
+            require('../models/ActivityLog');
+            require('../models/BlocklistIP');
+            require('../models/ThreatBlockerSettings');
             await sequelize.sync({ force: false, alter: false });
             console.log('Database tables created successfully.');
             

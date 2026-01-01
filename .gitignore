@@ -75,3 +75,8 @@ SAADAT_CODE_LOCATIONS.md
 **/*TEST*.md
 **/*test*.md
 server/DATABASE_CONNECTION_TEST.md
+
+# Fix/Setup documentation files
+**/FIX*.md
+**/*FIX*.md
+server/FIX_IMPERSONATION_TABLE.md
