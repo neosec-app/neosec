@@ -294,13 +294,13 @@ const Groups = ({ user, theme, palette, isMobile, isTablet }) => {
         </div>
     );
 
-    const renderInvitedMemberships = () => (
-        <div>
+    // const renderInvitedMemberships = () => (
+    //     <div>
             <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px', color: palette.text }}>
                 Groups I Joined via Invitations
             </h3>
 
-            {invitedMemberships.length === 0 ? (
+            {/* No invited memberships check */}
                 <div style={{
                     textAlign: 'center',
                     padding: isMobile ? '32px 16px' : '48px 32px',
@@ -316,70 +316,70 @@ const Groups = ({ user, theme, palette, isMobile, isTablet }) => {
                         You haven't joined any groups via invitations yet.
                     </p>
                 </div>
-            ) : (
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
-                    gap: '24px'
-                }}>
-                    {invitedMemberships.map((membership) => (
-                        <div
-                            key={membership.id}
-                            style={{
-                                padding: '24px',
-                                backgroundColor: palette.bgCard,
-                                borderRadius: '12px',
-                                border: `1px solid ${palette.border}`,
-                                position: 'relative'
-                            }}
-                        >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                                <h3 style={{ fontSize: '20px', fontWeight: '600', margin: 0, color: palette.text }}>
-                                    {membership.group?.name || 'Unknown Group'}
-                                </h3>
-                                <span style={{
-                                    padding: '4px 8px',
-                                    backgroundColor: theme === 'light' ? 'rgba(34, 197, 94, 0.1)' : palette.accentSoft,
-                                    color: palette.accent,
-                                    fontSize: '11px',
-                                    fontWeight: '600',
-                                    borderRadius: '4px',
-                                    border: `1px solid ${palette.accent}`
-                                }}>
-                                    Invited
-                                </span>
-                            </div>
-                            <p style={{ color: palette.textMuted, fontSize: '14px', marginBottom: '16px' }}>
-                                {membership.group?.description || 'No description'}
-                            </p>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ color: palette.textMuted, fontSize: '14px' }}>
-                                    Role: <span style={{ color: palette.text, fontWeight: '600' }}>
-                                        {membership.role || 'Member'}
-                                    </span>
-                                </span>
-                                <button
-                                    onClick={() => handleLeaveGroup(membership.id, membership.group?.name)}
-                                    style={{
-                                        padding: '6px 12px',
-                                        backgroundColor: palette.danger,
-                                        color: '#fff',
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        fontSize: '12px',
-                                        fontWeight: '600',
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    Leave
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
+            // ) : (
+            //     <div style={{
+            //         display: 'grid',
+            //         gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
+            //         gap: '24px'
+            //     }}>
+            //         {invitedMemberships.map((membership) => (
+                        // <div
+                        //     key={membership.id}
+                        //     style={{
+                        //         padding: '24px',
+                        //         backgroundColor: palette.bgCard,
+                        //         borderRadius: '12px',
+                        //         border: `1px solid ${palette.border}`,
+                        //         position: 'relative'
+                        //     }}
+                        // >
+                        //     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                        //         <h3 style={{ fontSize: '20px', fontWeight: '600', margin: 0, color: palette.text }}>
+                        //             {membership.group?.name || 'Unknown Group'}
+                        //         </h3>
+                        //         <span style={{
+                        //             padding: '4px 8px',
+                        //             backgroundColor: theme === 'light' ? 'rgba(34, 197, 94, 0.1)' : palette.accentSoft,
+                        //             color: palette.accent,
+                        //             fontSize: '11px',
+                        //             fontWeight: '600',
+                        //             borderRadius: '4px',
+                        //             border: `1px solid ${palette.accent}`
+                        //         }}>
+                        //             Invited
+                        //         </span>
+                        //     </div>
+                        //     <p style={{ color: palette.textMuted, fontSize: '14px', marginBottom: '16px' }}>
+                        //         {membership.group?.description || 'No description'}
+                        //     </p>
+                        //     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        //         <span style={{ color: palette.textMuted, fontSize: '14px' }}>
+                        //             Role: <span style={{ color: palette.text, fontWeight: '600' }}>
+                        //                 {membership.role || 'Member'}
+                        //             </span>
+                        //         </span>
+                        //         <button
+                        //             onClick={() => handleLeaveGroup(membership.id, membership.group?.name)}
+                        //             style={{
+                        //                 padding: '6px 12px',
+                        //                 backgroundColor: palette.danger,
+                        //                 color: '#fff',
+                        //                 border: 'none',
+                        //                 borderRadius: '6px',
+                        //                 fontSize: '12px',
+                        //                 fontWeight: '600',
+                        //                 cursor: 'pointer'
+                        //             }}
+                        //         >
+                        //             Leave
+                        //         </button>
+                        //     </div>
+                        // </div>
+                    // ))}
+                // </div>
+            // )}
+        // </div>
+    // );
 
     const renderAllGroups = () => {
         // Combine owned groups and memberships into a single array
