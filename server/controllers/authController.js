@@ -376,6 +376,8 @@ const getMe = async (req, res) => {
       attributes: [
         'id',
         'email',
+        'name',
+        'phone',
         'role',
         'accountType',
         'subscriptionTier',
@@ -406,10 +408,94 @@ const getMe = async (req, res) => {
   }
 };
 
+// @desc    Update user profile
+// @route   PUT /api/auth/profile
+// @access  Private
+const updateProfile = async (req, res) => {
+  try {
+    const { name, phone, currentPassword, newPassword } = req.body;
+    const userId = req.user.id;
+
+    // Find user
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // If changing password, verify current password
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'Current password is required to change password'
+        });
+      }
+
+      const isCurrentPasswordValid = await user.comparePassword(currentPassword);
+      if (!isCurrentPasswordValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Current password is incorrect'
+        });
+      }
+
+      // Validate new password length
+      if (newPassword.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: 'New password must be at least 6 characters long'
+        });
+      }
+    }
+
+    // Update user fields
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (phone !== undefined) updateData.phone = phone;
+    if (newPassword) updateData.password = newPassword;
+
+    // Update user
+    await user.update(updateData);
+
+    // Fetch updated user data (without password)
+    const updatedUser = await User.findByPk(userId, {
+      attributes: [
+        'id',
+        'email',
+        'name',
+        'phone',
+        'role',
+        'accountType',
+        'subscriptionTier',
+        'isPaid',
+        'isApproved',
+        'createdAt'
+      ]
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating profile',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
-  getMe
+  getMe,
+  updateProfile
 };
 
 

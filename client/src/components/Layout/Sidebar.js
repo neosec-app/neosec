@@ -339,7 +339,29 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                     {/* Leader Section */}
                     {user.accountType === 'leader' && (
                         <>
-                            <SidebarButton label="My Groups" view="groups" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
+                            <button
+                                onMouseEnter={() => setNavHover('groups-leader')}
+                                onMouseLeave={() => setNavHover(null)}
+                                onClick={() => setCurrentView('groups')}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px 15px',
+                                    marginBottom: '10px',
+                                    backgroundColor: currentView === 'groups' || navHover === 'groups-leader'
+                                        ? (theme === 'light' ? palette.accentSoft : (currentView === 'groups' ? '#1E402C' : 'rgba(255, 255, 255, 0.1)'))
+                                        : 'transparent',
+                                    color: currentView === 'groups' || navHover === 'groups-leader' ? palette.accent : palette.text,
+                                    border: currentView === 'groups' || navHover === 'groups-leader' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                    borderRadius: '10px',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: navHover === 'groups-leader' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                                }}
+                            >
+                                My Groups
+                            </button>
                             <SidebarButton label="Member Security" view="member-security" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
                             <button
                                 onMouseEnter={() => setNavHover('impersonation')}
