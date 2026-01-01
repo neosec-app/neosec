@@ -106,16 +106,91 @@ const startImpersonation = async (req, res) => {
         // Try to create the table automatically
         try {
           await ImpersonationSession.sync({ force: false, alter: false });
-          console.log('✅ Table impersonation_sessions created successfully.');
+          console.log('✅ Table impersonation_sessions created successfully. Retrying operation...');
           
-          // Return a helpful message
-          return res.status(503).json({
-            success: false,
-            message: 'Table was just created. Please try the request again in a moment.',
-            error: process.env.NODE_ENV === 'development' ? {
-              message: 'Table created successfully. Please retry your request.',
-              hint: 'The table has been created. Wait a moment and try starting impersonation again.'
-            } : undefined
+          // Retry the original operation now that table exists
+          // Extract the original request data
+          const { targetUserId, reason } = req.body;
+
+          if (!targetUserId) {
+            return res.status(400).json({
+              success: false,
+              message: 'targetUserId is required'
+            });
+          }
+
+          if (targetUserId === req.user.id) {
+            return res.status(400).json({
+              success: false,
+              message: 'You cannot impersonate yourself'
+            });
+          }
+
+          const targetUser = await User.findByPk(targetUserId, {
+            attributes: { exclude: ['password'] }
+          });
+
+          if (!targetUser) {
+            return res.status(404).json({
+              success: false,
+              message: 'Target user not found'
+            });
+          }
+
+          // End any existing active session for this admin
+          await ImpersonationSession.update(
+            { isActive: false, endedAt: new Date() },
+            {
+              where: {
+                adminUserId: req.user.id,
+                isActive: true
+              }
+            }
+          );
+
+          // Create new session
+          const session = await ImpersonationSession.create({
+            adminUserId: req.user.id,
+            targetUserId,
+            reason: reason || null,
+            ipAddress: req.ip || req.headers['x-forwarded-for'] || 'unknown',
+            isActive: true
+          });
+
+          if (!process.env.JWT_SECRET) {
+            console.error('JWT_SECRET is not set in environment variables');
+            return res.status(500).json({
+              success: false,
+              message: 'Server configuration error: JWT_SECRET is not set',
+              error: process.env.NODE_ENV === 'development' ? 'JWT_SECRET environment variable is required' : undefined
+            });
+          }
+
+          const token = jwt.sign(
+            { userId: targetUser.id, role: targetUser.role, impersonated: true, adminId: req.user.id },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+          );
+
+          await createAuditLog(
+            req.user.id,
+            'User Impersonation Started',
+            'Security',
+            {
+              targetUserId,
+              details: `Started impersonation session for ${targetUser.email}. Reason: ${reason || 'Not specified'}`,
+              ipAddress: req.ip || req.headers['x-forwarded-for'] || 'unknown'
+            }
+          );
+
+          return res.status(200).json({
+            success: true,
+            message: 'Impersonation session started',
+            data: {
+              session,
+              targetUser,
+              token
+            }
           });
         } catch (syncError) {
           console.error('Failed to create table:', syncError.message);
