@@ -35,6 +35,11 @@ const VpnConfig = sequelize.define('VpnConfig', {
         type: DataTypes.TEXT,
         allowNull: true
     },
+    serverAddress: {
+        type: DataTypes.STRING,
+        allowNull: true, // Make it nullable to avoid constraint errors
+        comment: 'VPN server address extracted from config file'
+    },
     isActive: {
         type: DataTypes.BOOLEAN,
         defaultValue: false

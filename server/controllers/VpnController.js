@@ -102,12 +102,38 @@ exports.createVpnConfig = async (req, res) => {
             });
         }
 
+        // Extract server address from config file content if possible
+        let serverAddress = null;
+        try {
+            if (configFileContent) {
+                // Try to extract server address from OpenVPN config
+                if (protocol === 'OpenVPN') {
+                    const remoteMatch = configFileContent.match(/remote\s+([^\s]+)/i);
+                    if (remoteMatch) {
+                        serverAddress = remoteMatch[1].split(' ')[0]; // Get hostname/IP, ignore port
+                    }
+                }
+                // Try to extract from WireGuard config
+                else if (protocol === 'WireGuard') {
+                    const endpointMatch = configFileContent.match(/Endpoint\s*=\s*([^\s,]+)/i);
+                    if (endpointMatch) {
+                        serverAddress = endpointMatch[1].split(':')[0]; // Get hostname/IP, ignore port
+                    }
+                }
+            }
+        } catch (extractError) {
+            console.warn('Could not extract server address from config file:', extractError.message);
+            // Continue without server address - use default
+            serverAddress = 'Unknown';
+        }
+
         const vpnConfig = await VpnConfig.create({
             name,
             protocol,
             configFileName,
             configFileContent,
             description: description || null,
+            serverAddress: serverAddress || 'Unknown', // Provide default value to satisfy NOT NULL constraint
             userId: req.user.id,
             isActive: false
         });
