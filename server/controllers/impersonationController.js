@@ -54,6 +54,16 @@ const startImpersonation = async (req, res) => {
       isActive: true
     });
 
+    // Check if JWT_SECRET is set
+    if (!process.env.JWT_SECRET) {
+      console.error('JWT_SECRET is not set in environment variables');
+      return res.status(500).json({
+        success: false,
+        message: 'Server configuration error: JWT_SECRET is not set',
+        error: process.env.NODE_ENV === 'development' ? 'JWT_SECRET environment variable is required' : undefined
+      });
+    }
+
     // Generate token for impersonated user
     const token = jwt.sign(
       { userId: targetUser.id, role: targetUser.role, impersonated: true, adminId: req.user.id },
@@ -84,10 +94,42 @@ const startImpersonation = async (req, res) => {
     });
   } catch (error) {
     console.error('Start impersonation error:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Check for specific database errors
+    if (error.name === 'SequelizeDatabaseError') {
+      if (error.message?.includes('does not exist') || error.message?.includes('relation')) {
+        console.error('Database table "impersonation_sessions" might not exist. Please run database migrations.');
+        return res.status(500).json({
+          success: false,
+          message: 'Database table not found. Please ensure the database is properly set up.',
+          error: process.env.NODE_ENV === 'development' ? {
+            message: error.message,
+            hint: 'The impersonation_sessions table might not exist. Restart the server to create tables automatically.'
+          } : undefined
+        });
+      }
+    }
+    
+    // Check for JWT errors
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+      return res.status(500).json({
+        success: false,
+        message: 'Token generation failed',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Server error starting impersonation',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      } : undefined
     });
   }
 };

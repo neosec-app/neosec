@@ -24,6 +24,7 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
     dialectOptions: {
         ssl:
             process.env.DATABASE_URL?.includes('render.com') ||
+            process.env.DATABASE_URL?.includes('dpg-') || // Render database pattern
             process.env.DATABASE_URL?.includes('amazonaws.com') ||
             process.env.DATABASE_URL?.includes('supabase.co') ||
             process.env.DATABASE_URL?.includes('vercel-storage.com') ||
