@@ -102,30 +102,42 @@ exports.createVpnConfig = async (req, res) => {
             });
         }
 
-        // Extract server address from config file content if possible
+        // Extract server address and port from config file content if possible
         let serverAddress = null;
+        let port = null;
         try {
             if (configFileContent) {
-                // Try to extract server address from OpenVPN config
+                // Try to extract server address and port from OpenVPN config
                 if (protocol === 'OpenVPN') {
-                    const remoteMatch = configFileContent.match(/remote\s+([^\s]+)/i);
+                    const remoteMatch = configFileContent.match(/remote\s+([^\s]+)(?:\s+(\d+))?/i);
                     if (remoteMatch) {
-                        serverAddress = remoteMatch[1].split(' ')[0]; // Get hostname/IP, ignore port
+                        serverAddress = remoteMatch[1].split(' ')[0]; // Get hostname/IP
+                        port = remoteMatch[2] ? parseInt(remoteMatch[2], 10) : (remoteMatch[1].includes(':') ? parseInt(remoteMatch[1].split(':')[1], 10) : null);
                     }
                 }
                 // Try to extract from WireGuard config
                 else if (protocol === 'WireGuard') {
                     const endpointMatch = configFileContent.match(/Endpoint\s*=\s*([^\s,]+)/i);
                     if (endpointMatch) {
-                        serverAddress = endpointMatch[1].split(':')[0]; // Get hostname/IP, ignore port
+                        const endpoint = endpointMatch[1];
+                        if (endpoint.includes(':')) {
+                            const parts = endpoint.split(':');
+                            serverAddress = parts[0];
+                            port = parseInt(parts[1], 10) || null;
+                        } else {
+                            serverAddress = endpoint;
+                        }
                     }
                 }
             }
         } catch (extractError) {
-            console.warn('Could not extract server address from config file:', extractError.message);
-            // Continue without server address - use default
-            serverAddress = 'Unknown';
+            console.warn('Could not extract server address/port from config file:', extractError.message);
+            // Continue with defaults
         }
+
+        // Ensure we always have values (database requires NOT NULL)
+        const finalServerAddress = serverAddress || 'Unknown';
+        const finalPort = port !== null && port !== undefined ? port : 0;
 
         const vpnConfig = await VpnConfig.create({
             name,
@@ -133,7 +145,8 @@ exports.createVpnConfig = async (req, res) => {
             configFileName,
             configFileContent,
             description: description || null,
-            serverAddress: serverAddress || 'Unknown', // Provide default value to satisfy NOT NULL constraint
+            serverAddress: finalServerAddress, // Always provide a value
+            port: finalPort, // Always provide a port value to satisfy NOT NULL constraint
             userId: req.user.id,
             isActive: false
         });

@@ -42,6 +42,36 @@ const { sequelize } = require('../config/db');
       }
     }
     
+    // Check if port column exists
+    const [portColumns] = await sequelize.query(`
+      SELECT column_name, data_type, is_nullable
+      FROM information_schema.columns
+      WHERE table_name = 'vpn_configs' 
+      AND column_name = 'port'
+      AND table_schema = 'public';
+    `);
+    
+    if (portColumns.length === 0) {
+      console.log('port column does not exist. Adding it...');
+      await sequelize.query(`
+        ALTER TABLE vpn_configs 
+        ADD COLUMN port INTEGER;
+      `);
+      console.log('✅ Added port column as nullable');
+    } else {
+      const portColumn = portColumns[0];
+      if (portColumn.is_nullable === 'NO') {
+        console.log('Making port column nullable...');
+        await sequelize.query(`
+          ALTER TABLE vpn_configs 
+          ALTER COLUMN port DROP NOT NULL;
+        `);
+        console.log('✅ Made port column nullable');
+      } else {
+        console.log('✅ port is already nullable');
+      }
+    }
+    
     // Update any existing rows with null serverAddress to have a default value
     await sequelize.query(`
       UPDATE vpn_configs 
@@ -49,7 +79,14 @@ const { sequelize } = require('../config/db');
       WHERE "serverAddress" IS NULL;
     `);
     
-    console.log('✅ Fixed serverAddress column');
+    // Update any existing rows with null port to have a default value
+    await sequelize.query(`
+      UPDATE vpn_configs 
+      SET port = 0
+      WHERE port IS NULL;
+    `);
+    
+    console.log('✅ Fixed serverAddress and port columns');
   } catch (error) {
     console.error('Error fixing serverAddress:', error.message);
     console.error('Full error:', error);
