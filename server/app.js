@@ -86,7 +86,7 @@ app.use(
 // CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-    : ['http://localhost:3000'];
+    : ['http://localhost:3000', 'https://neosec-ui.onrender.com'];
 
 app.use(cors({
     origin: function (origin, callback) {
@@ -231,11 +231,14 @@ if (!process.env.DATABASE_URL) {
     console.error('Please set DATABASE_URL in your environment variables.');
 }
 
-app.listen(PORT, () => {
-    console.log(`Server started on port ${PORT}`);
+const HOST = process.env.HOST || '0.0.0.0';
+
+app.listen(PORT, HOST, () => {
+    console.log(`Server started on ${HOST}:${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`JWT_SECRET: ${process.env.JWT_SECRET ? 'Set' : 'NOT SET - THIS WILL CAUSE ERRORS!'}`);
     console.log(`DATABASE_URL: ${process.env.DATABASE_URL ? 'Set' : 'NOT SET - THIS WILL CAUSE ERRORS!'}`);
+    console.log(`Accessible at: http://${HOST}:${PORT}`);
     
     // Start automatic threat blocker scheduler
     // Wait a bit for database to be ready

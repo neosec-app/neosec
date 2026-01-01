@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { hierarchyAPI } from '../../services/hierarchyAPI';
 
-const Invitations = () => {
+const Invitations = ({ theme, palette }) => {
     const [invitations, setInvitations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -78,102 +78,237 @@ const Invitations = () => {
     };
 
     return (
-        <div className="min-h-screen bg-background-dark text-text-light p-8">
-            <div className="max-w-4xl mx-auto">
+        <div style={{
+            minHeight: '100vh',
+            backgroundColor: palette.bgMain,
+            color: palette.text,
+            padding: '40px'
+        }}>
+            <div style={{ maxWidth: '1024px', margin: '0 auto' }}>
                 {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold mb-2">My Invitations</h1>
-                    <p className="text-text-muted">
+                <div style={{ marginBottom: '40px' }}>
+                    <h1 style={{
+                        fontSize: '32px',
+                        fontWeight: '600',
+                        margin: '0 0 8px 0',
+                        color: palette.text
+                    }}>
+                        My Invitations
+                    </h1>
+                    <p style={{
+                        color: palette.textMuted,
+                        margin: 0,
+                        fontSize: '16px'
+                    }}>
                         Group invitations you've received
                     </p>
                 </div>
 
                 {/* Error Message */}
                 {error && (
-                    <div className="mb-6 p-4 bg-error-red bg-opacity-10 border border-error-red rounded-lg text-error-red">
+                    <div style={{
+                        marginBottom: '24px',
+                        padding: '16px',
+                        backgroundColor: `${palette.danger}20`,
+                        border: `1px solid ${palette.danger}`,
+                        borderRadius: '8px',
+                        color: palette.danger
+                    }}>
                         {error}
                     </div>
                 )}
 
                 {/* Loading State */}
                 {loading ? (
-                    <div className="text-center py-12 text-text-muted">
-                        <div className="text-4xl mb-4">⏳</div>
-                        <p>Loading invitations...</p>
+                    <div style={{
+                        textAlign: 'center',
+                        padding: '48px 0',
+                        color: palette.textMuted
+                    }}>
+                        <div style={{
+                            fontSize: '48px',
+                            marginBottom: '16px'
+                        }}>⏳</div>
+                        <p style={{ margin: 0 }}>Loading invitations...</p>
                     </div>
                 ) : invitations.length === 0 ? (
                     /* Empty State */
-                    <div className="text-center py-12 p-8 bg-form-background-dark rounded-lg border border-input-background-dark">
-                        <div className="text-6xl mb-4">📬</div>
-                        <h3 className="text-xl font-bold mb-2">No Invitations</h3>
-                        <p className="text-text-muted">
+                    <div style={{
+                        textAlign: 'center',
+                        padding: '48px 32px',
+                        backgroundColor: palette.bgCard,
+                        borderRadius: '12px',
+                        border: `1px solid ${palette.border}`
+                    }}>
+                        <div style={{
+                            fontSize: '72px',
+                            marginBottom: '16px'
+                        }}>📬</div>
+                        <h3 style={{
+                            fontSize: '20px',
+                            fontWeight: '600',
+                            margin: '0 0 8px 0',
+                            color: palette.text
+                        }}>
+                            No Invitations
+                        </h3>
+                        <p style={{
+                            color: palette.textMuted,
+                            margin: 0
+                        }}>
                             You don't have any pending group invitations at the moment.
                         </p>
                     </div>
                 ) : (
                     /* Invitations List */
-                    <div className="space-y-4">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         {invitations.map((invitation) => (
                             <div
                                 key={invitation.id}
-                                className={`p-6 bg-form-background-dark rounded-lg border transition-all ${
-                                    isExpired(invitation.expiresAt)
-                                        ? 'border-input-background-dark opacity-60'
-                                        : 'border-primary'
-                                }`}
+                                style={{
+                                    padding: '24px',
+                                    backgroundColor: palette.bgCard,
+                                    borderRadius: '12px',
+                                    border: `1px solid ${isExpired(invitation.expiresAt) ? palette.border : palette.accent}`,
+                                    opacity: isExpired(invitation.expiresAt) ? 0.6 : 1,
+                                    transition: 'all 0.2s ease'
+                                }}
                             >
-                                <div className="flex items-start justify-between mb-4">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <h3 className="text-xl font-bold">{invitation.group?.name}</h3>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'flex-start',
+                                    justifyContent: 'space-between',
+                                    marginBottom: '16px'
+                                }}>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px',
+                                            marginBottom: '8px'
+                                        }}>
+                                            <h3 style={{
+                                                fontSize: '20px',
+                                                fontWeight: '600',
+                                                color: palette.text,
+                                                margin: 0
+                                            }}>
+                                                {invitation.group?.name}
+                                            </h3>
                                             {!isExpired(invitation.expiresAt) && (
-                                                <span className="px-3 py-1 bg-primary bg-opacity-20 text-primary text-xs font-semibold rounded-full">
-                          New
-                        </span>
+                                                <span style={{
+                                                    padding: '4px 12px',
+                                                    backgroundColor: `${palette.accent}20`,
+                                                    color: palette.accent,
+                                                    fontSize: '12px',
+                                                    fontWeight: '600',
+                                                    borderRadius: '999px'
+                                                }}>
+                                                    New
+                                                </span>
                                             )}
                                         </div>
-                                        <p className="text-text-muted mb-4">
+                                        <p style={{
+                                            color: palette.textMuted,
+                                            margin: '0 0 16px 0',
+                                            fontSize: '14px'
+                                        }}>
                                             {invitation.group?.description || 'No description available'}
                                         </p>
 
                                         {/* Group Info */}
-                                        <div className="flex items-center gap-6 text-sm mb-4">
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '24px',
+                                            fontSize: '14px',
+                                            marginBottom: '16px'
+                                        }}>
                                             <div>
-                                                <span className="text-text-muted">Leader: </span>
-                                                <span className="text-text-light font-semibold">
-                          {invitation.group?.leader?.email}
-                        </span>
+                                                <span style={{ color: palette.textMuted }}>Leader: </span>
+                                                <span style={{
+                                                    color: palette.text,
+                                                    fontWeight: '600'
+                                                }}>
+                                                    {invitation.group?.leader?.email}
+                                                </span>
                                             </div>
                                             <div>
-                                                <span className="text-text-muted">Invited by: </span>
-                                                <span className="text-text-light font-semibold">
-                          {invitation.inviter?.email}
-                        </span>
+                                                <span style={{ color: palette.textMuted }}>Invited by: </span>
+                                                <span style={{
+                                                    color: palette.text,
+                                                    fontWeight: '600'
+                                                }}>
+                                                    {invitation.inviter?.email}
+                                                </span>
                                             </div>
                                         </div>
 
                                         {/* Time Remaining */}
-                                        <div className="flex items-center gap-2 text-sm">
-                      <span className={`${
-                          isExpired(invitation.expiresAt) ? 'text-error-red' : 'text-text-muted'
-                      }`}>
-                        ⏱️ {getTimeRemaining(invitation.expiresAt)}
-                      </span>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            fontSize: '14px'
+                                        }}>
+                                            <span style={{
+                                                color: isExpired(invitation.expiresAt) ? palette.danger : palette.textMuted
+                                            }}>
+                                                ⏱️ {getTimeRemaining(invitation.expiresAt)}
+                                            </span>
                                         </div>
                                     </div>
 
                                     {/* Action Buttons */}
                                     {!isExpired(invitation.expiresAt) && (
-                                        <div className="flex gap-3 ml-4">
+                                        <div style={{
+                                            display: 'flex',
+                                            gap: '12px',
+                                            marginLeft: '16px'
+                                        }}>
                                             <button
                                                 onClick={() => handleReject(invitation.id)}
-                                                className="px-4 py-2 bg-input-background-dark text-text-light rounded-lg font-semibold hover:bg-opacity-80 transition-all"
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    backgroundColor: 'transparent',
+                                                    color: palette.text,
+                                                    border: `1px solid ${palette.border}`,
+                                                    borderRadius: '8px',
+                                                    fontSize: '14px',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s ease'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.target.style.backgroundColor = palette.danger;
+                                                    e.target.style.color = '#fff';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.target.style.backgroundColor = 'transparent';
+                                                    e.target.style.color = palette.text;
+                                                }}
                                             >
                                                 Reject
                                             </button>
                                             <button
                                                 onClick={() => handleAccept(invitation.id)}
-                                                className="px-4 py-2 bg-primary text-background-dark rounded-lg font-semibold hover:bg-opacity-90 transition-all"
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    backgroundColor: palette.accent,
+                                                    color: theme === 'dark' ? '#000' : '#fff',
+                                                    border: 'none',
+                                                    borderRadius: '8px',
+                                                    fontSize: '14px',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s ease'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.target.style.opacity = '0.8';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.target.style.opacity = '1';
+                                                }}
                                             >
                                                 Accept
                                             </button>
@@ -206,13 +341,32 @@ const Invitations = () => {
                 )}
 
                 {/* Info Card */}
-                <div className="mt-8 p-6 bg-form-background-dark rounded-lg border border-input-background-dark">
-                    <h3 className="text-lg font-semibold mb-3">About Group Invitations</h3>
-                    <div className="space-y-2 text-sm text-text-muted">
-                        <p>• Invitations expire after 7 days</p>
-                        <p>• Accepting an invitation makes you a member of the group</p>
-                        <p>• Group leaders can manage your security configurations</p>
-                        <p>• You can leave a group at any time from the Memberships page</p>
+                <div style={{
+                    marginTop: '32px',
+                    padding: '24px',
+                    backgroundColor: palette.bgCard,
+                    borderRadius: '12px',
+                    border: `1px solid ${palette.border}`
+                }}>
+                    <h3 style={{
+                        fontSize: '18px',
+                        fontWeight: '600',
+                        margin: '0 0 12px 0',
+                        color: palette.text
+                    }}>
+                        About Group Invitations
+                    </h3>
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                        fontSize: '14px',
+                        color: palette.textMuted
+                    }}>
+                        <p style={{ margin: 0 }}>• Invitations expire after 7 days</p>
+                        <p style={{ margin: 0 }}>• Accepting an invitation makes you a member of the group</p>
+                        <p style={{ margin: 0 }}>• Group leaders can manage your security configurations</p>
+                        <p style={{ margin: 0 }}>• You can leave a group at any time from the Memberships page</p>
                     </div>
                 </div>
             </div>

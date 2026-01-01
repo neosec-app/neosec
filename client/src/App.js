@@ -15,6 +15,7 @@ import { useScreenSize } from './hooks/useScreenSize';
 
 // Layout Components
 import Sidebar from './components/Layout/Sidebar';
+import Header from './components/Layout/Header';
 import DashboardView from './components/Views/DashboardView';
 import AdminUsersView from './components/Views/AdminUsersView';
 import Toast from './components/Common/Toast';
@@ -297,6 +298,12 @@ function App() {
         showToast('Logged out', 'info');
     };
 
+    const handleUserUpdate = (updatedUserData) => {
+        setUser(updatedUserData);
+        localStorage.setItem('user', JSON.stringify(updatedUserData));
+        showToast('Profile updated successfully', 'success');
+    };
+
     
 
     // Loading State
@@ -386,11 +393,23 @@ if (isShareManagementPage) {
     if (user) {
         return (
             <>
+                {/* Header */}
+                <Header
+                    user={user}
+                    theme={theme}
+                    palette={palette}
+                    isMobile={isMobile}
+                    isTablet={isTablet}
+                    onLogout={handleLogout}
+                    onUserUpdate={handleUserUpdate}
+                />
+
                 <div style={{
                     minHeight: '100vh',
                     backgroundColor: palette.bgMain,
                     color: palette.text,
-                    display: 'flex'
+                    display: 'flex',
+                    paddingTop: '60px' // Account for fixed header
                 }}>
                     <Sidebar
                         user={user}
@@ -411,13 +430,13 @@ if (isShareManagementPage) {
                     <div style={{
                         flex: 1,
                         padding: isMobile ? '16px' : isTablet ? '24px' : '40px',
-                        paddingTop: isMobile ? '64px' : (isTablet ? '24px' : '40px'),
+                        paddingTop: isMobile ? '16px' : (isTablet ? '24px' : '40px'), // Reduced since header accounts for top spacing
                         overflowY: 'auto',
                         backgroundColor: palette.bgMain,
                         color: palette.text,
-                        marginLeft: isMobile ? (sidebarOpen ? '260px' : '0') : '260px',  
+                        marginLeft: isMobile ? (sidebarOpen ? '260px' : '0') : '260px',
                         transition: 'background-color 0.3s ease, color 0.3s ease, padding 0.3s ease, margin-left 0.3s ease, padding-top 0.3s ease',
-                        height: '100vh'  
+                        height: 'calc(100vh - 60px)' // Subtract header height
                     }}>
                         {/* Dashboard View */}
                         {currentView === 'dashboard' && (
@@ -459,20 +478,22 @@ if (isShareManagementPage) {
                         <ShareManagement theme={theme} palette={palette} />
                         )}
 
-                        {/* SUBCRIPTION View */}
+                        {/* SUBSCRIPTION View */}
                         {currentView === "subscription" && (
-                        <Subscription
-                            user={user}
-                            onUpgradeSuccess={(updatedUser) => {
-                                setUser(updatedUser);
-                                localStorage.setItem("user", JSON.stringify(updatedUser));
-                            }}
-                        />
+                            <Subscription
+                                user={user}
+                                theme={theme}
+                                palette={palette}
+                                onUpgradeSuccess={(updatedUser) => {
+                                    setUser(updatedUser);
+                                    localStorage.setItem("user", JSON.stringify(updatedUser));
+                                }}
+                            />
                         )}
 
                         {currentView === "groups" && <GroupManagement user={user} theme={theme} palette={palette} isMobile={isMobile} isTablet={isTablet} />}
                         {currentView === "member-security" && <MemberSecurityManagement user={user} theme={theme} palette={palette} isMobile={isMobile} isTablet={isTablet} />}
-                        {currentView === "invitations" && <Invitations />}
+                        {currentView === "invitations" && <Invitations theme={theme} palette={palette} />}
 
 
                         {/* Audit View */}

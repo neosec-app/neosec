@@ -2,18 +2,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
 
-const darkPalette = {
-  bgMain: '#121212',
-  bgCard: '#181818',
-  bgPanel: '#0a0a0a',
-  text: '#ffffff',
-  textMuted: '#9aa3b5',
-  border: '#242424',
-  accent: '#36E27B',
-  accentSoft: 'rgba(54,226,123,0.12)',
-  danger: '#e04848',
-};
-
 const plans = [
   {
     id: 'basic',
@@ -57,8 +45,8 @@ const plans = [
   },
 ];
 
-const Subscription = () => {
-  const colors = darkPalette;
+const Subscription = ({ theme, palette }) => {
+  const colors = palette;
 
   const [currentPlan, setCurrentPlan] = useState('free');
   const [billingHistory, setBillingHistory] = useState([]);
@@ -106,9 +94,10 @@ const Subscription = () => {
 
       // Refresh user data to check if they became a leader
       const token = localStorage.getItem('token');
+      const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000"; 
       if (token) {
         console.log('Refreshing user data...');
-        const response = await fetch('http://localhost:5000/api/auth/me', {
+        const response = await fetch(`${API_BASE}/api/auth/me`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
