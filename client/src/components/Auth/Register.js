@@ -141,7 +141,7 @@ const Register = ({ onSwitchToLogin }) => {
                     textAlign: 'center',
                     fontSize: '14px',
                     margin: '0 0 32px 0'
-                }}>Join NeoShield today</p>
+                }}>Join NeoSec today</p>
 
                 {error && (
                     <div style={{

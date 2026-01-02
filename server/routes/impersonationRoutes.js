@@ -5,11 +5,11 @@ const {
   endImpersonation,
   getImpersonationSessions
 } = require('../controllers/impersonationController');
-const { protect, admin } = require('../middleware/auth');
+const { protect, requireLeader } = require('../middleware/auth');
 
-// All routes require admin authentication
+// All routes require admin or leader authentication
 router.use(protect);
-router.use(admin);
+router.use(requireLeader);
 
 router.post('/start', startImpersonation);
 router.post('/end/:sessionId', endImpersonation);
