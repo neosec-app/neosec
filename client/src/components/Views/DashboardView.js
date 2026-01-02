@@ -1,12 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { SiAlwaysdata } from 'react-icons/si';
 import { GoAlertFill } from 'react-icons/go';
 import { FiUsers } from 'react-icons/fi';
 import { getCardBaseStyle } from '../../utils/styles';
-import { vpnAPI } from '../../services/api';
+import { vpnAPI, dashboardAPI, getErrorMessage } from '../../services/api';
 
-function DashboardView({ user, theme, palette, dashboardData, dashboardLoading, dashboardError, isMobile, isTablet, setCurrentView }) {
+function DashboardView({ user, theme, palette, dashboardData, dashboardLoading, dashboardError, isMobile, isTablet, setCurrentView, onDashboardRefresh }) {
     const cardBase = getCardBaseStyle(palette, theme);
+    const [disconnecting, setDisconnecting] = useState(false);
 
     return (
         <div>
@@ -127,10 +128,11 @@ function DashboardView({ user, theme, palette, dashboardData, dashboardLoading, 
                                         color: palette.text,
                                         border: `1px solid ${palette.border}`,
                                         borderRadius: '6px',
-                                        cursor: 'pointer',
+                                        cursor: disconnecting ? 'not-allowed' : 'pointer',
                                         fontSize: '14px',
                                         fontWeight: 500,
-                                        transition: 'all 0.2s ease'
+                                        transition: 'all 0.2s ease',
+                                        opacity: disconnecting ? 0.6 : 1
                                     }}
                                     onMouseEnter={(e) => {
                                         e.target.style.backgroundColor = theme === 'light' ? '#f3f4f6' : palette.bgPanel;
@@ -138,13 +140,42 @@ function DashboardView({ user, theme, palette, dashboardData, dashboardLoading, 
                                     onMouseLeave={(e) => {
                                         e.target.style.backgroundColor = 'transparent';
                                     }}
-                                    onClick={() => {
-                                        if (dashboardData?.vpnStatus?.configId) {
-                                            vpnAPI.toggleVpnConfig(dashboardData.vpnStatus.configId);
+                                    onClick={async () => {
+                                        const configId = dashboardData?.vpnStatus?.configId;
+                                        if (!configId) {
+                                            console.error('VPN config ID not found');
+                                            return;
+                                        }
+
+                                        try {
+                                            setDisconnecting(true);
+                                            const response = await vpnAPI.toggleVpnConfig(configId);
+                                            if (response.success) {
+                                                // Refresh dashboard data after disconnecting
+                                                if (onDashboardRefresh) {
+                                                    await onDashboardRefresh();
+                                                } else {
+                                                    // Fallback: manually refresh dashboard
+                                                    const dashboardResponse = await dashboardAPI.getDashboard();
+                                                    if (dashboardResponse.success) {
+                                                        // Force page reload if refresh callback not available
+                                                        window.location.reload();
+                                                    }
+                                                }
+                                            } else {
+                                                console.error('Failed to disconnect VPN:', response.message);
+                                                alert(response.message || 'Failed to disconnect VPN');
+                                            }
+                                        } catch (error) {
+                                            console.error('Error disconnecting VPN:', error);
+                                            alert(getErrorMessage(error, 'Failed to disconnect VPN'));
+                                        } finally {
+                                            setDisconnecting(false);
                                         }
                                     }}
+                                    disabled={disconnecting}
                                 >
-                                    Disconnect
+                                    {disconnecting ? 'Disconnecting...' : 'Disconnect'}
                                 </button>
                             )}
                         </div>

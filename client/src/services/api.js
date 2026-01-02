@@ -208,7 +208,7 @@ export const firewallAPI = {
 export const vpnAPI = {
   // Toggle VPN configuration (connect/disconnect)
   toggleVpnConfig: async (configId) => {
-    const response = await api.post(`/vpn/${configId}/toggle`);
+    const response = await api.patch(`/vpn/${configId}/toggle`);
     return response.data;
   }
 };

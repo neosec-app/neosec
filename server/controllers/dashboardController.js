@@ -310,6 +310,342 @@ const getActiveUsers = async (userId, userRole) => {
   }
 };
 
+// Helper: Update user activity heartbeat
+const updateUserActivityHeartbeat = async (userId) => {
+  try {
+    const [device] = await Device.findOrCreate({
+      where: {
+        userId: userId,
+        deviceId: `web-${userId}`
+      },
+      defaults: {
+        userId: userId,
+        deviceId: `web-${userId}`,
+        deviceName: 'Web Browser',
+        osType: 'Windows',
+        lastOnlineAt: new Date(),
+        isActive: true
+      }
+    });
+
+    if (!device.isNewRecord) {
+      device.lastOnlineAt = new Date();
+      device.isActive = true;
+      await device.save();
+    }
+  } catch (error) {
+    console.error('Error updating user activity heartbeat:', error);
+  }
+};
+
+// Helper: Get VPN status and connection time
+const getVpnStatus = async (userId) => {
+  let activeVpn = null;
+  let connectionTime = null;
+
+  try {
+    activeVpn = await VpnConfig.findOne({
+      where: {
+        userId: userId,
+        isActive: true
+      }
+    });
+    console.log('dashboard: activeVpn=', !!activeVpn);
+
+    if (activeVpn && activeVpn.updatedAt) {
+      const now = new Date();
+      const connectedAt = new Date(activeVpn.updatedAt);
+      const diffMs = now - connectedAt;
+      const hours = Math.floor(diffMs / 3600000);
+      const minutes = Math.floor((diffMs % 3600000) / 60000);
+      connectionTime = `${hours}h ${minutes}m`;
+    }
+    console.log('dashboard: connectionTime=', connectionTime);
+  } catch (error) {
+    console.error('Error getting active VPN:', error);
+  }
+
+  return { activeVpn, connectionTime };
+};
+
+// Helper: Get threat statistics
+const getThreatStatistics = async (userId) => {
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  const lastWeekAgo = new Date();
+  lastWeekAgo.setDate(lastWeekAgo.getDate() - 14);
+  const oneDayAgo = new Date();
+  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+
+  let threatsThisWeek = 0;
+  let threatsLastWeek = 0;
+  let last24HoursThreats = 0;
+  let totalThreats = 0;
+  let uniqueBlockedIPs = [];
+  let totalBlocklistIPs = 0;
+
+  try {
+    // Count from Threat table
+    threatsThisWeek = await Threat.count({
+      where: {
+        userId: userId,
+        blocked: true,
+        createdAt: { [Op.gte]: oneWeekAgo }
+      }
+    });
+
+    threatsLastWeek = await Threat.count({
+      where: {
+        userId: userId,
+        blocked: true,
+        createdAt: {
+          [Op.gte]: lastWeekAgo,
+          [Op.lt]: oneWeekAgo
+        }
+      }
+    });
+
+    last24HoursThreats = await Threat.count({
+      where: {
+        userId: userId,
+        blocked: true,
+        createdAt: { [Op.gte]: oneDayAgo }
+      }
+    });
+
+    totalThreats = await Threat.count({
+      where: {
+        userId: userId,
+        blocked: true
+      }
+    });
+
+    // Also count from ActivityLog for more accurate blocking stats
+    const activityLogThreatsThisWeek = await ActivityLog.count({
+      where: {
+        eventType: 'Blocked Threat',
+        status: 'Blocked',
+        createdAt: { [Op.gte]: oneWeekAgo },
+        [Op.or]: [
+          { userId: userId },
+          { userId: null }
+        ]
+      }
+    });
+
+    if (activityLogThreatsThisWeek > threatsThisWeek) {
+      threatsThisWeek = activityLogThreatsThisWeek;
+    }
+
+    const activityLogThreatsLast24h = await ActivityLog.count({
+      where: {
+        eventType: 'Blocked Threat',
+        status: 'Blocked',
+        createdAt: { [Op.gte]: oneDayAgo },
+        [Op.or]: [
+          { userId: userId },
+          { userId: null }
+        ]
+      }
+    });
+
+    if (activityLogThreatsLast24h > last24HoursThreats) {
+      last24HoursThreats = activityLogThreatsLast24h;
+    }
+
+    // Get unique blocked IPs
+    uniqueBlockedIPs = await Threat.findAll({
+      where: {
+        userId: userId,
+        blocked: true,
+        sourceIp: { [Op.ne]: null }
+      },
+      attributes: ['sourceIp'],
+      group: ['sourceIp']
+    });
+
+    totalBlocklistIPs = await BlocklistIP.count();
+  } catch (error) {
+    console.error('Error counting threats:', error);
+  }
+
+  const percentageChange = threatsLastWeek > 0
+    ? Math.round(((threatsThisWeek - threatsLastWeek) / threatsLastWeek) * 100)
+    : threatsThisWeek > 0 ? 100 : 0;
+
+  return {
+    threatsThisWeek,
+    threatsLastWeek,
+    last24HoursThreats,
+    totalThreats,
+    percentageChange,
+    uniqueBlockedIPs,
+    totalBlocklistIPs
+  };
+};
+
+// Helper: Get active profile
+const getActiveProfile = async (userId) => {
+  try {
+    return await Profile.findOne({
+      where: {
+        userId: userId,
+        isActive: true
+      }
+    });
+  } catch (error) {
+    console.error('Error getting active profile:', error);
+    return null;
+  }
+};
+
+// Helper: Get recent activities
+const getRecentActivities = async (userId) => {
+  const oneWeekAgoForLogs = new Date();
+  oneWeekAgoForLogs.setDate(oneWeekAgoForLogs.getDate() - 7);
+
+  let recentThreats = [];
+  let recentNotifications = [];
+  let recentActivityLogs = [];
+
+  try {
+    recentThreats = await Threat.findAll({
+      where: {
+        userId: userId,
+        blocked: true,
+        createdAt: { [Op.gte]: oneWeekAgoForLogs }
+      },
+      order: [['createdAt', 'DESC']],
+      limit: 10,
+      attributes: ['id', 'sourceIp', 'description', 'threatType', 'createdAt']
+    });
+  } catch (error) {
+    console.error('Error getting recent threats:', error);
+  }
+
+  try {
+    recentNotifications = await Notification.findAll({
+      where: {
+        userId: userId,
+        createdAt: { [Op.gte]: oneWeekAgoForLogs }
+      },
+      order: [['createdAt', 'DESC']],
+      limit: 10,
+      attributes: ['id', 'title', 'message', 'eventType', 'createdAt']
+    });
+  } catch (error) {
+    console.error('Error getting recent notifications:', error);
+  }
+
+  try {
+    recentActivityLogs = await ActivityLog.findAll({
+      where: {
+        userId: userId,
+        createdAt: { [Op.gte]: oneWeekAgoForLogs }
+      },
+      order: [['createdAt', 'DESC']],
+      limit: 15,
+      attributes: ['id', 'eventType', 'description', 'status', 'severity', 'createdAt']
+    });
+  } catch (error) {
+    console.error('Error getting recent activity logs:', error);
+  }
+
+  // Combine and sort activities
+  const activities = [
+    ...recentThreats.map(t => ({
+      id: t.id,
+      type: 'threat',
+      message: t.description || `Blocked connection from ${t.sourceIp || 'unknown IP'}`,
+      timestamp: t.createdAt,
+      isBlocked: true
+    })),
+    ...recentNotifications.map(n => ({
+      id: n.id,
+      type: 'notification',
+      message: n.message || n.title,
+      timestamp: n.createdAt,
+      isBlocked: n.eventType ? (n.eventType.includes('error') || n.eventType.includes('failed')) : false
+    })),
+    ...recentActivityLogs.map(log => ({
+      id: log.id,
+      type: log.eventType.toLowerCase().replace(/\s+/g, '_'),
+      message: log.description,
+      timestamp: log.createdAt,
+      isBlocked: log.status === 'Blocked' || log.severity === 'critical',
+      eventType: log.eventType,
+      status: log.status
+    }))
+  ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 10);
+
+  return activities;
+};
+
+// Helper: Get data transfer statistics
+const getDataTransferStats = async (userId) => {
+  let totalBytesSent = BigInt(0);
+  let totalBytesReceived = BigInt(0);
+
+  try {
+    const dataTransferStats = await DataTransfer.findAll({
+      where: { userId: userId },
+      attributes: [
+        [sequelize.fn('SUM', sequelize.col('bytesSent')), 'totalBytesSent'],
+        [sequelize.fn('SUM', sequelize.col('bytesReceived')), 'totalBytesReceived']
+      ],
+      raw: true
+    });
+    console.log('dashboard: dataTransferStats=', dataTransferStats);
+
+    const sentValue = dataTransferStats[0]?.totalBytesSent ?? null;
+    const receivedValue = dataTransferStats[0]?.totalBytesReceived ?? null;
+
+    if (sentValue !== null && sentValue !== undefined) {
+      totalBytesSent = BigInt(String(sentValue));
+    }
+    if (receivedValue !== null && receivedValue !== undefined) {
+      totalBytesReceived = BigInt(String(receivedValue));
+    }
+  } catch (error) {
+    console.error('Error calculating data transfer stats:', error);
+  }
+
+  // Convert bytes to GB
+  const bytesPerGB = 1073741824;
+  const gbSent = Number(totalBytesSent) / bytesPerGB;
+  const gbReceived = Number(totalBytesReceived) / bytesPerGB;
+
+  // Calculate progress percentages
+  const maxGB = 10;
+  const sentPercentage = Math.min((gbSent / maxGB) * 100, 100);
+  const receivedPercentage = Math.min((gbReceived / maxGB) * 100, 100);
+
+  return {
+    bytesSent: Number(totalBytesSent),
+    bytesReceived: Number(totalBytesReceived),
+    gbSent: parseFloat(gbSent.toFixed(2)),
+    gbReceived: parseFloat(gbReceived.toFixed(2)),
+    sentPercentage: parseFloat(sentPercentage.toFixed(1)),
+    receivedPercentage: parseFloat(receivedPercentage.toFixed(1))
+  };
+};
+
+// Helper: Get client IP address
+const getClientIpAddress = (req, activeVpn) => {
+  if (!activeVpn) return null;
+
+  try {
+    let clientIP = getClientIP(req);
+    if (clientIP === '127.0.0.1 (Local Development)' || clientIP === '127.0.0.1' || clientIP === 'unknown') {
+      clientIP = activeVpn.serverAddress || null;
+    }
+    return clientIP;
+  } catch (error) {
+    console.error('Error getting client IP:', error);
+    return activeVpn.serverAddress || null;
+  }
+};
+
 // @desc    Get dashboard data (VPN status and threats blocked)
 // @route   GET /api/dashboard
 // @access  Private
@@ -325,342 +661,26 @@ const getDashboard = async (req, res) => {
     const userId = req.user.id;
     console.log('dashboard: userId=', userId);
 
-    // Update user activity (heartbeat) - track that user is actively using the app
-    // This ensures users who stay logged in show as active
-    try {
-      // Update or create device activity as heartbeat
-      const [device] = await Device.findOrCreate({
-        where: {
-          userId: userId,
-          deviceId: `web-${userId}` // Use a default web device ID
-        },
-        defaults: {
-          userId: userId,
-          deviceId: `web-${userId}`,
-          deviceName: 'Web Browser',
-          osType: 'Windows', // Default, can be improved with user-agent detection
-          lastOnlineAt: new Date(),
-          isActive: true
-        }
-      });
+    // Update user activity heartbeat
+    await updateUserActivityHeartbeat(userId);
 
-      // Update lastOnlineAt if device exists (heartbeat)
-      if (!device.isNewRecord) {
-        device.lastOnlineAt = new Date();
-        device.isActive = true;
-        await device.save();
-      }
-    } catch (heartbeatError) {
-      // Don't fail dashboard if heartbeat fails
-      console.error('Error updating user activity heartbeat:', heartbeatError);
-    }
+    // Get VPN status and connection time
+    const { activeVpn, connectionTime } = await getVpnStatus(userId);
 
-    // Get user's active VPN config
-    let activeVpn = null;
-    try {
-      activeVpn = await VpnConfig.findOne({
-        where: {
-          userId: userId,
-          isActive: true
-        }
-      });
-      console.log('dashboard: activeVpn=', !!activeVpn);
-    } catch (vpnError) {
-      console.error('Error getting active VPN:', vpnError);
-    }
-
-    // Calculate connection time if VPN is active
-    let connectionTime = null;
-    if (activeVpn && activeVpn.updatedAt) {
-      const now = new Date();
-      const connectedAt = new Date(activeVpn.updatedAt);
-      const diffMs = now - connectedAt;
-      const hours = Math.floor(diffMs / 3600000);
-      const minutes = Math.floor((diffMs % 3600000) / 60000);
-      connectionTime = `${hours}h ${minutes}m`;
-    }
-    console.log('dashboard: connectionTime=', connectionTime);
-
-    // Get threats blocked count for this week
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const lastWeekAgo = new Date();
-    lastWeekAgo.setDate(lastWeekAgo.getDate() - 14);
-    const oneDayAgo = new Date();
-    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-
-    let threatsThisWeek = 0;
-    let threatsLastWeek = 0;
-    let last24HoursThreats = 0;
-    let totalThreats = 0;
-    
-    try {
-      // Count from Threat table (actual blocked threats)
-      threatsThisWeek = await Threat.count({
-        where: {
-          userId: userId,
-          blocked: true,
-          createdAt: {
-            [Op.gte]: oneWeekAgo
-          }
-        }
-      });
-
-      threatsLastWeek = await Threat.count({
-        where: {
-          userId: userId,
-          blocked: true,
-          createdAt: {
-            [Op.gte]: lastWeekAgo,
-            [Op.lt]: oneWeekAgo
-          }
-        }
-      });
-
-      last24HoursThreats = await Threat.count({
-        where: {
-          userId: userId,
-          blocked: true,
-          createdAt: {
-            [Op.gte]: oneDayAgo
-          }
-        }
-      });
-
-      totalThreats = await Threat.count({
-        where: {
-          userId: userId,
-          blocked: true
-        }
-      });
-
-      // Also count from ActivityLog for more accurate blocking stats
-      // This includes blocks even when user wasn't authenticated
-      const activityLogThreatsThisWeek = await ActivityLog.count({
-        where: {
-          eventType: 'Blocked Threat',
-          status: 'Blocked',
-          createdAt: {
-            [Op.gte]: oneWeekAgo
-          },
-          // Include system blocks (userId is null) or user-specific blocks
-          [Op.or]: [
-            { userId: userId },
-            { userId: null } // System-wide blocks
-          ]
-        }
-      });
-
-      // Use the higher count (ActivityLog is more comprehensive)
-      if (activityLogThreatsThisWeek > threatsThisWeek) {
-        threatsThisWeek = activityLogThreatsThisWeek;
-      }
-
-      const activityLogThreatsLast24h = await ActivityLog.count({
-        where: {
-          eventType: 'Blocked Threat',
-          status: 'Blocked',
-          createdAt: {
-            [Op.gte]: oneDayAgo
-          },
-          [Op.or]: [
-            { userId: userId },
-            { userId: null }
-          ]
-        }
-      });
-
-      if (activityLogThreatsLast24h > last24HoursThreats) {
-        last24HoursThreats = activityLogThreatsLast24h;
-      }
-    } catch (threatError) {
-      console.error('Error counting threats:', threatError);
-      // Continue with zero values
-    }
-
-    // Calculate percentage change
-    const percentageChange = threatsLastWeek > 0 
-      ? Math.round(((threatsThisWeek - threatsLastWeek) / threatsLastWeek) * 100)
-      : threatsThisWeek > 0 ? 100 : 0;
-
-    // Get total unique blocked IPs from both Threat table and BlocklistIP table
-    let uniqueBlockedIPs = [];
-    let totalBlocklistIPs = 0;
-    
-    try {
-      // Get unique IPs from Threat table (actually blocked)
-      uniqueBlockedIPs = await Threat.findAll({
-        where: {
-          userId: userId,
-          blocked: true,
-          sourceIp: { [Op.ne]: null }
-        },
-        attributes: ['sourceIp'],
-        group: ['sourceIp']
-      });
-
-      // Also get total IPs in blocklist (available to block)
-      totalBlocklistIPs = await BlocklistIP.count();
-    } catch (uniqueIPsError) {
-      console.error('Error getting unique blocked IPs:', uniqueIPsError);
-      // Continue with empty array
-    }
+    // Get threat statistics
+    const threatStats = await getThreatStatistics(userId);
 
     // Get active profile
-    let activeProfile = null;
-    try {
-      activeProfile = await Profile.findOne({
-        where: {
-          userId: userId,
-          isActive: true
-        }
-      });
-    } catch (profileError) {
-      console.error('Error getting active profile:', profileError);
-    }
+    const activeProfile = await getActiveProfile(userId);
 
-    // Get recent activity logs (combine threats, notifications, and activity logs)
-    const oneWeekAgoForLogs = new Date();
-    oneWeekAgoForLogs.setDate(oneWeekAgoForLogs.getDate() - 7);
+    // Get recent activities
+    const activities = await getRecentActivities(userId);
 
-    let recentThreats = [];
-    try {
-      recentThreats = await Threat.findAll({
-        where: {
-          userId: userId,
-          blocked: true,
-          createdAt: {
-            [Op.gte]: oneWeekAgoForLogs
-          }
-        },
-        order: [['createdAt', 'DESC']],
-        limit: 10,
-        attributes: ['id', 'sourceIp', 'description', 'threatType', 'createdAt']
-      });
-    } catch (recentThreatsError) {
-      console.error('Error getting recent threats:', recentThreatsError);
-    }
+    // Get data transfer statistics
+    const dataTransfer = await getDataTransferStats(userId);
 
-    let recentNotifications = [];
-    try {
-      recentNotifications = await Notification.findAll({
-        where: {
-          userId: userId,
-          createdAt: {
-            [Op.gte]: oneWeekAgoForLogs
-          }
-        },
-        order: [['createdAt', 'DESC']],
-        limit: 10,
-        attributes: ['id', 'title', 'message', 'eventType', 'createdAt']
-      });
-    } catch (notificationsError) {
-      console.error('Error getting recent notifications:', notificationsError);
-    }
-
-    // Get ActivityLog entries (VPN, Firewall, Profile activities, etc.)
-    let recentActivityLogs = [];
-    try {
-      recentActivityLogs = await ActivityLog.findAll({
-        where: {
-          userId: userId,
-          createdAt: {
-            [Op.gte]: oneWeekAgoForLogs
-          }
-        },
-        order: [['createdAt', 'DESC']],
-        limit: 15, // Get more to account for filtering
-        attributes: ['id', 'eventType', 'description', 'status', 'severity', 'createdAt']
-      });
-    } catch (activityLogError) {
-      console.error('Error getting recent activity logs:', activityLogError);
-    }
-
-    // Combine and sort activities
-    const activities = [
-      ...recentThreats.map(t => ({
-        id: t.id,
-        type: 'threat',
-        message: t.description || `Blocked connection from ${t.sourceIp || 'unknown IP'}`,
-        timestamp: t.createdAt,
-        isBlocked: true
-      })),
-      ...recentNotifications.map(n => ({
-        id: n.id,
-        type: 'notification',
-        message: n.message || n.title,
-        timestamp: n.createdAt,
-        isBlocked: n.eventType ? (n.eventType.includes('error') || n.eventType.includes('failed')) : false
-      })),
-      ...recentActivityLogs.map(log => ({
-        id: log.id,
-        type: log.eventType.toLowerCase().replace(/\s+/g, '_'), // e.g., 'vpn_connection', 'firewall_rule_update'
-        message: log.description,
-        timestamp: log.createdAt,
-        isBlocked: log.status === 'Blocked' || log.severity === 'critical',
-        eventType: log.eventType,
-        status: log.status
-      }))
-    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 10);
-
-    // Calculate data transfer totals
-    let totalBytesSent = BigInt(0);
-    let totalBytesReceived = BigInt(0);
-    
-    try {
-      const dataTransferStats = await DataTransfer.findAll({
-        where: {
-          userId: userId
-        },
-        attributes: [
-          [sequelize.fn('SUM', sequelize.col('bytesSent')), 'totalBytesSent'],
-          [sequelize.fn('SUM', sequelize.col('bytesReceived')), 'totalBytesReceived']
-        ],
-        raw: true
-      });
-      console.log('dashboard: dataTransferStats=', dataTransferStats);
-
-      const sentValue = dataTransferStats[0]?.totalBytesSent ?? null;
-      const receivedValue = dataTransferStats[0]?.totalBytesReceived ?? null;
-      
-      if (sentValue !== null && sentValue !== undefined) {
-        totalBytesSent = BigInt(String(sentValue));
-      }
-      if (receivedValue !== null && receivedValue !== undefined) {
-        totalBytesReceived = BigInt(String(receivedValue));
-      }
-    } catch (dataTransferError) {
-      console.error('Error calculating data transfer stats:', dataTransferError);
-      // Continue with zero values if query fails
-    }
-    
-    // Convert bytes to GB (1 GB = 1,073,741,824 bytes)
-    const bytesPerGB = 1073741824;
-    const gbSent = Number(totalBytesSent) / bytesPerGB;
-    const gbReceived = Number(totalBytesReceived) / bytesPerGB;
-    
-    // Calculate progress percentages (assuming max of 10GB for visualization, or use actual max)
-    const maxGB = 10; // Maximum for progress bar visualization
-    const sentPercentage = Math.min((gbSent / maxGB) * 100, 100);
-    const receivedPercentage = Math.min((gbReceived / maxGB) * 100, 100);
-
-    // Note: last24HoursThreats and totalThreats are already calculated above
-
-    // Get client IP address (actual connection IP when VPN is active)
-    let clientIP = null;
-    if (activeVpn) {
-      try {
-        clientIP = getClientIP(req);
-        // If it's localhost in development, use server address as fallback
-        if (clientIP === '127.0.0.1 (Local Development)' || clientIP === '127.0.0.1' || clientIP === 'unknown') {
-          clientIP = activeVpn.serverAddress || null;
-        }
-      } catch (ipError) {
-        console.error('Error getting client IP:', ipError);
-        // Fallback to server address
-        clientIP = activeVpn.serverAddress || null;
-      }
-    }
+    // Get client IP address
+    const clientIP = getClientIpAddress(req, activeVpn);
 
     // Get active users
     let activeUsers = [];
@@ -683,34 +703,28 @@ const getDashboard = async (req, res) => {
       data: {
         vpnStatus: {
           connected: !!activeVpn,
+          configId: activeVpn ? activeVpn.id : null,
           server: activeVpn ? activeVpn.serverAddress : null,
           protocol: activeVpn ? activeVpn.protocol : null,
           configName: activeVpn ? activeVpn.name : null,
           serverLocation: activeVpn ? (activeVpn.description || 'Unknown Location') : null,
-          ipAddress: clientIP, // Dynamic IP from request or server address
+          ipAddress: clientIP,
           connectionTime: connectionTime
         },
         threatsBlocked: {
-          thisWeek: threatsThisWeek,
-          percentageChange: percentageChange,
-          totalBlockedIPs: uniqueBlockedIPs.length || 0,
-          totalBlocklistIPs: totalBlocklistIPs, // Total IPs in blocklist (available to block)
-          last24Hours: last24HoursThreats,
-          total: totalThreats
+          thisWeek: threatStats.threatsThisWeek,
+          percentageChange: threatStats.percentageChange,
+          totalBlockedIPs: threatStats.uniqueBlockedIPs.length || 0,
+          totalBlocklistIPs: threatStats.totalBlocklistIPs,
+          last24Hours: threatStats.last24HoursThreats,
+          total: threatStats.totalThreats
         },
         activeProfile: activeProfile ? {
           name: activeProfile.name,
           description: activeProfile.description || 'High security settings enabled',
           profileType: activeProfile.profileType
         } : null,
-        dataTransfer: {
-          bytesSent: Number(totalBytesSent),
-          bytesReceived: Number(totalBytesReceived),
-          gbSent: parseFloat(gbSent.toFixed(2)),
-          gbReceived: parseFloat(gbReceived.toFixed(2)),
-          sentPercentage: parseFloat(sentPercentage.toFixed(1)),
-          receivedPercentage: parseFloat(receivedPercentage.toFixed(1))
-        },
+        dataTransfer: dataTransfer,
         recentActivities: activities.map(a => ({
           id: a.id,
           message: a.message,

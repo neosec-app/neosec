@@ -63,6 +63,7 @@ neosec-desktop/data/
 
 # Documentation
 THREAT_BLOCKER_IMPLEMENTATION.md
+PULL_AND_DEPLOY.md
 
 # Project Proposal/Report Files
 CSE471_Project_Report_NeoSec.*

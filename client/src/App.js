@@ -450,6 +450,7 @@ if (isShareManagementPage) {
                                 isMobile={isMobile}
                                 isTablet={isTablet}
                                 setCurrentView={setCurrentView}
+                                onDashboardRefresh={fetchDashboard}
                             />
                         )}
 
