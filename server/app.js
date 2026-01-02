@@ -231,57 +231,6 @@ app.listen(PORT, HOST, () => {
     console.log(`JWT_SECRET: ${process.env.JWT_SECRET ? 'Set' : 'NOT SET - THIS WILL CAUSE ERRORS!'}`);
     console.log(`DATABASE_URL: ${process.env.DATABASE_URL ? 'Set' : 'NOT SET - THIS WILL CAUSE ERRORS!'}`);
     console.log(`Accessible at: http://${HOST}:${PORT}`);
-    
-    // Start automatic threat blocker scheduler
-    // Wait a bit for database to be ready
-    setTimeout(async () => {
-        try {
-            const { startScheduler, stopScheduler } = require('./services/threatBlockerScheduler');
-            
-            // Get settings from database dynamically
-            let enabled = true;
-            let frequency = 'daily';
-            
-            try {
-                const ThreatBlockerSettings = require('./models/ThreatBlockerSettings');
-                const enabledSetting = await ThreatBlockerSettings.findOne({ where: { key: 'enabled' } });
-                const frequencySetting = await ThreatBlockerSettings.findOne({ where: { key: 'updateFrequency' } });
-                
-                if (enabledSetting && enabledSetting.value !== null) {
-                    try {
-                        enabled = JSON.parse(enabledSetting.value);
-                    } catch {
-                        enabled = enabledSetting.value === 'true' || enabledSetting.value === true;
-                    }
-                }
-                
-                if (frequencySetting && frequencySetting.value !== null) {
-                    try {
-                        frequency = JSON.parse(frequencySetting.value);
-                    } catch {
-                        frequency = frequencySetting.value || 'daily';
-                    }
-                } else {
-                    // Fallback to environment variable
-                    frequency = process.env.THREAT_BLOCKER_UPDATE_FREQUENCY || 'daily';
-                }
-            } catch (settingsError) {
-                console.warn('⚠️  Could not load threat blocker settings from database, using defaults:', settingsError.message);
-                frequency = process.env.THREAT_BLOCKER_UPDATE_FREQUENCY || 'daily';
-            }
-            
-            // Start or stop scheduler based on enabled status
-            if (enabled !== false && frequency !== 'disabled') {
-                startScheduler(frequency);
-                console.log(`✅ Automatic Threat Blocker scheduler started (frequency: ${frequency})`);
-            } else {
-                stopScheduler();
-                console.log('🛑 Automatic Threat Blocker scheduler is disabled');
-            }
-        } catch (error) {
-            console.error('⚠️  Failed to start threat blocker scheduler:', error.message);
-        }
-    }, 5000); // Wait 5 seconds for database connection
 });
 
 

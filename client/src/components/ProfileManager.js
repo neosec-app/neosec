@@ -1260,7 +1260,7 @@ const handleRemoveCountry = (countryToRemove) => {
                                     : (theme === 'dark' ? '#FF7777' : '#d4183d'),
                                 }}
                               >
-                                {rule.action === 'allow' ? '✓' : '✗'} {rule.action.toUpperCase()}
+                                {rule.action === 'allow' ? '✓' : '✗'} {String(rule.action ||'deny').toUpperCase()}
                               </span>
                               
                               <span
