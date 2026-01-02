@@ -270,6 +270,28 @@ exports.getStatus = async (req, res) => {
  */
 exports.getBlocklist = async (req, res) => {
   try {
+    // Valid ENUM values from BlocklistIP model
+    const validThreatTypes = [
+      'Malware C&C', 'Botnet', 'Brute Force', 'Malware Host',
+      'Phishing', 'DDoS', 'Spam', 'Exploit', 'Suspicious', 'Other'
+    ];
+
+    // Map common lowercase/alternative names to valid enum values
+    const threatTypeMap = {
+      'malware': 'Malware Host',
+      'malware host': 'Malware Host',
+      'malware c&c': 'Malware C&C',
+      'malware cnc': 'Malware C&C',
+      'botnet': 'Botnet',
+      'brute force': 'Brute Force',
+      'bruteforce': 'Brute Force',
+      'phishing': 'Phishing',
+      'ddos': 'DDoS',
+      'spam': 'Spam',
+      'exploit': 'Exploit',
+      'suspicious': 'Suspicious',
+      'other': 'Other'
+    };
 
     const {
       page = 1,
@@ -289,12 +311,25 @@ exports.getBlocklist = async (req, res) => {
       whereClause.ipAddress = { [Op.iLike]: `%${search}%` };
     }
 
+    // Validate and map threatType
     if (threatType && threatType !== 'all') {
-      whereClause.threatType = threatType;
+      const trimmedThreatType = threatType.trim();
+      // Check if it's a valid enum value (case-sensitive)
+      if (validThreatTypes.includes(trimmedThreatType)) {
+        whereClause.threatType = trimmedThreatType;
+      } else {
+        // Try to map from common names
+        const mappedType = threatTypeMap[trimmedThreatType.toLowerCase()];
+        if (mappedType) {
+          whereClause.threatType = mappedType;
+        }
+        // If no mapping found, ignore the filter (don't throw error)
+      }
     }
 
     if (source && source !== 'all') {
-      whereClause.source = source;
+      const trimmedSource = source.trim();
+      whereClause.source = trimmedSource;
     }
 
     // Build where clause properly - handle empty whereClause

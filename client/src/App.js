@@ -40,7 +40,6 @@ import VpnManagement from './components/VpnManagement';
 
 // Hierarchy Components
 import Subscription from './components/Hierarchy/Subscription';
-import Groups from './components/Hierarchy/Groups';
 import GroupManagement from './components/Hierarchy/GroupManagement';
 import MemberSecurityManagement from './components/Hierarchy/MemberSecurityManagement';
 import Invitations from './components/Hierarchy/Invitations';
@@ -118,7 +117,8 @@ function App() {
                 setAdminError(null);
                 const usersResponse = await adminAPI.getAllUsers();
                 if (usersResponse.success) {
-                    setUsers(usersResponse.data || []);
+                    // API returns { success: true, data: { users: [...], pagination: {...} } }
+                    setUsers(usersResponse.data?.users || []);
                 } else {
                     setAdminError(usersResponse.message || 'Failed to load users');
                 }

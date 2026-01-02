@@ -61,19 +61,37 @@ const buildDateRangeFilter = (startDate, endDate) => {
 const buildEventFilters = (eventType, severity, status) => {
   const filter = {};
 
-  // Event type filter
+  // Valid ENUM values from ActivityLog model
+  const validEventTypes = [
+    'VPN Connection', 'VPN Disconnection', 'Blocked Threat', 'System Event',
+    'Notification', 'Firewall Rule Update', 'Profile Activation', 'Profile Deactivation',
+    'Blocklist Update', 'User Action', 'Other'
+  ];
+  const validStatuses = ['Success', 'Failed', 'Blocked', 'Disconnected', 'Pending'];
+  const validSeverities = ['critical', 'warning', 'info'];
+
+  // Event type filter - trim and validate
   if (eventType && eventType !== 'all') {
-    filter.eventType = eventType;
+    const trimmedEventType = eventType.trim();
+    if (validEventTypes.includes(trimmedEventType)) {
+      filter.eventType = trimmedEventType;
+    }
   }
 
-  // Severity filter
+  // Severity filter - trim and validate
   if (severity && severity !== 'all') {
-    filter.severity = severity;
+    const trimmedSeverity = severity.trim();
+    if (validSeverities.includes(trimmedSeverity)) {
+      filter.severity = trimmedSeverity;
+    }
   }
 
-  // Status filter
+  // Status filter - trim and validate (this was causing the error!)
   if (status && status !== 'all') {
-    filter.status = status;
+    const trimmedStatus = status.trim();
+    if (validStatuses.includes(trimmedStatus)) {
+      filter.status = trimmedStatus;
+    }
   }
 
   return filter;
@@ -125,6 +143,7 @@ const formatPaginationResponse = (count, page, limit) => {
  */
 exports.getLogs = async (req, res) => {
   try {
+    // Decode URL-encoded query parameters (handles spaces like "Blocked Threat")
     const {
       page = 1,
       limit = 50,
@@ -140,6 +159,9 @@ exports.getLogs = async (req, res) => {
       sortOrder = 'DESC'
     } = req.query;
 
+    // Decode eventType if it contains URL-encoded spaces
+    const decodedEventType = eventType ? decodeURIComponent(eventType) : eventType;
+
     // Build pagination parameters
     const pagination = buildPaginationParams(page, limit);
 
@@ -149,8 +171,8 @@ exports.getLogs = async (req, res) => {
     // Build date range filter
     const dateFilter = buildDateRangeFilter(startDate, endDate);
 
-    // Build event filters
-    const eventFilters = buildEventFilters(eventType, severity, status);
+    // Build event filters (use decoded eventType)
+    const eventFilters = buildEventFilters(decodedEventType, severity, status);
 
     // Build search filter
     const searchFilter = buildSearchFilter(search);
@@ -163,26 +185,38 @@ exports.getLogs = async (req, res) => {
       ...searchFilter
     };
 
-    const { count, rows } = await ActivityLog.findAndCountAll({
-      where: whereClause,
-      include: [
-        {
-          model: User,
-          as: 'user',
-          attributes: ['id', 'email', 'role'],
-          required: false
-        },
-        {
-          model: Device,
-          as: 'device',
-          attributes: ['id', 'deviceName', 'deviceId'],
-          required: false
-        }
-      ],
-      order: [[sortBy, sortOrder.toUpperCase()]],
-      limit: pagination.limit,
-      offset: pagination.offset
-    });
+    // Validate sortBy to prevent SQL injection
+    const allowedSortFields = ['createdAt', 'eventType', 'severity', 'status', 'description'];
+    const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const safeSortOrder = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    let count, rows;
+    try {
+      ({ count, rows } = await ActivityLog.findAndCountAll({
+        where: whereClause,
+        include: [
+          {
+            model: User,
+            as: 'user',
+            attributes: ['id', 'email', 'role'],
+            required: false
+          },
+          {
+            model: Device,
+            as: 'device',
+            attributes: ['id', 'deviceName', 'deviceId'],
+            required: false
+          }
+        ],
+        order: [[safeSortBy, safeSortOrder]],
+        limit: pagination.limit,
+        offset: pagination.offset
+      }));
+    } catch (dbError) {
+      console.error('Database query error:', dbError);
+      console.error('Query whereClause:', JSON.stringify(whereClause, null, 2));
+      throw dbError;
+    }
 
     res.status(200).json({
       success: true,
@@ -193,9 +227,15 @@ exports.getLogs = async (req, res) => {
     });
   } catch (error) {
     console.error('Get logs error:', error);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch activity logs'
+      message: 'Failed to fetch activity logs',
+      error: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        stack: error.stack
+      } : undefined
     });
   }
 };

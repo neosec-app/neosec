@@ -7,37 +7,79 @@ const getMFASettings = async (req, res) => {
   try {
     const userId = req.user.role === 'admin' && req.params.userId ? req.params.userId : req.user.id;
 
-    let mfaSettings = await MFASettings.findOne({
-      where: { userId },
-      include: [
-        {
-          model: User,
-          as: 'user',
-          attributes: ['id', 'email']
-        }
-      ]
-    });
-
-    if (!mfaSettings) {
-      // Create default settings
-      mfaSettings = await MFASettings.create({
-        userId,
-        enabled: false
+    // Check if table exists, if not return default settings
+    try {
+      let mfaSettings = await MFASettings.findOne({
+        where: { userId },
+        include: [
+          {
+            model: User,
+            as: 'user',
+            attributes: ['id', 'email'],
+            required: false
+          }
+        ]
       });
-    }
 
-    // Don't send secret to client unless setting up
-    const response = mfaSettings.toJSON();
-    if (response.secret) {
-      delete response.secret;
-    }
+      if (!mfaSettings) {
+        // Create default settings
+        try {
+          mfaSettings = await MFASettings.create({
+            userId,
+            enabled: false
+          });
+        } catch (createError) {
+          // If table doesn't exist, return default response
+          if (createError.name === 'SequelizeDatabaseError' && 
+              (createError.message?.includes('does not exist') || createError.message?.includes('relation'))) {
+            return res.status(200).json({
+              success: true,
+              data: {
+                id: null,
+                userId: userId,
+                enabled: false,
+                method: null,
+                backupCodes: null,
+                lastUsedAt: null
+              }
+            });
+          }
+          throw createError;
+        }
+      }
 
-    res.status(200).json({
-      success: true,
-      data: response
-    });
+      // Don't send secret to client unless setting up
+      const response = mfaSettings.toJSON();
+      if (response.secret) {
+        delete response.secret;
+      }
+
+      res.status(200).json({
+        success: true,
+        data: response
+      });
+    } catch (dbError) {
+      // If table doesn't exist, return default response
+      if (dbError.name === 'SequelizeDatabaseError' && 
+          (dbError.message?.includes('does not exist') || dbError.message?.includes('relation'))) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            id: null,
+            userId: userId,
+            enabled: false,
+            method: null,
+            backupCodes: null,
+            lastUsedAt: null
+          }
+        });
+      }
+      throw dbError;
+    }
   } catch (error) {
     console.error('Get MFA settings error:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
     res.status(500).json({
       success: false,
       message: 'Server error fetching MFA settings',

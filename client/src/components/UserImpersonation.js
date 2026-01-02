@@ -32,13 +32,13 @@ const UserImpersonation = ({ theme = 'dark', palette = null, user }) => {
         // Admin can impersonate any user
         const response = await adminAPI.getAllUsers();
         if (response.success) {
-          setUsers(response.data || []);
+          setUsers(response.data?.users || []);
         }
       } else if (user.accountType === 'leader') {
         // Leader can only impersonate their group members
         const response = await hierarchyAPI.getMyGroupMembers();
         if (response.success) {
-          setUsers(response.data || []);
+          setUsers(response.data?.users || response.data || []);
         }
       }
     } catch (err) {
@@ -156,7 +156,7 @@ const UserImpersonation = ({ theme = 'dark', palette = null, user }) => {
             }}
           >
             <option value="">-- Select User --</option>
-            {users.map(user => (
+            {Array.isArray(users) && users.map(user => (
               <option key={user.id} value={user.id}>{user.email}</option>
             ))}
           </select>

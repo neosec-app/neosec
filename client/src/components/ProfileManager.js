@@ -363,6 +363,29 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
   const [sharingProfile, setSharingProfile] = useState(null);
   const [showShareManagement, setShowShareManagement] = useState(false);
 
+  // Helper function to convert action (number or string) to string
+  const getActionString = (action) => {
+    if (typeof action === 'string') {
+      return action.toLowerCase();
+    }
+    // Map numeric actions: 0 = allow/accept, 1 = reject, 2 = drop
+    const actionMap = { 0: 'allow', 1: 'reject', 2: 'drop' };
+    return actionMap[action] || 'allow';
+  };
+
+  // Helper function to convert protocol (number or string) to string
+  const getProtocolString = (protocol) => {
+    if (typeof protocol === 'string') {
+      return protocol.toUpperCase();
+    }
+    if (protocol == null || protocol === undefined) {
+      return 'ANY';
+    }
+    // Map numeric protocols: 0 = TCP, 1 = UDP, 2 = BOTH
+    const protocolMap = { 0: 'TCP', 1: 'UDP', 2: 'BOTH' };
+    return protocolMap[protocol] || 'ANY';
+  };
+
 
 
 const showToast = (message, type = 'info') => {
@@ -489,6 +512,13 @@ useEffect(() => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate profile name
+    if (!formData.name || formData.name.trim().length < 3 || formData.name.trim().length > 50) {
+      showToast('Profile name must be between 3 and 50 characters', 'error');
+      return;
+    }
+    
     try {
       const submitData = {
         ...formData,
@@ -977,9 +1007,17 @@ const handleRemoveCountry = (countryToRemove) => {
                   value={formData.name}
                   onChange={handleInputChange}
                   required
+                  minLength={3}
+                  maxLength={50}
+                  placeholder="Enter profile name (3-50 characters)"
                   className="form-input"
                   style={styles.formInput}
                 />
+                {formData.name && (formData.name.length < 3 || formData.name.length > 50) && (
+                  <div style={{ color: colors.danger, fontSize: '12px', marginTop: '4px' }}>
+                    Profile name must be between 3 and 50 characters
+                  </div>
+                )}
               </div>
 
               <div className="form-group">
@@ -1252,15 +1290,15 @@ const handleRemoveCountry = (countryToRemove) => {
                                   borderRadius: 12,
                                   fontSize: 11,
                                   fontWeight: 600,
-                                  backgroundColor: rule.action === 'allow'
+                                  backgroundColor: getActionString(rule.action) === 'allow'
                                     ? (theme === 'dark' ? '#1E402C' : '#e6f4ed')
                                     : (theme === 'dark' ? '#40201E' : '#fee2e2'),
-                                  color: rule.action === 'allow'
+                                  color: getActionString(rule.action) === 'allow'
                                     ? (theme === 'dark' ? '#36E27B' : '#1fa45a')
                                     : (theme === 'dark' ? '#FF7777' : '#d4183d'),
                                 }}
                               >
-                                {rule.action === 'allow' ? '✓' : '✗'} {rule.action.toUpperCase()}
+                                {getActionString(rule.action) === 'allow' ? '✓' : '✗'} {getActionString(rule.action).toUpperCase()}
                               </span>
                               
                               <span
@@ -1273,7 +1311,7 @@ const handleRemoveCountry = (countryToRemove) => {
                                   fontWeight: 500
                                 }}
                               >
-                                {(rule.protocol || 'any').toUpperCase()}
+                                {getProtocolString(rule.protocol)}
                               </span>
                               
                               <span style={{ fontSize: 11, color: colors.textMuted }}>
@@ -1343,7 +1381,7 @@ const handleRemoveCountry = (countryToRemove) => {
                             Firewall Rule {ruleIndex + 1}
                           </div>
                           <div>
-                            {rule.action.toUpperCase()} - {rule.protocol.toUpperCase()} ({rule.direction})
+                            {getActionString(rule.action).toUpperCase()} - {getProtocolString(rule.protocol)} ({rule.direction || 'inbound'})
                             {rule.description && ` - ${rule.description}`}
                           </div>
                         </div>
