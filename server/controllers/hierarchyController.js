@@ -292,7 +292,7 @@ const getMyGroupMembers = async (req, res) => {
                 include: [{
                     model: User,
                     as: 'user',
-                    attributes: ['id', 'email', 'firstName', 'lastName', 'accountType']
+                    attributes: ['id', 'email', 'name', 'phone', 'accountType']
                 }]
             }]
         });
@@ -305,8 +305,8 @@ const getMyGroupMembers = async (req, res) => {
                     memberMap.set(member.user.id, {
                         id: member.user.id,
                         email: member.user.email,
-                        firstName: member.user.firstName,
-                        lastName: member.user.lastName,
+                        name: member.user.name,
+                        phone: member.user.phone,
                         accountType: member.user.accountType,
                         joinedAt: member.createdAt,
                         groupName: group.name

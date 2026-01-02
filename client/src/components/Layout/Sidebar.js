@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import SidebarButton from './SidebarButton';
+//import { FiShield} from 'react-icons/fi';
+
 
 function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, isMobile, isTablet, sidebarOpen, setSidebarOpen, handleLogout }) {
     const [navHover, setNavHover] = useState(null);
@@ -122,17 +124,14 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                                 onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
                             >
                                 <div style={{
-                                    width: '14px',
-                                    height: '14px',
-                                    borderRadius: '4px',
-                                    background: theme === 'dark' ? '#7c8bff' : '#030213'
+                                    
                                 }} />
                                 <h2 style={{
                                     color: palette.accent,
                                     margin: 0,
                                     fontSize: isMobile ? '18px' : '20px',
                                     letterSpacing: '0.2px'
-                                }}>NeoSec</h2>
+                                }}> 🛡 NeoSec</h2>
                             </button>
 
                             <p style={{
