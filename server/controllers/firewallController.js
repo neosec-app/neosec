@@ -41,6 +41,280 @@ const validateRulePayload = (payload) => {
   return errors;
 };
 
+// Helper: Normalize and validate rule input
+const normalizeAndValidateRuleInput = (body, userId = null) => {
+  let { ip_address, port_start, port_end, protocol, action, direction } = body;
+  
+  // Log received values for debugging
+  console.log('Received firewall rule data:', {
+    ip_address,
+    port_start,
+    port_end,
+    protocol,
+    action,
+    direction,
+    protocolType: typeof protocol,
+    actionType: typeof action,
+    directionType: typeof direction,
+    userId: userId
+  });
+  
+  // Convert values to proper types BEFORE validation
+  // Handle string numbers, actual numbers, and null/undefined
+  protocol = protocol !== undefined && protocol !== null 
+    ? (typeof protocol === 'string' ? parseInt(protocol, 10) : Number(protocol))
+    : undefined;
+  action = action !== undefined && action !== null 
+    ? (typeof action === 'string' ? parseInt(action, 10) : Number(action))
+    : undefined;
+  port_start = port_start !== undefined && port_start !== null && port_start !== '' 
+    ? (typeof port_start === 'string' ? parseInt(port_start, 10) : Number(port_start))
+    : null;
+  port_end = port_end !== undefined && port_end !== null && port_end !== '' 
+    ? (typeof port_end === 'string' ? parseInt(port_end, 10) : Number(port_end))
+    : null;
+  
+  console.log('After conversion:', { protocol, action, port_start, port_end });
+  
+  // Validate after conversion
+  if (protocol === undefined || protocol === null || isNaN(protocol) || protocol < 0 || protocol > 2) {
+    return {
+      error: {
+        status: 400,
+        message: 'Invalid protocol value. Must be 0 (TCP), 1 (UDP), or 2 (BOTH)',
+        received: body.protocol,
+        converted: protocol
+      }
+    };
+  }
+  if (action === undefined || action === null || isNaN(action) || action < 0 || action > 2) {
+    return {
+      error: {
+        status: 400,
+        message: 'Invalid action value. Must be 0 (ACCEPT), 1 (REJECT), or 2 (DROP)',
+        received: body.action,
+        converted: action
+      }
+    };
+  }
+  
+  const errors = validateRulePayload({ ip_address, port_start, port_end, protocol, action });
+  if (errors.length) {
+    return {
+      error: {
+        status: 400,
+        message: 'Validation failed',
+        errors
+      }
+    };
+  }
+  
+  return {
+    ip_address,
+    port_start,
+    port_end,
+    protocol,
+    action,
+    direction
+  };
+};
+
+// Helper: Create firewall rule in database with retry logic
+const createFirewallRuleInDB = async (ruleData, userId) => {
+  const { ip_address, port_start, port_end, protocol, action, direction } = ruleData;
+  
+  // Always use integers - database should have INTEGER columns
+  // If database has ENUMs, the fixFirewallRulesColumns script should convert them
+  console.log('Creating firewall rule with integer values:', { 
+    ip_address, 
+    port_start, 
+    port_end, 
+    protocol, 
+    action, 
+    userId 
+  });
+  
+  let rule;
+  try {
+    // Always include direction with value from request or default to 'inbound'
+    // If column doesn't exist, error handling will retry without it
+    const createData = {
+      ip_address: ip_address.trim(),
+      port_start,
+      port_end,
+      protocol: protocol, // Always integer
+      action: action, // Always integer
+      userId: userId,
+      direction: direction || 'inbound' // Use direction from request or default
+    };
+
+    console.log('Creating firewall rule with data:', createData);
+    rule = await FirewallRule.create(createData);
+    console.log('Successfully created firewall rule:', rule.id, 'with direction:', rule.direction);
+  } catch (createError) {
+    console.error('FirewallRule.create failed:', createError.message);
+    console.error('Error details:', {
+      message: createError.message,
+      original: createError.original?.message,
+      code: createError.original?.code,
+      sql: createError.sql,
+      stack: createError.stack
+    });
+    
+    // Check if it's a missing column error (like direction)
+    const isMissingColumnError = createError.original && createError.original.message && 
+      (createError.original.message.includes('column') &&
+       createError.original.message.includes('does not exist'));
+    
+    // If direction column doesn't exist, retry without it
+    if (isMissingColumnError && createError.original.message.includes('direction')) {
+      console.log('Retrying without direction column...');
+      const createDataWithoutDirection = {
+        ip_address: ip_address.trim(),
+        port_start,
+        port_end,
+        protocol: protocol,
+        action: action,
+        userId: userId
+        // Note: direction column doesn't exist, so we don't include it
+      };
+      rule = await FirewallRule.create(createDataWithoutDirection);
+      console.log('Successfully created firewall rule (without direction):', rule.id);
+    } else {
+      // Check if it's an ENUM error - database needs migration
+      const isEnumError = createError.original && createError.original.message && 
+        (createError.original.message.includes('invalid input value for enum') ||
+         createError.original.message.includes('enum') ||
+         createError.original.code === '22P02');
+      
+      if (isEnumError) {
+        throw {
+          isEnumError: true,
+          originalError: createError
+        };
+      }
+      
+      // Check if it's a NOT NULL constraint error for direction
+      const isNotNullError = createError.original && createError.original.message && 
+        createError.original.message.includes('null value in column "direction"');
+      
+      if (isNotNullError) {
+        // Retry with direction value
+        console.log('Retrying with direction value...');
+        const createDataWithDirection = {
+          ip_address: ip_address.trim(),
+          port_start,
+          port_end,
+          protocol: protocol,
+          action: action,
+          userId: userId,
+          direction: direction || 'inbound'
+        };
+        rule = await FirewallRule.create(createDataWithDirection);
+        console.log('Successfully created firewall rule (with direction):', rule.id);
+      } else {
+        // Re-throw other errors to be handled by outer catch
+        throw createError;
+      }
+    }
+  }
+  
+  return rule;
+};
+
+// Helper: Log firewall rule creation
+const logFirewallRuleCreation = async (rule, action, protocol, ip_address, userId, req) => {
+  try {
+    const ipAddress = getClientIP(req);
+    const actionText = action === 0 ? 'ACCEPT' : action === 1 ? 'REJECT' : 'DROP';
+    const protocolText = protocol === 0 ? 'TCP' : protocol === 1 ? 'UDP' : 'BOTH';
+    await ActivityLog.create({
+      eventType: 'Firewall Rule Update',
+      description: `Firewall rule created: ${actionText} ${protocolText} for ${ip_address}`,
+      status: 'Success',
+      severity: 'info',
+      userId: userId,
+      ipAddress: ipAddress,
+      metadata: {
+        ruleId: rule.id,
+        action,
+        protocol,
+        ip_address
+      }
+    });
+  } catch (logError) {
+    console.error('Error logging firewall rule creation:', logError);
+  }
+};
+
+// Helper: Format firewall rule response
+const formatFirewallRuleResponse = (rule) => {
+  // Ensure protocol and action are integers in response (they should already be)
+  let responseProtocol = typeof rule.protocol === 'string' 
+    ? (rule.protocol.toLowerCase() === 'tcp' ? 0 : rule.protocol.toLowerCase() === 'udp' ? 1 : 2)
+    : Number(rule.protocol);
+  let responseAction = typeof rule.action === 'string'
+    ? (rule.action.toLowerCase() === 'accept' ? 0 : rule.action.toLowerCase() === 'reject' ? 1 : 2)
+    : Number(rule.action);
+  
+  return {
+    id: rule.id,
+    ip_address: rule.ip_address,
+    port_start: rule.port_start,
+    port_end: rule.port_end,
+    protocol: responseProtocol,
+    action: responseAction,
+    direction: rule.direction || 'inbound', // Include direction field
+    userId: rule.userId,
+    createdAt: rule.createdAt,
+    updatedAt: rule.updatedAt
+  };
+};
+
+// Helper: Format error response
+const formatFirewallErrorResponse = (error) => {
+  // Provide more helpful error messages
+  let errorMessage = 'Server error creating firewall rule';
+  if (error.original && error.original.code === '22P02') {
+    errorMessage = 'Invalid protocol or action value. The database ENUM type may not match the expected values.';
+  } else if (error.original && error.original.message) {
+    if (error.original.message.includes('enum')) {
+      errorMessage = `Database ENUM error: ${error.original.message}. The conversion script may need to run to convert ENUMs to INTEGERs.`;
+    } else {
+      errorMessage = `Database error: ${error.original.message}`;
+    }
+  } else if (error.message) {
+    errorMessage = error.message;
+  }
+  
+  // Always include error details in development, and include helpful info in production
+  const errorResponse = {
+    success: false,
+    message: errorMessage
+  };
+  
+  // Include detailed error info in development
+  if (process.env.NODE_ENV === 'development') {
+    errorResponse.error = {
+      message: error.message,
+      original: error.original?.message,
+      code: error.original?.code,
+      sql: error.sql,
+      stack: error.stack
+    };
+  } else {
+    // In production, still include the original error message if it's helpful
+    if (error.original?.message) {
+      errorResponse.error = {
+        message: error.original.message,
+        code: error.original.code
+      };
+    }
+  }
+  
+  return errorResponse;
+};
+
 // Get all firewall rules for the current user
 const getRules = async (req, res) => {
   try {
@@ -123,66 +397,6 @@ const getRules = async (req, res) => {
 // Create a new firewall rule
 const createRule = async (req, res) => {
   try {
-    let { ip_address, port_start, port_end, protocol, action, direction } = req.body;
-    
-    // Log received values for debugging
-    console.log('Received firewall rule data:', {
-      ip_address,
-      port_start,
-      port_end,
-      protocol,
-      action,
-      direction,
-      protocolType: typeof protocol,
-      actionType: typeof action,
-      directionType: typeof direction,
-      userId: req.user?.id
-    });
-    
-    // Convert values to proper types BEFORE validation
-    // Handle string numbers, actual numbers, and null/undefined
-    protocol = protocol !== undefined && protocol !== null 
-      ? (typeof protocol === 'string' ? parseInt(protocol, 10) : Number(protocol))
-      : undefined;
-    action = action !== undefined && action !== null 
-      ? (typeof action === 'string' ? parseInt(action, 10) : Number(action))
-      : undefined;
-    port_start = port_start !== undefined && port_start !== null && port_start !== '' 
-      ? (typeof port_start === 'string' ? parseInt(port_start, 10) : Number(port_start))
-      : null;
-    port_end = port_end !== undefined && port_end !== null && port_end !== '' 
-      ? (typeof port_end === 'string' ? parseInt(port_end, 10) : Number(port_end))
-      : null;
-    
-    console.log('After conversion:', { protocol, action, port_start, port_end });
-    
-    // Validate after conversion
-    if (protocol === undefined || protocol === null || isNaN(protocol) || protocol < 0 || protocol > 2) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid protocol value. Must be 0 (TCP), 1 (UDP), or 2 (BOTH)',
-        received: req.body.protocol,
-        converted: protocol
-      });
-    }
-    if (action === undefined || action === null || isNaN(action) || action < 0 || action > 2) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid action value. Must be 0 (ACCEPT), 1 (REJECT), or 2 (DROP)',
-        received: req.body.action,
-        converted: action
-      });
-    }
-    
-    const errors = validateRulePayload({ ip_address, port_start, port_end, protocol, action });
-    if (errors.length) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors
-      });
-    }
-
     // Check if userId exists
     if (!req.user || !req.user.id) {
       return res.status(401).json({
@@ -191,153 +405,49 @@ const createRule = async (req, res) => {
       });
     }
 
-    // Always use integers - database should have INTEGER columns
-    // If database has ENUMs, the fixFirewallRulesColumns script should convert them
-    console.log('Creating firewall rule with integer values:', { 
-      ip_address, 
-      port_start, 
-      port_end, 
-      protocol, 
-      action, 
-      userId: req.user.id 
-    });
-    
+    // Normalize and validate input
+    const validationResult = normalizeAndValidateRuleInput(req.body, req.user.id);
+    if (validationResult.error) {
+      return res.status(validationResult.error.status).json({
+        success: false,
+        message: validationResult.error.message,
+        ...(validationResult.error.received !== undefined && { received: validationResult.error.received }),
+        ...(validationResult.error.converted !== undefined && { converted: validationResult.error.converted }),
+        ...(validationResult.error.errors && { errors: validationResult.error.errors })
+      });
+    }
+
+    const { ip_address, port_start, port_end, protocol, action, direction } = validationResult;
+
+    // Create firewall rule in database (with retry logic)
     let rule;
     try {
-      // Always include direction with value from request or default to 'inbound'
-      // If column doesn't exist, error handling will retry without it
-      const createData = {
-        ip_address: ip_address.trim(),
-        port_start,
-        port_end,
-        protocol: protocol, // Always integer
-        action: action, // Always integer
-        userId: req.user.id,
-        direction: direction || 'inbound' // Use direction from request or default
-      };
-
-      console.log('Creating firewall rule with data:', createData);
-      rule = await FirewallRule.create(createData);
-      console.log('Successfully created firewall rule:', rule.id, 'with direction:', rule.direction);
-    } catch (createError) {
-      console.error('FirewallRule.create failed:', createError.message);
-      console.error('Error details:', {
-        message: createError.message,
-        original: createError.original?.message,
-        code: createError.original?.code,
-        sql: createError.sql,
-        stack: createError.stack
-      });
-      
-      // Check if it's a missing column error (like direction)
-      const isMissingColumnError = createError.original && createError.original.message && 
-        (createError.original.message.includes('column') && 
-         createError.original.message.includes('does not exist'));
-      
-      // If direction column doesn't exist, retry without it
-      if (isMissingColumnError && createError.original.message.includes('direction')) {
-        console.log('Retrying without direction column...');
-      const createDataWithoutDirection = {
-        ip_address: ip_address.trim(),
-        port_start,
-        port_end,
-        protocol: protocol,
-        action: action,
-        userId: req.user.id
-        // Note: direction column doesn't exist, so we don't include it
-      };
-        rule = await FirewallRule.create(createDataWithoutDirection);
-        console.log('Successfully created firewall rule (without direction):', rule.id);
-      } else {
-        // Check if it's an ENUM error - database needs migration
-        const isEnumError = createError.original && createError.original.message && 
-          (createError.original.message.includes('invalid input value for enum') ||
-           createError.original.message.includes('enum') ||
-           createError.original.code === '22P02');
-        
-        if (isEnumError) {
-          return res.status(500).json({
-            success: false,
-            message: 'Database schema error: protocol and action columns are ENUM types but should be INTEGER. Please run the migration script: node server/scripts/fixFirewallRulesColumns.js',
-            error: process.env.NODE_ENV === 'development' ? {
-              message: createError.message,
-              original: createError.original?.message,
-              code: createError.original?.code
-            } : undefined
-          });
-        }
-        
-        // Check if it's a NOT NULL constraint error for direction
-        const isNotNullError = createError.original && createError.original.message && 
-          createError.original.message.includes('null value in column "direction"');
-        
-        if (isNotNullError) {
-        // Retry with direction value
-        console.log('Retrying with direction value...');
-        const createDataWithDirection = {
-          ip_address: ip_address.trim(),
-          port_start,
-          port_end,
-          protocol: protocol,
-          action: action,
-          userId: req.user.id,
-          direction: direction || 'inbound'
-        };
-          rule = await FirewallRule.create(createDataWithDirection);
-          console.log('Successfully created firewall rule (with direction):', rule.id);
-        } else {
-          // Re-throw other errors to be handled by outer catch
-          throw createError;
-        }
+      rule = await createFirewallRuleInDB({ ip_address, port_start, port_end, protocol, action, direction }, req.user.id);
+    } catch (dbError) {
+      // Handle ENUM error specifically
+      if (dbError.isEnumError) {
+        return res.status(500).json({
+          success: false,
+          message: 'Database schema error: protocol and action columns are ENUM types but should be INTEGER. Please run the migration script: node server/scripts/fixFirewallRulesColumns.js',
+          error: process.env.NODE_ENV === 'development' ? {
+            message: dbError.originalError.message,
+            original: dbError.originalError.original?.message,
+            code: dbError.originalError.original?.code
+          } : undefined
+        });
       }
+      // Re-throw other database errors
+      throw dbError;
     }
 
     // Log firewall rule creation
-    try {
-      const ipAddress = getClientIP(req);
-      const actionText = action === 0 ? 'ACCEPT' : action === 1 ? 'REJECT' : 'DROP';
-      const protocolText = protocol === 0 ? 'TCP' : protocol === 1 ? 'UDP' : 'BOTH';
-      await ActivityLog.create({
-        eventType: 'Firewall Rule Update',
-        description: `Firewall rule created: ${actionText} ${protocolText} for ${ip_address}`,
-        status: 'Success',
-        severity: 'info',
-        userId: req.user.id,
-        ipAddress: ipAddress,
-        metadata: {
-          ruleId: rule.id,
-          action,
-          protocol,
-          ip_address
-        }
-      });
-    } catch (logError) {
-      console.error('Error logging firewall rule creation:', logError);
-    }
+    await logFirewallRuleCreation(rule, action, protocol, ip_address, req.user.id, req);
 
-    // Ensure protocol and action are integers in response (they should already be)
-    let responseProtocol = typeof rule.protocol === 'string' 
-      ? (rule.protocol.toLowerCase() === 'tcp' ? 0 : rule.protocol.toLowerCase() === 'udp' ? 1 : 2)
-      : Number(rule.protocol);
-    let responseAction = typeof rule.action === 'string'
-      ? (rule.action.toLowerCase() === 'accept' ? 0 : rule.action.toLowerCase() === 'reject' ? 1 : 2)
-      : Number(rule.action);
-    
-    // Return consistent format with integers
+    // Format and return response
+    const responseData = formatFirewallRuleResponse(rule);
     res.status(201).json({
       success: true,
-      data: {
-        id: rule.id,
-        ip_address: rule.ip_address,
-        port_start: rule.port_start,
-        port_end: rule.port_end,
-        protocol: responseProtocol,
-        action: responseAction,
-        direction: rule.direction || 'inbound', // Include direction field
-        userId: rule.userId,
-        createdAt: rule.createdAt,
-        updatedAt: rule.updatedAt
-      }
+      data: responseData
     });
   } catch (error) {
     console.error('Create firewall rule error:', error);
@@ -345,45 +455,7 @@ const createRule = async (req, res) => {
     console.error('Error original:', error.original);
     console.error('Error stack:', error.stack);
     
-    // Provide more helpful error messages
-    let errorMessage = 'Server error creating firewall rule';
-    if (error.original && error.original.code === '22P02') {
-      errorMessage = 'Invalid protocol or action value. The database ENUM type may not match the expected values.';
-    } else if (error.original && error.original.message) {
-      if (error.original.message.includes('enum')) {
-        errorMessage = `Database ENUM error: ${error.original.message}. The conversion script may need to run to convert ENUMs to INTEGERs.`;
-      } else {
-        errorMessage = `Database error: ${error.original.message}`;
-      }
-    } else if (error.message) {
-      errorMessage = error.message;
-    }
-    
-    // Always include error details in development, and include helpful info in production
-    const errorResponse = {
-      success: false,
-      message: errorMessage
-    };
-    
-    // Include detailed error info in development
-    if (process.env.NODE_ENV === 'development') {
-      errorResponse.error = {
-        message: error.message,
-        original: error.original?.message,
-        code: error.original?.code,
-        sql: error.sql,
-        stack: error.stack
-      };
-    } else {
-      // In production, still include the original error message if it's helpful
-      if (error.original?.message) {
-        errorResponse.error = {
-          message: error.original.message,
-          code: error.original.code
-        };
-      }
-    }
-    
+    const errorResponse = formatFirewallErrorResponse(error);
     res.status(500).json(errorResponse);
   }
 };

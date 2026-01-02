@@ -5,20 +5,100 @@ const Threat = require('../models/Threat');
 const bcrypt = require('bcryptjs');
 const { createAuditLog } = require('../middleware/auditLogger');
 
-// @desc    Get all users
+/**
+ * Helper: Build user filters
+ */
+const buildUserFilters = (role, isApproved, search) => {
+  const whereClause = {};
+
+  // Filter by role
+  if (role && role !== 'all') {
+    whereClause.role = role;
+  }
+
+  // Filter by approval status
+  if (isApproved !== undefined && isApproved !== null) {
+    whereClause.isApproved = isApproved === 'true' || isApproved === true;
+  }
+
+  // Search filter (email, name, phone)
+  if (search) {
+    whereClause[Op.or] = [
+      { email: { [Op.iLike]: `%${search}%` } },
+      { name: { [Op.iLike]: `%${search}%` } },
+      { phone: { [Op.iLike]: `%${search}%` } }
+    ];
+  }
+
+  return whereClause;
+};
+
+/**
+ * Helper: Build pagination parameters
+ */
+const buildPaginationParams = (page, limit) => {
+  const pageNum = parseInt(page) || 1;
+  const limitNum = parseInt(limit) || 50;
+  const offset = (pageNum - 1) * limitNum;
+
+  return {
+    page: pageNum,
+    limit: limitNum,
+    offset
+  };
+};
+
+/**
+ * Helper: Format pagination response
+ */
+const formatPaginationResponse = (count, page, limit) => {
+  return {
+    total: count,
+    page: page,
+    limit: limit,
+    totalPages: Math.ceil(count / limit)
+  };
+};
+
+// @desc    Get all users with filtering and pagination
 // @route   GET /api/admin/users
 // @access  Private/Admin
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.findAll({
+    const {
+      page = 1,
+      limit = 50,
+      role,
+      isApproved,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'DESC'
+    } = req.query;
+
+    // Build pagination parameters
+    const pagination = buildPaginationParams(page, limit);
+
+    // Build filters
+    const whereClause = buildUserFilters(role, isApproved, search);
+
+    // Build sort order
+    const order = [[sortBy, sortOrder.toUpperCase()]];
+
+    const { count, rows } = await User.findAndCountAll({
+      where: whereClause,
       attributes: { exclude: ['password'] },
-      order: [['createdAt', 'DESC']]
+      order: order,
+      limit: pagination.limit,
+      offset: pagination.offset
     });
 
     res.status(200).json({
       success: true,
-      count: users.length,
-      data: users
+      count: count,
+      data: {
+        users: rows,
+        pagination: formatPaginationResponse(count, pagination.page, pagination.limit)
+      }
     });
   } catch (error) {
     console.error('Get all users error:', error);

@@ -4,6 +4,123 @@ const Device = require('../models/Device');
 const { Op } = require('sequelize');
 
 /**
+ * Helper: Build user filter for activity logs
+ */
+const buildUserFilter = async (currentUser, userId, userRole) => {
+  const whereClause = {};
+
+  // Filter by user (if not admin, only show their logs)
+  if (currentUser.role !== 'admin') {
+    whereClause.userId = currentUser.id;
+  } else if (userId) {
+    // If specific userId is provided, use that (takes priority over role filter)
+    whereClause.userId = userId;
+  } else if (userRole && userRole !== 'all') {
+    // Filter by user role if specified (admin only, and no specific userId)
+    // Get all user IDs with the specified role
+    const usersWithRole = await User.findAll({
+      where: { role: userRole },
+      attributes: ['id']
+    });
+    const userIds = usersWithRole.map(u => u.id);
+    
+    // Filter activity logs by user IDs
+    if (userIds.length > 0) {
+      whereClause.userId = { [Op.in]: userIds };
+    } else {
+      // No users with this role, return empty result
+      whereClause.userId = { [Op.in]: [] };
+    }
+  }
+
+  return whereClause;
+};
+
+/**
+ * Helper: Build date range filter
+ */
+const buildDateRangeFilter = (startDate, endDate) => {
+  const filter = {};
+  
+  if (startDate || endDate) {
+    filter.createdAt = {};
+    if (startDate) {
+      filter.createdAt[Op.gte] = new Date(startDate);
+    }
+    if (endDate) {
+      filter.createdAt[Op.lte] = new Date(endDate);
+    }
+  }
+  
+  return filter;
+};
+
+/**
+ * Helper: Build event type, severity, and status filters
+ */
+const buildEventFilters = (eventType, severity, status) => {
+  const filter = {};
+
+  // Event type filter
+  if (eventType && eventType !== 'all') {
+    filter.eventType = eventType;
+  }
+
+  // Severity filter
+  if (severity && severity !== 'all') {
+    filter.severity = severity;
+  }
+
+  // Status filter
+  if (status && status !== 'all') {
+    filter.status = status;
+  }
+
+  return filter;
+};
+
+/**
+ * Helper: Build search filter
+ */
+const buildSearchFilter = (search) => {
+  if (!search) return {};
+
+  return {
+    [Op.or]: [
+      { description: { [Op.iLike]: `%${search}%` } },
+      { ipAddress: { [Op.iLike]: `%${search}%` } }
+    ]
+  };
+};
+
+/**
+ * Helper: Build pagination parameters
+ */
+const buildPaginationParams = (page, limit) => {
+  const pageNum = parseInt(page) || 1;
+  const limitNum = parseInt(limit) || 50;
+  const offset = (pageNum - 1) * limitNum;
+
+  return {
+    page: pageNum,
+    limit: limitNum,
+    offset
+  };
+};
+
+/**
+ * Helper: Format pagination response
+ */
+const formatPaginationResponse = (count, page, limit) => {
+  return {
+    total: count,
+    page: page,
+    limit: limit,
+    totalPages: Math.ceil(count / limit)
+  };
+};
+
+/**
  * Get activity logs with filters and pagination
  */
 exports.getLogs = async (req, res) => {
@@ -23,66 +140,28 @@ exports.getLogs = async (req, res) => {
       sortOrder = 'DESC'
     } = req.query;
 
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-    const whereClause = {};
+    // Build pagination parameters
+    const pagination = buildPaginationParams(page, limit);
 
-    // Filter by user (if not admin, only show their logs)
-    if (req.user.role !== 'admin') {
-      whereClause.userId = req.user.id;
-    } else if (userId) {
-      // If specific userId is provided, use that (takes priority over role filter)
-      whereClause.userId = userId;
-    } else if (userRole && userRole !== 'all') {
-      // Filter by user role if specified (admin only, and no specific userId)
-      // Get all user IDs with the specified role
-      const usersWithRole = await User.findAll({
-        where: { role: userRole },
-        attributes: ['id']
-      });
-      const userIds = usersWithRole.map(u => u.id);
-      
-      // Filter activity logs by user IDs
-      if (userIds.length > 0) {
-        whereClause.userId = { [Op.in]: userIds };
-      } else {
-        // No users with this role, return empty result
-        whereClause.userId = { [Op.in]: [] };
-      }
-    }
+    // Build user filter
+    const userFilter = await buildUserFilter(req.user, userId, userRole);
 
-    // Date range filter
-    if (startDate || endDate) {
-      whereClause.createdAt = {};
-      if (startDate) {
-        whereClause.createdAt[Op.gte] = new Date(startDate);
-      }
-      if (endDate) {
-        whereClause.createdAt[Op.lte] = new Date(endDate);
-      }
-    }
+    // Build date range filter
+    const dateFilter = buildDateRangeFilter(startDate, endDate);
 
-    // Event type filter
-    if (eventType && eventType !== 'all') {
-      whereClause.eventType = eventType;
-    }
+    // Build event filters
+    const eventFilters = buildEventFilters(eventType, severity, status);
 
-    // Severity filter
-    if (severity && severity !== 'all') {
-      whereClause.severity = severity;
-    }
+    // Build search filter
+    const searchFilter = buildSearchFilter(search);
 
-    // Status filter
-    if (status && status !== 'all') {
-      whereClause.status = status;
-    }
-
-    // Search filter
-    if (search) {
-      whereClause[Op.or] = [
-        { description: { [Op.iLike]: `%${search}%` } },
-        { ipAddress: { [Op.iLike]: `%${search}%` } }
-      ];
-    }
+    // Combine all filters
+    const whereClause = {
+      ...userFilter,
+      ...dateFilter,
+      ...eventFilters,
+      ...searchFilter
+    };
 
     const { count, rows } = await ActivityLog.findAndCountAll({
       where: whereClause,
@@ -101,20 +180,15 @@ exports.getLogs = async (req, res) => {
         }
       ],
       order: [[sortBy, sortOrder.toUpperCase()]],
-      limit: parseInt(limit),
-      offset: offset
+      limit: pagination.limit,
+      offset: pagination.offset
     });
 
     res.status(200).json({
       success: true,
       data: {
         logs: rows,
-        pagination: {
-          total: count,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalPages: Math.ceil(count / parseInt(limit))
-        }
+        pagination: formatPaginationResponse(count, pagination.page, pagination.limit)
       }
     });
   } catch (error) {

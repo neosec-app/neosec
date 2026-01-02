@@ -350,7 +350,6 @@ const getVpnStatus = async (userId) => {
         isActive: true
       }
     });
-    console.log('dashboard: activeVpn=', !!activeVpn);
 
     if (activeVpn && activeVpn.updatedAt) {
       const now = new Date();
@@ -360,7 +359,6 @@ const getVpnStatus = async (userId) => {
       const minutes = Math.floor((diffMs % 3600000) / 60000);
       connectionTime = `${hours}h ${minutes}m`;
     }
-    console.log('dashboard: connectionTime=', connectionTime);
   } catch (error) {
     console.error('Error getting active VPN:', error);
   }
@@ -595,7 +593,6 @@ const getDataTransferStats = async (userId) => {
       ],
       raw: true
     });
-    console.log('dashboard: dataTransferStats=', dataTransferStats);
 
     const sentValue = dataTransferStats[0]?.totalBytesSent ?? null;
     const receivedValue = dataTransferStats[0]?.totalBytesReceived ?? null;
@@ -659,7 +656,6 @@ const getDashboard = async (req, res) => {
     }
     
     const userId = req.user.id;
-    console.log('dashboard: userId=', userId);
 
     // Update user activity heartbeat
     await updateUserActivityHeartbeat(userId);
@@ -685,17 +681,13 @@ const getDashboard = async (req, res) => {
     // Get active users
     let activeUsers = [];
     try {
-      console.log(`dashboard: Getting active users for user ${userId}, role: ${req.user.role}`);
       activeUsers = await getActiveUsers(userId, req.user.role);
-      console.log(`dashboard: Found ${activeUsers.length} active users for ${req.user.role}`);
-      if (activeUsers.length > 0) {
-        console.log(`dashboard: Active users:`, activeUsers.map(u => u.email));
-      } else {
-        console.log(`dashboard: No active users found (current user ${userId} is excluded)`);
-      }
     } catch (activeUsersError) {
       console.error('Error getting active users:', activeUsersError);
-      console.error('Active users error stack:', activeUsersError.stack);
+      // Only log stack trace in development
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Active users error stack:', activeUsersError.stack);
+      }
     }
 
     res.status(200).json({
