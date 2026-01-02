@@ -309,6 +309,29 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                     >
                         Security Profiles
                     </button>
+                    <button
+                        onMouseEnter={() => setNavHover('scan')}
+                        onMouseLeave={() => setNavHover(null)}
+                        onClick={() => setCurrentView('scan')}
+                        style={{
+                            width: '100%',
+                            padding: '12px 15px',
+                            marginBottom: '10px',
+                            backgroundColor: currentView === 'scan' || navHover === 'scan'
+                                ? (theme === 'light' ? palette.accentSoft : (currentView === 'scan' ? '#1E402C' : 'rgba(255, 255, 255, 0.1)'))
+                                : 'transparent',
+                            color: currentView === 'scan' || navHover === 'scan' ? palette.accent : palette.text,
+                            border: currentView === 'scan' || navHover === 'scan' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                            borderRadius: '10px',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            transition: 'all 0.15s ease',
+                            boxShadow: navHover === 'scan' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                        }}
+                    >
+                        URL Scanner
+                    </button>
 
                     {/* Activity Log and Notification - Only for non-admin users */}
                     {user.role !== 'admin' && (
@@ -414,29 +437,6 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                                 }}
                             >
                                 User Management
-                            </button>
-                            <button
-                                onMouseEnter={() => setNavHover('scan')}
-                                onMouseLeave={() => setNavHover(null)}
-                                onClick={() => setCurrentView('scan')}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 15px',
-                                    marginBottom: '10px',
-                                    backgroundColor: currentView === 'scan' || navHover === 'scan'
-                                        ? (theme === 'light' ? palette.accentSoft : (currentView === 'scan' ? '#1E402C' : 'rgba(255, 255, 255, 0.1)'))
-                                        : 'transparent',
-                                    color: currentView === 'scan' || navHover === 'scan' ? palette.accent : palette.text,
-                                    border: currentView === 'scan' || navHover === 'scan' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                    borderRadius: '10px',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: navHover === 'scan' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                }}
-                            >
-                                URL Scanner
                             </button>
                             <button
                                 onMouseEnter={() => setNavHover('audit')}
