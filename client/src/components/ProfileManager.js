@@ -4,6 +4,8 @@ import ShareCreationModal from './ShareCreationModal';
 import ShareManagement from './ShareManagement';
 import countries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
+import vpnAPI from '../services/vpnAPI';
+import { firewallAPI } from '../services/api';
 countries.registerLocale(enLocale);
 
 const ConfirmModal = ({ message, onConfirm, onCancel, colors }) => {
@@ -362,33 +364,12 @@ const ProfileManager = ({ theme = 'dark', palette }) => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [sharingProfile, setSharingProfile] = useState(null);
   const [showShareManagement, setShowShareManagement] = useState(false);
-
+  const [vpnConfigs, setVpnConfigs] = useState([]);
 
 
 const showToast = (message, type = 'info') => {
     setToast({ message, type });
   };
-
-  const fetchFirewallRules = useCallback(async () => {
-    const res = await api.get('/firewall');
-    setFirewallRules(res.data.data || []);
-  }, []);
-
-
-
-useEffect(() => {
-  fetchProfiles();
-  fetchLogs();
-  fetchFirewallRules();
-  const handleClickOutside = (e) => {
-    if (!e.target.closest('.country-input-container')) {
-      setShowCountrySuggestions(false);
-    }
-  };
-  document.addEventListener('mousedown', handleClickOutside);
-  return () => document.removeEventListener('mousedown', handleClickOutside);
-}, [fetchFirewallRules]);
-
 
 
   const showConfirm = (message) => {
@@ -415,6 +396,7 @@ useEffect(() => {
     // VPN
     vpnEnabled: false,
     vpnServer: '',
+    vpnConfigId: '',
     vpnProtocol: 'OpenVPN',
     vpnPort: '',
     vpnUsername: '',
@@ -422,7 +404,7 @@ useEffect(() => {
     // Firewall
     firewallEnabled: true,
     defaultFirewallAction: 'DENY',
-    firewallRules: [],
+    firewallRuleId: '',
 
     // Scheduling
     isScheduled: false,
@@ -435,34 +417,60 @@ useEffect(() => {
 
     geoLocationCountries: [], 
   });
-    const selectedFirewallRules = firewallRules.filter(rule =>
-      formData.firewallRules.includes(rule.id)
-    );
 
-  useEffect(() => {
-    fetchProfiles();
-    fetchLogs();
-  }, []);
+  const fetchProfiles = useCallback(async () => {
+  try {
+    const response = await api.get('/profiles');
+    setProfiles(response.data.profiles);
+    setLoading(false);
+  } catch (error) {
+    console.error('Error fetching profiles:', error);
+    setLoading(false);
+  }
+}, []);
 
-  const fetchProfiles = async () => {
-    try {
-      const response = await api.get('/profiles');
-      setProfiles(response.data.profiles);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching profiles:', error);
-      setLoading(false);
+const fetchLogs = useCallback(async () => {
+  try {
+    const response = await api.get('/profiles/logs/all');
+    setLogs(response.data.logs);
+  } catch (error) {
+    console.error('Error fetching logs:', error);
+  }
+}, []);
+
+const fetchFirewallRules = useCallback(async () => {
+  try {
+    const res = await firewallAPI.getRules();
+    if (res.success) setFirewallRules(res.data || []);
+  } catch (error) {
+    console.error('Error fetching firewall rules:', error);
+  }
+}, []);
+
+const fetchVpnConfigs = useCallback(async () => {
+  try {
+    const res = await vpnAPI.getConfigs();
+    if (res.success) setVpnConfigs(res.data || []);
+  } catch (error) {
+    console.error('Error fetching VPN configs:', error);
+  }
+}, []);
+
+useEffect(() => {
+  fetchProfiles();
+  fetchLogs();
+  fetchFirewallRules();
+  fetchVpnConfigs();
+
+  const handleClickOutside = (e) => {
+    if (!e.target.closest('.country-input-container')) {
+      setShowCountrySuggestions(false);
     }
   };
 
-  const fetchLogs = async () => {
-    try {
-      const response = await api.get('/profiles/logs/all');
-      setLogs(response.data.logs);
-    } catch (error) {
-      console.error('Error fetching logs:', error);
-    }
-  };
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, [fetchProfiles, fetchLogs, fetchFirewallRules, fetchVpnConfigs]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -497,8 +505,9 @@ useEffect(() => {
           formData.vpnPort && !isNaN(formData.vpnPort)
             ? parseInt(formData.vpnPort)
             : null,
+        vpnConfigId: formData.vpnConfigId || null,
 
-        firewallRules: formData.firewallRules,
+        firewallRules: formData.firewallRuleId ? [formData.firewallRuleId] : [],
 
         allowedIps: formData.allowedIps
           ? formData.allowedIps
@@ -563,17 +572,18 @@ useEffect(() => {
 
       vpnEnabled: profile.vpnEnabled,
       vpnServer: profile.vpnServer || '',
+      vpnConfigId: profile.vpnConfigId || '',
       vpnProtocol: profile.vpnProtocol || 'OpenVPN',
       vpnPort: profile.vpnPort || '',
       vpnUsername: profile.vpnUsername || '',
 
-      firewallEnabled: profile.firewallEnabled,
-      defaultFirewallAction: profile.defaultFirewallAction || 'DENY',
-      firewallRules: Array.isArray(profile.firewallRules)
-        ? profile.firewallRules.map(r =>
-            typeof r === 'string' ? r : r.id
-          )
-        : [],
+    firewallEnabled: profile.firewallEnabled,
+    defaultFirewallAction: profile.defaultFirewallAction || 'DENY',
+    firewallRuleId: Array.isArray(profile.firewallRules) && profile.firewallRules.length > 0
+      ? (typeof profile.firewallRules[0] === 'string' 
+          ? profile.firewallRules[0] 
+          : profile.firewallRules[0].id)
+      : '', 
 
 
       dnsEnabled: profile.dnsEnabled,
@@ -690,13 +700,14 @@ const handleRemoveCountry = (countryToRemove) => {
       description: '',
       profileType: 'Custom',
       vpnEnabled: false,
+      vpnConfigId: '',
       vpnServer: '',
       vpnProtocol: 'OpenVPN',
       vpnPort: '',
       vpnUsername: '',
       firewallEnabled: true,
       defaultFirewallAction: 'DENY',
-      firewallRules: [],
+      firewallRuleId: '',
       dnsEnabled: false,
       primaryDns: '',
       secondaryDns: '',
@@ -1022,66 +1033,255 @@ const handleRemoveCountry = (countryToRemove) => {
                 <span>Enable VPN</span>
               </label>
 
-
               {formData.vpnEnabled && (
-                <div className="nested-fields">
-                  <div className="form-group">
-                    <label>VPN Server Address</label>
-                    <input
-                      type="text"
-                      name="vpnServer"
-                      placeholder="vpn.example.com"
-                      value={formData.vpnServer}
-                      onChange={handleInputChange}
-                      className="form-input"
-                      style={styles.formInput}
-                    />
+                <div className="nested-fields" style={{ marginTop: 16 }}>
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ 
+                      display: 'block', 
+                      marginBottom: 8, 
+                      color: colors.text, 
+                      fontWeight: 500 
+                    }}>
+                      Select VPN Configuration
+                    </label>
+                    <p style={{ 
+                      fontSize: 12, 
+                      color: colors.textMuted, 
+                      marginBottom: 12 
+                    }}>
+                      Choose a VPN configuration from your saved configs
+                    </p>
+                    
+                    {vpnConfigs.length === 0 ? (
+                      <p style={{ color: colors.textMuted, fontSize: 13 }}>
+                        No VPN configurations available. Create VPN configs in the VPN Management section first.
+                      </p>
+                    ) : (
+                      <div style={{ 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: 10,
+                        maxHeight: 300,
+                        overflowY: 'auto',
+                        padding: 4
+                      }}>
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: 12,
+                            padding: 12,
+                            borderRadius: 8,
+                            border: `2px solid ${!formData.vpnConfigId ? colors.accent : colors.border}`,
+                            backgroundColor: !formData.vpnConfigId
+                              ? (theme === 'dark' ? 'rgba(54,226,123,0.08)' : colors.accentSoft)
+                              : colors.bgPanel,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (formData.vpnConfigId) {
+                              e.currentTarget.style.borderColor = colors.textMuted;
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (formData.vpnConfigId) {
+                              e.currentTarget.style.borderColor = colors.border;
+                            }
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="vpnConfigSelection"
+                            checked={!formData.vpnConfigId}
+                            onChange={() => {
+                              setFormData({
+                                ...formData,
+                                vpnConfigId: ''
+                              });
+                            }}
+                            style={{
+                              marginTop: 2,
+                              cursor: 'pointer',
+                              width: 16,
+                              height: 16,
+                              accentColor: colors.accent
+                            }}
+                          />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ 
+                              fontSize: 14, 
+                              fontWeight: 700, 
+                              color: colors.text,
+                              marginBottom: 4
+                            }}>
+                              No VPN Configuration (Default)
+                            </div>
+                            <div style={{ fontSize: 12, color: colors.textMuted }}>
+                              Continue without VPN
+                            </div>
+                          </div>
+                        </label>
+                        
+                        {vpnConfigs.map((vpn, index) => {
+                          const isSelected = formData.vpnConfigId === vpn.id;
+                          return (
+                            <label
+                              key={vpn.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                gap: 12,
+                                padding: 12,
+                                borderRadius: 8,
+                                border: `2px solid ${isSelected ? colors.accent : colors.border}`,
+                                backgroundColor: isSelected 
+                                  ? (theme === 'dark' ? 'rgba(54,226,123,0.08)' : colors.accentSoft)
+                                  : colors.bgPanel,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.borderColor = colors.textMuted;
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.borderColor = colors.border;
+                                }
+                              }}
+                            >
+                              <input
+                                type="radio"
+                                name="vpnConfigSelection"
+                                checked={isSelected}
+                                onChange={() => {
+                                  setFormData({
+                                    ...formData,
+                                    vpnConfigId: vpn.id
+                                  });
+                                }}
+                                style={{
+                                  marginTop: 2,
+                                  cursor: 'pointer',
+                                  width: 16,
+                                  height: 16,
+                                  accentColor: colors.accent
+                                }}
+                              />
+                              
+                              <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                  <span
+                                    style={{
+                                      fontSize: 14,
+                                      fontWeight: 700,
+                                      color: colors.text,
+                                    }}
+                                  >
+                                    {vpn.name}
+                                  </span>
+                                  
+                                  <span
+                                    style={{
+                                      padding: '3px 10px',
+                                      borderRadius: 12,
+                                      fontSize: 11,
+                                      fontWeight: 600,
+                                      backgroundColor: theme === 'dark' ? '#1E402C' : '#e6f4ed',
+                                      color: theme === 'dark' ? '#36E27B' : '#1fa45a',
+                                    }}
+                                  >
+                                    {vpn.protocol}
+                                  </span>
+                                  
+                                  {vpn.isActive && (
+                                    <span
+                                      style={{
+                                        padding: '3px 8px',
+                                        borderRadius: 12,
+                                        fontSize: 11,
+                                        backgroundColor: colors.accentSoft,
+                                        color: colors.accent,
+                                        fontWeight: 600
+                                      }}
+                                    >
+                                      ● Active
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 3 }}>
+                                  <strong>File:</strong> {vpn.configFileName}
+                                </div>
+
+                                {vpn.description && (
+                                  <div
+                                    style={{
+                                      fontSize: 12,
+                                      fontStyle: 'italic',
+                                      color: colors.textMuted,
+                                      marginTop: 6,
+                                    }}
+                                  >
+                                    "{vpn.description}"
+                                  </div>
+                                )}
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="form-group">
-                    <label>Protocol</label>
-                    <select
-                      name="vpnProtocol"
-                      value={formData.vpnProtocol}
-                      onChange={handleInputChange}
-                      className="form-select"
-                      style={styles.select}
-                    >
-                      <option value="OpenVPN">OpenVPN</option>
-                      <option value="WireGuard">WireGuard</option>
-                      <option value="IKEv2">IKEv2</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Port</label>
-                    <input
-                      type="number"
-                      name="vpnPort"
-                      placeholder="1194"
-                      value={formData.vpnPort}
-                      onChange={handleInputChange}
-                      className="form-input"
-                      style={styles.formInput}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Username</label>
-                    <input
-                      type="text"
-                      name="vpnUsername"
-                      placeholder="username"
-                      value={formData.vpnUsername}
-                      onChange={handleInputChange}
-                      className="form-input"
-                      style={styles.formInput}
-                    />
-                  </div>
+                  {/* Selected VPN Summary */}
+                  {formData.vpnConfigId && vpnConfigs.find(v => v.id === formData.vpnConfigId) && (
+                    <div style={{ 
+                      marginTop: 16, 
+                      padding: 12, 
+                      backgroundColor: colors.bgCard,
+                      borderRadius: 8,
+                      border: `1px solid ${colors.accent}`
+                    }}>
+                      <div style={{ 
+                        fontSize: 13, 
+                        fontWeight: 600, 
+                        color: colors.text,
+                        marginBottom: 8,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6
+                      }}>
+                        <span>✓</span> Selected VPN Configuration
+                      </div>
+                      <div style={{ fontSize: 12, color: colors.textMuted }}>
+                        {(() => {
+                          const selectedVpn = vpnConfigs.find(v => v.id === formData.vpnConfigId);
+                          return (
+                            <div style={{ 
+                              padding: 8,
+                              backgroundColor: colors.bgPanel,
+                              borderRadius: 6,
+                              border: `1px solid ${colors.border}`
+                            }}>
+                              <div style={{ fontWeight: 600, color: colors.text, marginBottom: 4 }}>
+                                {selectedVpn.name}
+                              </div>
+                              <div>
+                                {selectedVpn.protocol} - {selectedVpn.configFileName}
+                                {selectedVpn.description && ` - ${selectedVpn.description}`}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-
             {/* Firewall Rules Selection */}
             <div className="form-section" style={styles.formSection}>
               <h4
@@ -1097,10 +1297,19 @@ const handleRemoveCountry = (countryToRemove) => {
               </h4>
 
               <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', marginBottom: 8, color: colors.text, fontWeight: 500 }}>
-                  Select Firewall Rule Set to Apply
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: 8, 
+                  color: colors.text, 
+                  fontWeight: 500 
+                }}>
+                  Select Firewall Rule to Apply
                 </label>
-                <p style={{ fontSize: 12, color: colors.textMuted, marginBottom: 12 }}>
+                <p style={{ 
+                  fontSize: 12, 
+                  color: colors.textMuted, 
+                  marginBottom: 12 
+                }}>
                   Choose one firewall rule configuration for this profile
                 </p>
                 
@@ -1124,20 +1333,20 @@ const handleRemoveCountry = (countryToRemove) => {
                         gap: 12,
                         padding: 12,
                         borderRadius: 8,
-                        border: `2px solid ${formData.firewallRules.length === 0 ? colors.accent : colors.border}`,
-                        backgroundColor: formData.firewallRules.length === 0
+                        border: `2px solid ${!formData.firewallRuleId ? colors.accent : colors.border}`,
+                        backgroundColor: !formData.firewallRuleId
                           ? (theme === 'dark' ? 'rgba(54,226,123,0.08)' : colors.accentSoft)
                           : colors.bgPanel,
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
                       }}
                       onMouseEnter={(e) => {
-                        if (formData.firewallRules.length !== 0) {
+                        if (formData.firewallRuleId) {
                           e.currentTarget.style.borderColor = colors.textMuted;
                         }
                       }}
                       onMouseLeave={(e) => {
-                        if (formData.firewallRules.length !== 0) {
+                        if (formData.firewallRuleId) {
                           e.currentTarget.style.borderColor = colors.border;
                         }
                       }}
@@ -1145,11 +1354,11 @@ const handleRemoveCountry = (countryToRemove) => {
                       <input
                         type="radio"
                         name="firewallRuleSelection"
-                        checked={formData.firewallRules.length === 0}
+                        checked={!formData.firewallRuleId}
                         onChange={() => {
                           setFormData({
                             ...formData,
-                            firewallRules: []
+                            firewallRuleId: ''
                           });
                         }}
                         style={{
@@ -1176,7 +1385,54 @@ const handleRemoveCountry = (countryToRemove) => {
                     </label>
                     
                     {firewallRules.map((rule, index) => {
-                      const isSelected = formData.firewallRules.includes(rule.id);
+                      const isSelected = formData.firewallRuleId === rule.id;
+                      
+                      // Helper functions for display
+                      const getProtocolText = (protocol) => {
+                        if (protocol === 0) return 'TCP';
+                        if (protocol === 1) return 'UDP';
+                        if (protocol === 2) return 'BOTH';
+                        return 'ANY';
+                      };
+
+                      const getActionText = (action) => {
+                        if (action === 0) return 'ACCEPT';
+                        if (action === 1) return 'REJECT';
+                        if (action === 2) return 'DROP';
+                        return 'DENY';
+                      };
+
+                      const getActionColor = (action) => {
+                        if (action === 0) {
+                          return {
+                            bg: theme === 'dark' ? '#1E402C' : '#e6f4ed',
+                            color: theme === 'dark' ? '#36E27B' : '#1fa45a',
+                            icon: '✓'
+                          };
+                        }
+                        if (action === 1) {
+                          return {
+                            bg: theme === 'dark' ? '#40301E' : '#fef3c7',
+                            color: theme === 'dark' ? '#F59E0B' : '#d97706',
+                            icon: '⚠'
+                          };
+                        }
+                        if (action === 2) {
+                          return {
+                            bg: theme === 'dark' ? '#40201E' : '#fee2e2',
+                            color: theme === 'dark' ? '#FF7777' : '#d4183d',
+                            icon: '✗'
+                          };
+                        }
+                        return {
+                          bg: colors.bgPanel,
+                          color: colors.textMuted,
+                          icon: '—'
+                        };
+                      };
+
+                      const actionStyle = getActionColor(rule.action);
+
                       return (
                         <label
                           key={rule.id}
@@ -1211,7 +1467,7 @@ const handleRemoveCountry = (countryToRemove) => {
                             onChange={() => {
                               setFormData({
                                 ...formData,
-                                firewallRules: [rule.id]
+                                firewallRuleId: rule.id
                               });
                             }}
                             style={{
@@ -1224,7 +1480,7 @@ const handleRemoveCountry = (countryToRemove) => {
                           />
                           
                           <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
                               <span
                                 style={{
                                   fontSize: 14,
@@ -1237,30 +1493,15 @@ const handleRemoveCountry = (countryToRemove) => {
                               
                               <span
                                 style={{
-                                  fontSize: 10,
-                                  color: colors.textMuted,
-                                  fontFamily: 'monospace',
-                                  opacity: 0.6
-                                }}
-                              >
-                                
-                              </span>
-                              
-                              <span
-                                style={{
                                   padding: '3px 10px',
                                   borderRadius: 12,
                                   fontSize: 11,
                                   fontWeight: 600,
-                                  backgroundColor: rule.action === 'allow'
-                                    ? (theme === 'dark' ? '#1E402C' : '#e6f4ed')
-                                    : (theme === 'dark' ? '#40201E' : '#fee2e2'),
-                                  color: rule.action === 'allow'
-                                    ? (theme === 'dark' ? '#36E27B' : '#1fa45a')
-                                    : (theme === 'dark' ? '#FF7777' : '#d4183d'),
+                                  backgroundColor: actionStyle.bg,
+                                  color: actionStyle.color,
                                 }}
                               >
-                                {rule.action === 'allow' ? '✓' : '✗'} {rule.action.toUpperCase()}
+                                {actionStyle.icon} {getActionText(rule.action)}
                               </span>
                               
                               <span
@@ -1273,34 +1514,42 @@ const handleRemoveCountry = (countryToRemove) => {
                                   fontWeight: 500
                                 }}
                               >
-                                {(rule.protocol || 'any').toUpperCase()}
+                                {getProtocolText(rule.protocol)}
                               </span>
                               
-                              <span style={{ fontSize: 11, color: colors.textMuted }}>
-                                {rule.direction.toUpperCase()}
+                              <span
+                                style={{
+                                  padding: '3px 8px',
+                                  borderRadius: 12,
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  backgroundColor: rule.direction === 'inbound'
+                                    ? (theme === 'dark' ? '#1E3A2E' : '#e6f4ed')
+                                    : (theme === 'dark' ? '#3A2E1E' : '#fef3c7'),
+                                  color: rule.direction === 'inbound'
+                                    ? (theme === 'dark' ? '#36E27B' : '#1fa45a')
+                                    : (theme === 'dark' ? '#F59E0B' : '#d97706')
+                                }}
+                              >
+                                {rule.direction === 'inbound' ? '↓ IN' : '↑ OUT'}
                               </span>
                             </div>
 
                             <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 3 }}>
-                              <strong>Source:</strong> {rule.sourceIP || 'Any'}:{rule.sourcePort || 'Any'}
+                              <strong>IP:</strong> {rule.ip_address}
                             </div>
 
                             <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 3 }}>
-                              <strong>Destination:</strong> {rule.destinationIP || 'Any'}:{rule.destinationPort || 'Any'}
+                              <strong>Ports:</strong> {
+                                rule.port_start !== null && rule.port_end !== null
+                                  ? `${rule.port_start}-${rule.port_end}`
+                                  : rule.port_start !== null
+                                    ? `${rule.port_start}`
+                                    : rule.port_end !== null
+                                      ? `${rule.port_end}`
+                                      : 'All ports'
+                              }
                             </div>
-
-                            {rule.description && (
-                              <div
-                                style={{
-                                  fontSize: 12,
-                                  fontStyle: 'italic',
-                                  color: colors.textMuted,
-                                  marginTop: 6,
-                                }}
-                              >
-                                "{rule.description}"
-                              </div>
-                            )}
                           </div>
                         </label>
                       );
@@ -1310,48 +1559,74 @@ const handleRemoveCountry = (countryToRemove) => {
               </div>
 
               {/* Selected Rule Summary */}
-              {selectedFirewallRules.length > 0 && (
-                <div style={{ 
-                  marginTop: 16, 
-                  padding: 12, 
-                  backgroundColor: colors.bgCard,
-                  borderRadius: 8,
-                  border: `1px solid ${colors.accent}`
-                }}>
+              {formData.firewallRuleId && (() => {
+                const selectedRule = firewallRules.find(r => r.id === formData.firewallRuleId);
+                if (!selectedRule) return null;
+
+                const getProtocolText = (protocol) => {
+                  if (protocol === 0) return 'TCP';
+                  if (protocol === 1) return 'UDP';
+                  if (protocol === 2) return 'BOTH';
+                  return 'ANY';
+                };
+
+                const getActionText = (action) => {
+                  if (action === 0) return 'ACCEPT';
+                  if (action === 1) return 'REJECT';
+                  if (action === 2) return 'DROP';
+                  return 'DENY';
+                };
+
+                const ruleIndex = firewallRules.findIndex(r => r.id === selectedRule.id);
+
+                return (
                   <div style={{ 
-                    fontSize: 13, 
-                    fontWeight: 600, 
-                    color: colors.text,
-                    marginBottom: 8,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6
+                    marginTop: 16, 
+                    padding: 12, 
+                    backgroundColor: colors.bgCard,
+                    borderRadius: 8,
+                    border: `1px solid ${colors.accent}`
                   }}>
-                    <span>✓</span> Selected Rule
-                  </div>
-                  <div style={{ fontSize: 12, color: colors.textMuted }}>
-                    {selectedFirewallRules.map((rule) => {
-                      const ruleIndex = firewallRules.findIndex(r => r.id === rule.id);
-                      return (
-                        <div key={rule.id} style={{ 
-                          padding: 8,
-                          backgroundColor: colors.bgPanel,
-                          borderRadius: 6,
-                          border: `1px solid ${colors.border}`
-                        }}>
-                          <div style={{ fontWeight: 600, color: colors.text, marginBottom: 4 }}>
-                            Firewall Rule {ruleIndex + 1}
-                          </div>
-                          <div>
-                            {rule.action.toUpperCase()} - {rule.protocol.toUpperCase()} ({rule.direction})
-                            {rule.description && ` - ${rule.description}`}
-                          </div>
+                    <div style={{ 
+                      fontSize: 13, 
+                      fontWeight: 600, 
+                      color: colors.text,
+                      marginBottom: 8,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6
+                    }}>
+                      <span>✓</span> Selected Firewall Rule
+                    </div>
+                    <div style={{ fontSize: 12, color: colors.textMuted }}>
+                      <div style={{ 
+                        padding: 8,
+                        backgroundColor: colors.bgPanel,
+                        borderRadius: 6,
+                        border: `1px solid ${colors.border}`
+                      }}>
+                        <div style={{ fontWeight: 600, color: colors.text, marginBottom: 4 }}>
+                          Firewall Rule {ruleIndex + 1}
                         </div>
-                      );
-                    })}
+                        <div>
+                          {getActionText(selectedRule.action)} - {getProtocolText(selectedRule.protocol)} ({selectedRule.direction || 'inbound'})
+                        </div>
+                        <div style={{ marginTop: 4 }}>
+                          IP: {selectedRule.ip_address} | Ports: {
+                            selectedRule.port_start !== null && selectedRule.port_end !== null
+                              ? `${selectedRule.port_start}-${selectedRule.port_end}`
+                              : selectedRule.port_start !== null
+                                ? `${selectedRule.port_start}`
+                                : selectedRule.port_end !== null
+                                  ? `${selectedRule.port_end}`
+                                  : 'All'
+                          }
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
 
             
@@ -1924,7 +2199,6 @@ const handleRemoveCountry = (countryToRemove) => {
                           alignItems: 'center',
                           gap: '8px',
                         }}
-
                       >
                         <strong
                           style={{
@@ -1935,50 +2209,62 @@ const handleRemoveCountry = (countryToRemove) => {
                           VPN:
                         </strong>
 
-                        {profile.vpnEnabled ? (
-                          <span
-                            style={{ color: colors.accent, fontWeight: 500 }}
-                          >
+                        {profile.vpnEnabled && profile.vpnConfigId ? (
+                          <span style={{ color: colors.accent, fontWeight: 500 }}>
+                            ✓ Enabled ({(() => {
+                              const vpn = vpnConfigs.find(v => v.id === profile.vpnConfigId);
+                              return vpn ? `${vpn.name} - ${vpn.protocol}` : profile.vpnProtocol;
+                            })()})
+                          </span>
+                        ) : profile.vpnEnabled ? (
+                          <span style={{ color: colors.accent, fontWeight: 500 }}>
                             ✓ Enabled ({profile.vpnProtocol})
                           </span>
                         ) : (
-                          <span
-                            style={{ color: colors.danger, fontWeight: 500 }}
-                          >
+                          <span style={{ color: colors.danger, fontWeight: 500 }}>
                             ✗ Disabled
                           </span>
                         )}
                       </div>
 
                       <div 
-                        className="setting-item" 
+                        className="setting-item"
                         style={{ 
                           display: 'grid',
                           gridTemplateColumns: '120px auto',
                           alignItems: 'center',
                           gap: '8px',
                         }}
-
                       >
                         <strong style={{ color: colors.textMuted, fontWeight: 600 }}>
                           Firewall:
                         </strong>
 
-                        {profile.firewallEnabled ? (
-                          <span
-                            style={{ color: colors.accent, fontWeight: 500 }}
-                          >
+                        {profile.firewallEnabled && Array.isArray(profile.firewallRules) && profile.firewallRules.length > 0 ? (
+                          <span style={{ color: colors.accent, fontWeight: 500 }}>
+                            ✓ Enabled ({(() => {
+                              const ruleId = typeof profile.firewallRules[0] === 'string' 
+                                ? profile.firewallRules[0] 
+                                : profile.firewallRules[0]?.id;
+                              const rule = firewallRules.find(r => r.id === ruleId);
+                              if (rule) {
+                                const action = rule.action === 0 ? 'ACCEPT' : rule.action === 1 ? 'REJECT' : 'DROP';
+                                const protocol = rule.protocol === 0 ? 'TCP' : rule.protocol === 1 ? 'UDP' : 'BOTH';
+                                return `${action} - ${protocol}`;
+                              }
+                              return profile.defaultFirewallAction;
+                            })()})
+                          </span>
+                        ) : profile.firewallEnabled ? (
+                          <span style={{ color: colors.accent, fontWeight: 500 }}>
                             ✓ Enabled ({profile.defaultFirewallAction})
                           </span>
                         ) : (
-                          <span
-                            style={{ color: colors.danger, fontWeight: 500 }}
-                          >
+                          <span style={{ color: colors.danger, fontWeight: 500 }}>
                             ✗ Disabled
                           </span>
                         )}
                       </div>
-
                       <div 
                         className="setting-item"
                         style={{ 
