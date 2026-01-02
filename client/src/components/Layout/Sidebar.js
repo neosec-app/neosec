@@ -325,14 +325,6 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                     <nav className="flex-1 space-y-2 text-sm">
                         {/* HIERARCHY */}
                         <SidebarButton label="Subscription" view="subscription" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
-
-                        {user.accountType === "leader" && (
-                            <>
-                                <SidebarButton label="My Groups" view="groups" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
-                                <SidebarButton label="Member Security" view="member-security" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
-                            </>
-                        )}
-
                         <SidebarButton label="Invitations" view="invitations" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
                     </nav>
 
