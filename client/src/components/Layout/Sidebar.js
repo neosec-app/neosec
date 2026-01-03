@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import SidebarButton from './SidebarButton';
+//import { FiShield} from 'react-icons/fi';
+
 
 function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, isMobile, isTablet, sidebarOpen, setSidebarOpen, handleLogout }) {
     const [navHover, setNavHover] = useState(null);
@@ -123,17 +125,14 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                                 onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
                             >
                                 <div style={{
-                                    width: '14px',
-                                    height: '14px',
-                                    borderRadius: '4px',
-                                    background: theme === 'dark' ? '#7c8bff' : '#030213'
+                                    
                                 }} />
                                 <h2 style={{
                                     color: palette.accent,
                                     margin: 0,
                                     fontSize: isMobile ? '18px' : '20px',
                                     letterSpacing: '0.2px'
-                                }}>NeoSec</h2>
+                                }}> 🛡 NeoSec</h2>
                             </button>
 
                             <p style={{
@@ -310,6 +309,29 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                     >
                         Security Profiles
                     </button>
+                    <button
+                        onMouseEnter={() => setNavHover('scan')}
+                        onMouseLeave={() => setNavHover(null)}
+                        onClick={() => setCurrentView('scan')}
+                        style={{
+                            width: '100%',
+                            padding: '12px 15px',
+                            marginBottom: '10px',
+                            backgroundColor: currentView === 'scan' || navHover === 'scan'
+                                ? (theme === 'light' ? palette.accentSoft : (currentView === 'scan' ? '#1E402C' : 'rgba(255, 255, 255, 0.1)'))
+                                : 'transparent',
+                            color: currentView === 'scan' || navHover === 'scan' ? palette.accent : palette.text,
+                            border: currentView === 'scan' || navHover === 'scan' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                            borderRadius: '10px',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            transition: 'all 0.15s ease',
+                            boxShadow: navHover === 'scan' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
+                        }}
+                    >
+                        URL Scanner
+                    </button>
 
                     {/* Activity Log and Notification - Only for non-admin users */}
                     {user.role !== 'admin' && (
@@ -326,14 +348,6 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                     <nav className="flex-1 space-y-2 text-sm">
                         {/* HIERARCHY */}
                         <SidebarButton label="Subscription" view="subscription" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
-
-                        {user.accountType === "leader" && (
-                            <>
-                                <SidebarButton label="My Groups" view="groups" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
-                                <SidebarButton label="Member Security" view="member-security" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
-                            </>
-                        )}
-
                         <SidebarButton label="Invitations" view="invitations" currentView={currentView} setCurrentView={setCurrentView} theme={theme} palette={palette} />
                     </nav>
 
@@ -415,29 +429,6 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                                 }}
                             >
                                 User Management
-                            </button>
-                            <button
-                                onMouseEnter={() => setNavHover('scan')}
-                                onMouseLeave={() => setNavHover(null)}
-                                onClick={() => setCurrentView('scan')}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 15px',
-                                    marginBottom: '10px',
-                                    backgroundColor: currentView === 'scan' || navHover === 'scan'
-                                        ? (theme === 'light' ? palette.accentSoft : (currentView === 'scan' ? '#1E402C' : 'rgba(255, 255, 255, 0.1)'))
-                                        : 'transparent',
-                                    color: currentView === 'scan' || navHover === 'scan' ? palette.accent : palette.text,
-                                    border: currentView === 'scan' || navHover === 'scan' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                    borderRadius: '10px',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: navHover === 'scan' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                }}
-                            >
-                                URL Scanner
                             </button>
                             <button
                                 onMouseEnter={() => setNavHover('audit')}

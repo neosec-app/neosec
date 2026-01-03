@@ -157,6 +157,8 @@ const connectDB = async () => {
             const hasAccountType = columnNames.includes('accountType') || columnNames.includes('account_type');
             const hasSubscriptionTier = columnNames.includes('subscriptionTier') || columnNames.includes('subscription_tier');
             const hasIsPaid = columnNames.includes('isPaid') || columnNames.includes('is_paid');
+            const hasName = columnNames.includes('name');
+            const hasPhone = columnNames.includes('phone');
             
             // isApproved should already exist, but check anyway
             if (!hasIsApproved) {
@@ -188,6 +190,8 @@ const connectDB = async () => {
             if (!hasAccountType) missingColumns.push('accountType');
             if (!hasSubscriptionTier) missingColumns.push('subscriptionTier');
             if (!hasIsPaid) missingColumns.push('isPaid');
+            if (!hasName) missingColumns.push('name');
+            if (!hasPhone) missingColumns.push('phone');
             
             if (missingColumns.length > 0) {
                 console.log(`Missing columns detected: ${missingColumns.join(', ')}. Adding them...`);
@@ -227,8 +231,22 @@ const connectDB = async () => {
                 
                 if (missingColumns.includes('isPaid')) {
                     await sequelize.query(`
-                        ALTER TABLE users 
+                        ALTER TABLE users
                         ADD COLUMN IF NOT EXISTS is_paid BOOLEAN DEFAULT false;
+                    `);
+                }
+
+                if (missingColumns.includes('name')) {
+                    await sequelize.query(`
+                        ALTER TABLE users
+                        ADD COLUMN IF NOT EXISTS name VARCHAR(100);
+                    `);
+                }
+
+                if (missingColumns.includes('phone')) {
+                    await sequelize.query(`
+                        ALTER TABLE users
+                        ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
                     `);
                 }
                 
