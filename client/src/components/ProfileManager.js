@@ -497,6 +497,13 @@ useEffect(() => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate profile name
+    if (!formData.name || formData.name.trim().length < 3 || formData.name.trim().length > 50) {
+      showToast('Profile name must be between 3 and 50 characters', 'error');
+      return;
+    }
+    
     try {
       const submitData = {
         ...formData,
@@ -988,9 +995,17 @@ const handleRemoveCountry = (countryToRemove) => {
                   value={formData.name}
                   onChange={handleInputChange}
                   required
+                  minLength={3}
+                  maxLength={50}
+                  placeholder="Enter profile name (3-50 characters)"
                   className="form-input"
                   style={styles.formInput}
                 />
+                {formData.name && (formData.name.length < 3 || formData.name.length > 50) && (
+                  <div style={{ color: colors.danger, fontSize: '12px', marginTop: '4px' }}>
+                    Profile name must be between 3 and 50 characters
+                  </div>
+                )}
               </div>
 
               <div className="form-group">

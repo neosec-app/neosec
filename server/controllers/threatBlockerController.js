@@ -1,3 +1,4 @@
+// Import models and services for threat blocker functionality
 const BlocklistIP = require('../models/BlocklistIP');
 const ActivityLog = require('../models/ActivityLog');
 const Notification = require('../models/Notification');
@@ -10,11 +11,11 @@ const abuseIPDBService = require('../services/abuseIPDBService');
 const freeBlocklistService = require('../services/freeBlocklistService');
 const { getSchedulerStatus } = require('../services/threatBlockerScheduler');
 
-// Cache table existence check to avoid repeated queries
+// Cache to avoid repeated database table existence checks
 let tableExistsCache = null;
 let tableExistsChecked = false;
 
-// Helper function to get setting value
+// Helper function to retrieve threat blocker setting from database
 async function getSetting(key, defaultValue) {
   try {
     // Check table existence only once (cache it)
@@ -53,7 +54,7 @@ async function getSetting(key, defaultValue) {
   }
 }
 
-// Helper function to set setting value
+// Helper function to save threat blocker setting to database
 async function setSetting(key, value) {
   try {
     // Check if table exists first, if not, create it
@@ -79,94 +80,142 @@ async function setSetting(key, value) {
   }
 }
 
-/**
- * Get threat blocker status and statistics
- */
+// Helper function to calculate date ranges for statistics queries
+const getDateRanges = () => {
+  const now = new Date();
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  const weekStart = new Date(now);
+  weekStart.setDate(weekStart.getDate() - 7);
+  weekStart.setHours(0, 0, 0, 0);
+
+  return { now, todayStart, weekStart };
+};
+
+// Helper function to gather blocklist statistics including total IPs and sources
+const getBlocklistStats = async () => {
+  // Get last update time
+  const lastUpdate = await BlocklistIP.findOne({
+    order: [['updatedAt', 'DESC']],
+    attributes: ['updatedAt']
+  });
+
+  // Get total IPs in blocklist
+  const totalIPs = await BlocklistIP.count();
+
+  // Get unique sources
+  const sources = await BlocklistIP.findAll({
+    attributes: ['source'],
+    group: ['source'],
+    raw: true
+  });
+
+  // Get unique threat types
+  const threatTypes = await BlocklistIP.findAll({
+    attributes: ['threatType'],
+    group: ['threatType'],
+    raw: true
+  });
+
+  return {
+    lastUpdate: lastUpdate ? lastUpdate.updatedAt : null,
+    totalIPs,
+    sources: sources.map(s => s.source),
+    threatTypes: threatTypes.map(t => t.threatType)
+  };
+};
+
+// Helper function to count threats blocked today and this week
+const getBlockedThreatsCount = async (todayStart, weekStart) => {
+  let blockedToday = 0;
+  let blockedThisWeek = 0;
+
+  try {
+    blockedToday = await ActivityLog.count({
+      where: {
+        eventType: 'Blocked Threat',
+        status: 'Blocked',
+        createdAt: {
+          [Op.gte]: todayStart
+        }
+      }
+    });
+
+    // Get threats blocked this week
+    blockedThisWeek = await ActivityLog.count({
+      where: {
+        eventType: 'Blocked Threat',
+        status: 'Blocked',
+        createdAt: {
+          [Op.gte]: weekStart
+        }
+      }
+    });
+  } catch (logError) {
+    // If ActivityLog table doesn't exist yet, use 0
+    console.warn('ActivityLog table might not exist yet:', logError.message);
+  }
+
+  return { blockedToday, blockedThisWeek };
+};
+
+// Helper function to retrieve current threat blocker configuration settings
+const getThreatBlockerSettings = async () => {
+  // Get actual scheduler status dynamically
+  const schedulerStatus = getSchedulerStatus();
+  
+  // Get settings from database
+  const enabled = await getSetting('enabled', schedulerStatus.isRunning);
+  const updateFrequency = await getSetting('updateFrequency', schedulerStatus.frequency || 'daily');
+  const autoApply = await getSetting('autoApply', true);
+  const notificationsEnabled = await getSetting('notificationsEnabled', true);
+
+  return {
+    enabled: enabled !== false && schedulerStatus.isRunning,
+    updateFrequency: updateFrequency || schedulerStatus.frequency || 'daily',
+    autoApply: autoApply !== false,
+    notificationsEnabled: notificationsEnabled !== false,
+    schedulerStatus
+  };
+};
+
+// Helper function to format threat blocker status data for API response
+const formatStatusResponse = (blocklistStats, blockedThreats, settings) => {
+  return {
+    enabled: settings.enabled,
+    lastUpdate: blocklistStats.lastUpdate,
+    totalIPs: blocklistStats.totalIPs,
+    blockedToday: blockedThreats.blockedToday,
+    blockedThisWeek: blockedThreats.blockedThisWeek,
+    sources: blocklistStats.sources,
+    threatTypes: blocklistStats.threatTypes,
+    updateFrequency: settings.updateFrequency,
+    autoApply: settings.autoApply,
+    notificationsEnabled: settings.notificationsEnabled
+  };
+};
+
+// Function to retrieve threat blocker status and current statistics
 exports.getStatus = async (req, res) => {
   try {
-    const now = new Date();
-    const todayStart = new Date(now);
-    todayStart.setHours(0, 0, 0, 0);
-    const weekStart = new Date(now);
-    weekStart.setDate(weekStart.getDate() - 7);
-    weekStart.setHours(0, 0, 0, 0);
+    // Get date ranges
+    const { todayStart, weekStart } = getDateRanges();
 
-    // Get last update time
-    const lastUpdate = await BlocklistIP.findOne({
-      order: [['updatedAt', 'DESC']],
-      attributes: ['updatedAt']
-    });
+    // Get blocklist statistics
+    const blocklistStats = await getBlocklistStats();
 
-    // Get total IPs in blocklist
-    const totalIPs = await BlocklistIP.count();
+    // Get blocked threats count
+    const blockedThreats = await getBlockedThreatsCount(todayStart, weekStart);
 
-    // Get threats blocked today (count of distinct IPs that were blocked today)
-    // Note: This would typically come from ActivityLog, but for now we'll count blocklist entries
-    let blockedToday = 0;
-    let blockedThisWeek = 0;
-    try {
-      blockedToday = await ActivityLog.count({
-        where: {
-          eventType: 'Blocked Threat',
-          status: 'Blocked',
-          createdAt: {
-            [Op.gte]: todayStart
-          }
-        }
-      });
+    // Get threat blocker settings
+    const settings = await getThreatBlockerSettings();
 
-      // Get threats blocked this week
-      blockedThisWeek = await ActivityLog.count({
-        where: {
-          eventType: 'Blocked Threat',
-          status: 'Blocked',
-          createdAt: {
-            [Op.gte]: weekStart
-          }
-        }
-      });
-    } catch (logError) {
-      // If ActivityLog table doesn't exist yet, use 0
-      console.warn('ActivityLog table might not exist yet:', logError.message);
-    }
-
-    // Get unique sources
-    const sources = await BlocklistIP.findAll({
-      attributes: ['source'],
-      group: ['source'],
-      raw: true
-    });
-
-    // Get unique threat types
-    const threatTypes = await BlocklistIP.findAll({
-      attributes: ['threatType'],
-      group: ['threatType'],
-      raw: true
-    });
-
-    // Get actual scheduler status dynamically
-    const schedulerStatus = getSchedulerStatus();
-    
-    // Get settings from database
-    const enabled = await getSetting('enabled', schedulerStatus.isRunning);
-    const updateFrequency = await getSetting('updateFrequency', schedulerStatus.frequency || 'daily');
-    const autoApply = await getSetting('autoApply', true);
-    const notificationsEnabled = await getSetting('notificationsEnabled', true);
+    // Format and return response
+    const responseData = formatStatusResponse(blocklistStats, blockedThreats, settings);
 
     res.status(200).json({
       success: true,
-      data: {
-        enabled: enabled !== false && schedulerStatus.isRunning,
-        lastUpdate: lastUpdate ? lastUpdate.updatedAt : null,
-        totalIPs,
-        blockedToday,
-        blockedThisWeek,
-        sources: sources.map(s => s.source),
-        threatTypes: threatTypes.map(t => t.threatType),
-        updateFrequency: updateFrequency || schedulerStatus.frequency || 'daily',
-        autoApply: autoApply !== false,
-        notificationsEnabled: notificationsEnabled !== false
-      }
+      data: responseData
     });
   } catch (error) {
     console.error('Get status error:', error);
@@ -189,6 +238,7 @@ exports.getStatus = async (req, res) => {
           blockedToday: 0,
           blockedThisWeek: 0,
           sources: [],
+          threatTypes: [],
           updateFrequency: schedulerStatus.frequency || 'daily',
           autoApply: true,
           notificationsEnabled: true
@@ -204,11 +254,31 @@ exports.getStatus = async (req, res) => {
   }
 };
 
-/**
- * Get blocklist with pagination and filters
- */
+// Function to retrieve blocklist with pagination, search, and filtering options
 exports.getBlocklist = async (req, res) => {
   try {
+    // Valid ENUM values from BlocklistIP model
+    const validThreatTypes = [
+      'Malware C&C', 'Botnet', 'Brute Force', 'Malware Host',
+      'Phishing', 'DDoS', 'Spam', 'Exploit', 'Suspicious', 'Other'
+    ];
+
+    // Map common lowercase/alternative names to valid enum values
+    const threatTypeMap = {
+      'malware': 'Malware Host',
+      'malware host': 'Malware Host',
+      'malware c&c': 'Malware C&C',
+      'malware cnc': 'Malware C&C',
+      'botnet': 'Botnet',
+      'brute force': 'Brute Force',
+      'bruteforce': 'Brute Force',
+      'phishing': 'Phishing',
+      'ddos': 'DDoS',
+      'spam': 'Spam',
+      'exploit': 'Exploit',
+      'suspicious': 'Suspicious',
+      'other': 'Other'
+    };
 
     const {
       page = 1,
@@ -228,12 +298,25 @@ exports.getBlocklist = async (req, res) => {
       whereClause.ipAddress = { [Op.iLike]: `%${search}%` };
     }
 
+    // Validate and map threatType
     if (threatType && threatType !== 'all') {
-      whereClause.threatType = threatType;
+      const trimmedThreatType = threatType.trim();
+      // Check if it's a valid enum value (case-sensitive)
+      if (validThreatTypes.includes(trimmedThreatType)) {
+        whereClause.threatType = trimmedThreatType;
+      } else {
+        // Try to map from common names
+        const mappedType = threatTypeMap[trimmedThreatType.toLowerCase()];
+        if (mappedType) {
+          whereClause.threatType = mappedType;
+        }
+        // If no mapping found, ignore the filter (don't throw error)
+      }
     }
 
     if (source && source !== 'all') {
-      whereClause.source = source;
+      const trimmedSource = source.trim();
+      whereClause.source = trimmedSource;
     }
 
     // Build where clause properly - handle empty whereClause
@@ -290,9 +373,7 @@ exports.getBlocklist = async (req, res) => {
   }
 };
 
-/**
- * Force update blocklist from AbuseIPDB
- */
+// Function to manually trigger blocklist update from external sources
 exports.forceUpdate = async (req, res) => {
   try {
     const apiKey = process.env.ABUSEIPDB_API_KEY;
@@ -525,9 +606,7 @@ exports.forceUpdate = async (req, res) => {
   }
 };
 
-/**
- * Get statistics
- */
+// Function to retrieve detailed threat blocker statistics
 exports.getStats = async (req, res) => {
   try {
     const now = new Date();
@@ -594,9 +673,7 @@ exports.getStats = async (req, res) => {
   }
 };
 
-/**
- * Update settings
- */
+// Function to update threat blocker configuration settings
 exports.updateSettings = async (req, res) => {
   try {
     const { updateFrequency, autoApply, enabled, notificationsEnabled } = req.body;
@@ -760,9 +837,7 @@ exports.testThreatBlocker = async (req, res) => {
   }
 };
 
-/**
- * Export blocklist
- */
+// Function to export blocklist data in CSV or JSON format
 exports.exportBlocklist = async (req, res) => {
   try {
     const { format = 'csv' } = req.query;

@@ -6,6 +6,7 @@ import SidebarButton from './SidebarButton';
 function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, isMobile, isTablet, sidebarOpen, setSidebarOpen, handleLogout }) {
     const [navHover, setNavHover] = useState(null);
     const [logoutHover, setLogoutHover] = useState(false);
+    const [extrasDropdownOpen, setExtrasDropdownOpen] = useState(false);
 
     return (
         <>
@@ -453,29 +454,6 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                                 Audit Trail
                             </button>
                             <button
-                                onMouseEnter={() => setNavHover('system-health')}
-                                onMouseLeave={() => setNavHover(null)}
-                                onClick={() => setCurrentView('system-health')}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 15px',
-                                    marginBottom: '10px',
-                                    backgroundColor: currentView === 'system-health' || navHover === 'system-health'
-                                        ? (theme === 'light' ? palette.accentSoft : (currentView === 'system-health' ? '#1E402C' : 'rgba(255, 255, 255, 0.1)'))
-                                        : 'transparent',
-                                    color: currentView === 'system-health' || navHover === 'system-health' ? palette.accent : palette.text,
-                                    border: currentView === 'system-health' || navHover === 'system-health' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                    borderRadius: '10px',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: navHover === 'system-health' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                }}
-                            >
-                                System Health
-                            </button>
-                            <button
                                 onMouseEnter={() => setNavHover('devices')}
                                 onMouseLeave={() => setNavHover(null)}
                                 onClick={() => setCurrentView('devices')}
@@ -499,29 +477,6 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                                 Device Inventory
                             </button>
                             <button
-                                onMouseEnter={() => setNavHover('mfa')}
-                                onMouseLeave={() => setNavHover(null)}
-                                onClick={() => setCurrentView('mfa')}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 15px',
-                                    marginBottom: '10px',
-                                    backgroundColor: currentView === 'mfa' || navHover === 'mfa'
-                                        ? (theme === 'light' ? palette.accentSoft : (currentView === 'mfa' ? '#1E402C' : 'rgba(255, 255, 255, 0.1)'))
-                                        : 'transparent',
-                                    color: currentView === 'mfa' || navHover === 'mfa' ? palette.accent : palette.text,
-                                    border: currentView === 'mfa' || navHover === 'mfa' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                    borderRadius: '10px',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: navHover === 'mfa' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                }}
-                            >
-                                MFA Settings
-                            </button>
-                            <button
                                 onMouseEnter={() => setNavHover('login-history')}
                                 onMouseLeave={() => setNavHover(null)}
                                 onClick={() => setCurrentView('login-history')}
@@ -543,52 +498,6 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                                 }}
                             >
                                 Login History
-                            </button>
-                            <button
-                                onMouseEnter={() => setNavHover('feature-toggles')}
-                                onMouseLeave={() => setNavHover(null)}
-                                onClick={() => setCurrentView('feature-toggles')}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 15px',
-                                    marginBottom: '10px',
-                                    backgroundColor: currentView === 'feature-toggles' || navHover === 'feature-toggles'
-                                        ? (theme === 'light' ? palette.accentSoft : (currentView === 'feature-toggles' ? '#1E402C' : 'rgba(255, 255, 255, 0.1)'))
-                                        : 'transparent',
-                                    color: currentView === 'feature-toggles' || navHover === 'feature-toggles' ? palette.accent : palette.text,
-                                    border: currentView === 'feature-toggles' || navHover === 'feature-toggles' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                    borderRadius: '10px',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: navHover === 'feature-toggles' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                }}
-                            >
-                                Feature Toggles
-                            </button>
-                            <button
-                                onMouseEnter={() => setNavHover('role-templates')}
-                                onMouseLeave={() => setNavHover(null)}
-                                onClick={() => setCurrentView('role-templates')}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 15px',
-                                    marginBottom: '10px',
-                                    backgroundColor: currentView === 'role-templates' || navHover === 'role-templates'
-                                        ? (theme === 'light' ? palette.accentSoft : (currentView === 'role-templates' ? '#1E402C' : 'rgba(255, 255, 255, 0.1)'))
-                                        : 'transparent',
-                                    color: currentView === 'role-templates' || navHover === 'role-templates' ? palette.accent : palette.text,
-                                    border: currentView === 'role-templates' || navHover === 'role-templates' ? `1px solid ${palette.accent}` : '1px solid transparent',
-                                    borderRadius: '10px',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: navHover === 'role-templates' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none'
-                                }}
-                            >
-                                Role Templates
                             </button>
                             <button
                                 onMouseEnter={() => setNavHover('impersonation')}
@@ -662,6 +571,156 @@ function Sidebar({ user, theme, palette, currentView, setCurrentView, setTheme, 
                         </>
                     )}
                 </nav>
+                
+                {/* Extras Dropdown - Only for admin users */}
+                {user?.role === 'admin' && (
+                    <div style={{ marginTop: '20px', marginBottom: '10px' }}>
+                        <button
+                            onClick={() => setExtrasDropdownOpen(!extrasDropdownOpen)}
+                            onMouseEnter={() => setNavHover('extras')}
+                            onMouseLeave={() => setNavHover(null)}
+                            style={{
+                                width: '100%',
+                                padding: '12px 15px',
+                                marginBottom: '10px',
+                                backgroundColor: extrasDropdownOpen || navHover === 'extras'
+                                    ? (theme === 'light' ? palette.accentSoft : (extrasDropdownOpen ? '#1E402C' : 'rgba(255, 255, 255, 0.1)'))
+                                    : 'transparent',
+                                color: extrasDropdownOpen || navHover === 'extras' ? palette.accent : palette.text,
+                                border: extrasDropdownOpen || navHover === 'extras' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                borderRadius: '10px',
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                fontWeight: extrasDropdownOpen ? 600 : 500,
+                                transition: 'all 0.15s ease',
+                                boxShadow: navHover === 'extras' ? '0 6px 14px rgba(0,0,0,0.08)' : 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between'
+                            }}
+                        >
+                            <span>Extras</span>
+                            <span style={{
+                                transform: extrasDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transition: 'transform 0.2s ease',
+                                fontSize: '12px'
+                            }}>▼</span>
+                        </button>
+                        
+                        {extrasDropdownOpen && (
+                            <div style={{
+                                marginLeft: '15px',
+                                marginTop: '5px',
+                                marginBottom: '10px',
+                                paddingLeft: '10px',
+                                borderLeft: `2px solid ${palette.border}`
+                            }}>
+                                <button
+                                    onClick={() => {
+                                        setCurrentView('feature-toggles');
+                                        setExtrasDropdownOpen(false);
+                                    }}
+                                    onMouseEnter={() => setNavHover('feature-toggles')}
+                                    onMouseLeave={() => setNavHover(null)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        marginBottom: '8px',
+                                        backgroundColor: currentView === 'feature-toggles' || navHover === 'feature-toggles'
+                                            ? (theme === 'light' ? palette.accentSoft : 'rgba(255, 255, 255, 0.1)')
+                                            : 'transparent',
+                                        color: currentView === 'feature-toggles' || navHover === 'feature-toggles' ? palette.accent : palette.text,
+                                        border: currentView === 'feature-toggles' || navHover === 'feature-toggles' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                        borderRadius: '8px',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        fontSize: '13px',
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    Feature Toggles
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setCurrentView('role-templates');
+                                        setExtrasDropdownOpen(false);
+                                    }}
+                                    onMouseEnter={() => setNavHover('role-templates')}
+                                    onMouseLeave={() => setNavHover(null)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        marginBottom: '8px',
+                                        backgroundColor: currentView === 'role-templates' || navHover === 'role-templates'
+                                            ? (theme === 'light' ? palette.accentSoft : 'rgba(255, 255, 255, 0.1)')
+                                            : 'transparent',
+                                        color: currentView === 'role-templates' || navHover === 'role-templates' ? palette.accent : palette.text,
+                                        border: currentView === 'role-templates' || navHover === 'role-templates' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                        borderRadius: '8px',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        fontSize: '13px',
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    Role Templates
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setCurrentView('mfa');
+                                        setExtrasDropdownOpen(false);
+                                    }}
+                                    onMouseEnter={() => setNavHover('mfa')}
+                                    onMouseLeave={() => setNavHover(null)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        marginBottom: '8px',
+                                        backgroundColor: currentView === 'mfa' || navHover === 'mfa'
+                                            ? (theme === 'light' ? palette.accentSoft : 'rgba(255, 255, 255, 0.1)')
+                                            : 'transparent',
+                                        color: currentView === 'mfa' || navHover === 'mfa' ? palette.accent : palette.text,
+                                        border: currentView === 'mfa' || navHover === 'mfa' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                        borderRadius: '8px',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        fontSize: '13px',
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    Multi-Factor Authentication
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setCurrentView('system-health');
+                                        setExtrasDropdownOpen(false);
+                                    }}
+                                    onMouseEnter={() => setNavHover('system-health')}
+                                    onMouseLeave={() => setNavHover(null)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        marginBottom: '8px',
+                                        backgroundColor: currentView === 'system-health' || navHover === 'system-health'
+                                            ? (theme === 'light' ? palette.accentSoft : 'rgba(255, 255, 255, 0.1)')
+                                            : 'transparent',
+                                        color: currentView === 'system-health' || navHover === 'system-health' ? palette.accent : palette.text,
+                                        border: currentView === 'system-health' || navHover === 'system-health' ? `1px solid ${palette.accent}` : '1px solid transparent',
+                                        borderRadius: '8px',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        fontSize: '13px',
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    System Health
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+                
                 <button
                     onClick={handleLogout}
                     onMouseEnter={() => setLogoutHover(true)}

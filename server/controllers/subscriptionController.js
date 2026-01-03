@@ -64,21 +64,36 @@ const getBillingHistory = async (req, res) => {
       });
     }
 
-    const history = await BillingHistory.findAll({
-      where: { userId: req.user.id },
-      order: [['createdAt', 'DESC']], 
-    });
+    try {
+      const history = await BillingHistory.findAll({
+        where: { userId: req.user.id },
+        order: [['createdAt', 'DESC']], 
+      });
 
-    res.json({
-      success: true,
-      history: history || [],
-    });
+      res.json({
+        success: true,
+        history: history || [],
+      });
+    } catch (dbError) {
+      // If table doesn't exist, return empty array
+      if (dbError.name === 'SequelizeDatabaseError' && 
+          (dbError.message?.includes('does not exist') || dbError.message?.includes('relation'))) {
+        console.warn('Billing history table does not exist yet. Returning empty history.');
+        return res.json({
+          success: true,
+          history: [],
+        });
+      }
+      throw dbError;
+    }
   } catch (error) {
     console.error('Get billing history error:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch billing history',
-      error: error.message,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };

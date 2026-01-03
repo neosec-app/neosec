@@ -36,11 +36,14 @@ function AdminUsersView({
     const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
     const [actionButtonHover, setActionButtonHover] = useState(null);
 
+    // Ensure users is always an array
+    const usersArray = Array.isArray(users) ? users : [];
+
     // Filter users
-    const filteredUsers = users.filter(u => {
+    const filteredUsers = usersArray.filter(u => {
         if (userSearchQuery) {
             const searchLower = userSearchQuery.toLowerCase();
-            const userIndex = users.indexOf(u) + 1;
+            const userIndex = usersArray.indexOf(u) + 1;
             const userIDString = String(userIndex);
             const matchesEmail = u.email.toLowerCase().includes(searchLower);
             const matchesID = userIDString === userSearchQuery;
