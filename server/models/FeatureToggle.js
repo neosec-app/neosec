@@ -53,9 +53,10 @@ const FeatureToggle = sequelize.define('FeatureToggle', {
 }, {
   tableName: 'feature_toggles',
   timestamps: true,
+  underscored: true,
   indexes: [
-    { fields: ['featureName'] },
-    { fields: ['targetType', 'targetId'] },
+    { fields: ['feature_name'] },
+    { fields: ['target_type', 'target_id'] },
     { fields: ['enabled'] }
   ]
 });

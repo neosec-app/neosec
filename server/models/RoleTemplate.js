@@ -38,9 +38,10 @@ const RoleTemplate = sequelize.define('RoleTemplate', {
 }, {
   tableName: 'role_templates',
   timestamps: true,
+  underscored: true,
   indexes: [
     { fields: ['name'] },
-    { fields: ['isSystem'] }
+    { fields: ['is_system'] }
   ]
 });
 

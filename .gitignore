@@ -63,3 +63,21 @@ neosec-desktop/data/
 
 # Documentation
 THREAT_BLOCKER_IMPLEMENTATION.md
+PULL_AND_DEPLOY.md
+
+# Project Proposal/Report Files
+CSE471_Project_Report_NeoSec.*
+*.docx
+HOW_TO_ADD_POSTMAN_SCREENSHOTS.md
+POSTMAN_COLLECTION_*.json
+SAADAT_CODE_LOCATIONS.md
+
+# Test-related documentation files
+**/*TEST*.md
+**/*test*.md
+server/DATABASE_CONNECTION_TEST.md
+
+# Fix/Setup documentation files
+**/FIX*.md
+**/*FIX*.md
+server/FIX_IMPERSONATION_TABLE.md

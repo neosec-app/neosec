@@ -12,6 +12,8 @@ exports.getNotifications = async (req, res) => {
                 message: 'User not authenticated'
             });
         }
+        
+
 
         const { status, priority, userId } = req.query;
 

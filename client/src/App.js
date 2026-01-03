@@ -7,6 +7,7 @@ import './index.css';
 
 
 
+
 // Custom Hooks
 import { useTheme } from './hooks/useTheme';
 import { useToastManager } from './hooks/useToastManager';
@@ -449,6 +450,7 @@ if (isShareManagementPage) {
                                 isMobile={isMobile}
                                 isTablet={isTablet}
                                 setCurrentView={setCurrentView}
+                                onDashboardRefresh={fetchDashboard}
                             />
                         )}
 

@@ -24,6 +24,7 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
     dialectOptions: {
         ssl:
             process.env.DATABASE_URL?.includes('render.com') ||
+            process.env.DATABASE_URL?.includes('dpg-') || // Render database pattern
             process.env.DATABASE_URL?.includes('amazonaws.com') ||
             process.env.DATABASE_URL?.includes('supabase.co') ||
             process.env.DATABASE_URL?.includes('vercel-storage.com') ||
@@ -111,6 +112,11 @@ const connectDB = async () => {
                 `Missing tables detected (${missingTables.join(', ')}). Creating database tables...`
             );
             // Sync will create missing tables and update schema
+            // Make sure all models are loaded before syncing
+            require('../models/ImpersonationSession');
+            require('../models/ActivityLog');
+            require('../models/BlocklistIP');
+            require('../models/ThreatBlockerSettings');
             await sequelize.sync({ force: false, alter: false });
             console.log('Database tables created successfully.');
             
@@ -146,6 +152,8 @@ const connectDB = async () => {
             // We check for both camelCase and snake_case versions
             const missingColumns = [];
             const hasIsApproved = columnNames.includes('isApproved') || columnNames.includes('is_approved');
+            const hasName = columnNames.includes('name');
+            const hasPhone = columnNames.includes('phone');
             const hasAccountType = columnNames.includes('accountType') || columnNames.includes('account_type');
             const hasSubscriptionTier = columnNames.includes('subscriptionTier') || columnNames.includes('subscription_tier');
             const hasIsPaid = columnNames.includes('isPaid') || columnNames.includes('is_paid');
@@ -158,6 +166,24 @@ const connectDB = async () => {
                 await sequelize.query(`
                     ALTER TABLE users 
                     ADD COLUMN IF NOT EXISTS "isApproved" BOOLEAN DEFAULT false NOT NULL;
+                `);
+            }
+            
+            // name column check and add
+            if (!hasName) {
+                console.log('⚠️  name column missing. Adding it...');
+                await sequelize.query(`
+                    ALTER TABLE users 
+                    ADD COLUMN IF NOT EXISTS "name" VARCHAR(100);
+                `);
+            }
+            
+            // phone column check and add
+            if (!hasPhone) {
+                console.log('⚠️  phone column missing. Adding it...');
+                await sequelize.query(`
+                    ALTER TABLE users 
+                    ADD COLUMN IF NOT EXISTS "phone" VARCHAR(20);
                 `);
             }
             
