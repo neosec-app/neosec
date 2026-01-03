@@ -1,9 +1,10 @@
+// Import models and utilities for firewall rule management
 const FirewallRule = require('../models/FirewallRule');
 const ActivityLog = require('../models/ActivityLog');
 const { getClientIP } = require('../utils/ipUtils');
 const { sequelize } = require('../config/db');
 
-// Helper to validate payload
+// Helper function to validate firewall rule input data
 const validateRulePayload = (payload) => {
   const errors = [];
   if (payload.ip_address === undefined || payload.ip_address === null || payload.ip_address === '') {
@@ -41,7 +42,7 @@ const validateRulePayload = (payload) => {
   return errors;
 };
 
-// Helper: Normalize and validate rule input
+// Helper function to convert and validate firewall rule input from frontend
 const normalizeAndValidateRuleInput = (body, userId = null) => {
   let { ip_address, port_start, port_end, protocol, action, direction } = body;
   
@@ -119,7 +120,7 @@ const normalizeAndValidateRuleInput = (body, userId = null) => {
   };
 };
 
-// Helper: Create firewall rule in database with retry logic
+// Helper function to save firewall rule to database with error handling
 const createFirewallRuleInDB = async (ruleData, userId) => {
   const { ip_address, port_start, port_end, protocol, action, direction } = ruleData;
   
@@ -222,7 +223,7 @@ const createFirewallRuleInDB = async (ruleData, userId) => {
   return rule;
 };
 
-// Helper: Log firewall rule creation
+// Helper function to record firewall rule creation in activity log
 const logFirewallRuleCreation = async (rule, action, protocol, ip_address, userId, req) => {
   try {
     const ipAddress = getClientIP(req);
@@ -247,7 +248,7 @@ const logFirewallRuleCreation = async (rule, action, protocol, ip_address, userI
   }
 };
 
-// Helper: Format firewall rule response
+// Helper function to format firewall rule data for API response
 const formatFirewallRuleResponse = (rule) => {
   // Ensure protocol and action are integers in response (they should already be)
   let responseProtocol = typeof rule.protocol === 'string' 
@@ -271,7 +272,7 @@ const formatFirewallRuleResponse = (rule) => {
   };
 };
 
-// Helper: Format error response
+// Helper function to format error messages for API responses
 const formatFirewallErrorResponse = (error) => {
   // Provide more helpful error messages
   let errorMessage = 'Server error creating firewall rule';
@@ -315,7 +316,7 @@ const formatFirewallErrorResponse = (error) => {
   return errorResponse;
 };
 
-// Get all firewall rules for the current user
+// Function to retrieve all firewall rules belonging to the authenticated user
 const getRules = async (req, res) => {
   try {
     // Check if user is authenticated
@@ -394,10 +395,10 @@ const getRules = async (req, res) => {
   }
 };
 
-// Create a new firewall rule
+// Function to create a new firewall rule with validation
 const createRule = async (req, res) => {
   try {
-    // Check if userId exists
+    // Verify user authentication
     if (!req.user || !req.user.id) {
       return res.status(401).json({
         success: false,
@@ -405,7 +406,7 @@ const createRule = async (req, res) => {
       });
     }
 
-    // Normalize and validate input
+    // Validate and convert input data
     const validationResult = normalizeAndValidateRuleInput(req.body, req.user.id);
     if (validationResult.error) {
       return res.status(validationResult.error.status).json({
@@ -419,12 +420,12 @@ const createRule = async (req, res) => {
 
     const { ip_address, port_start, port_end, protocol, action, direction } = validationResult;
 
-    // Create firewall rule in database (with retry logic)
+    // Save rule to database
     let rule;
     try {
       rule = await createFirewallRuleInDB({ ip_address, port_start, port_end, protocol, action, direction }, req.user.id);
     } catch (dbError) {
-      // Handle ENUM error specifically
+      // Handle database schema errors
       if (dbError.isEnumError) {
         return res.status(500).json({
           success: false,
@@ -440,10 +441,10 @@ const createRule = async (req, res) => {
       throw dbError;
     }
 
-    // Log firewall rule creation
+    // Record rule creation in activity log
     await logFirewallRuleCreation(rule, action, protocol, ip_address, req.user.id, req);
 
-    // Format and return response
+    // Format response data
     const responseData = formatFirewallRuleResponse(rule);
     res.status(201).json({
       success: true,
@@ -460,7 +461,7 @@ const createRule = async (req, res) => {
   }
 };
 
-// Update an existing firewall rule
+// Function to update an existing firewall rule
 const updateRule = async (req, res) => {
   try {
     const { id } = req.params;
@@ -584,7 +585,7 @@ const updateRule = async (req, res) => {
 
     await rule.save();
 
-    // Log firewall rule update
+    // Record rule update in activity log
     try {
       const ipAddress = getClientIP(req);
       const actionText = rule.action === 0 ? 'ACCEPT' : rule.action === 1 ? 'REJECT' : 'DROP';
@@ -656,7 +657,7 @@ const updateRule = async (req, res) => {
   }
 };
 
-// Delete a firewall rule
+// Function to delete a firewall rule
 const deleteRule = async (req, res) => {
   try {
     const { id } = req.params;
@@ -677,7 +678,7 @@ const deleteRule = async (req, res) => {
 
     await rule.destroy();
 
-    // Log firewall rule deletion
+    // Record rule deletion in activity log
     try {
       const ipAddress = getClientIP(req);
       await ActivityLog.create({

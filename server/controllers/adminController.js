@@ -1,3 +1,4 @@
+// Import required modules for database operations and authentication
 const { Op, fn, col } = require('sequelize');
 const User = require('../models/User');
 const VpnConfig = require('../models/VpnConfig');
@@ -5,9 +6,7 @@ const Threat = require('../models/Threat');
 const bcrypt = require('bcryptjs');
 const { createAuditLog } = require('../middleware/auditLogger');
 
-/**
- * Helper: Build user filters
- */
+// Helper function to build database filters based on role, approval status, and search term
 const buildUserFilters = (role, isApproved, search) => {
   const whereClause = {};
 
@@ -33,9 +32,7 @@ const buildUserFilters = (role, isApproved, search) => {
   return whereClause;
 };
 
-/**
- * Helper: Build pagination parameters
- */
+// Helper function to calculate pagination parameters from page number and items per page
 const buildPaginationParams = (page, limit) => {
   const pageNum = parseInt(page) || 1;
   const limitNum = parseInt(limit) || 50;
@@ -48,9 +45,7 @@ const buildPaginationParams = (page, limit) => {
   };
 };
 
-/**
- * Helper: Format pagination response
- */
+// Helper function to format pagination information for API response
 const formatPaginationResponse = (count, page, limit) => {
   return {
     total: count,
@@ -60,11 +55,10 @@ const formatPaginationResponse = (count, page, limit) => {
   };
 };
 
-// @desc    Get all users with filtering and pagination
-// @route   GET /api/admin/users
-// @access  Private/Admin
+// Main function to retrieve all users with filtering, pagination, and sorting
 const getAllUsers = async (req, res) => {
   try {
+    // Extract query parameters for filtering and pagination
     const {
       page = 1,
       limit = 50,
@@ -75,13 +69,13 @@ const getAllUsers = async (req, res) => {
       sortOrder = 'DESC'
     } = req.query;
 
-    // Build pagination parameters
+    // Calculate pagination offset and limit
     const pagination = buildPaginationParams(page, limit);
 
-    // Build filters
+    // Build database query filters
     const whereClause = buildUserFilters(role, isApproved, search);
 
-    // Build sort order
+    // Set sorting order for results
     const order = [[sortBy, sortOrder.toUpperCase()]];
 
     const { count, rows } = await User.findAndCountAll({
@@ -110,9 +104,7 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-// @desc    Get single user by ID
-// @route   GET /api/admin/users/:id
-// @access  Private/Admin
+// Function to retrieve a single user by their ID with related VPN and threat information
 const getUserById = async (req, res) => {
   try {
     const user = await User.findByPk(req.params.id, {
@@ -154,14 +146,14 @@ const getUserById = async (req, res) => {
   }
 };
 
-// @desc    Update user
-// @route   PUT /api/admin/users/:id
-// @access  Private/Admin
+// Function to update user information with role and approval status management
 const updateUser = async (req, res) => {
   try {
+    // Extract update data from request body
     const { email, role, isApproved } = req.body;
     const userId = req.params.id;
 
+    // Find the user to update
     const user = await User.findByPk(userId);
 
     if (!user) {
@@ -171,7 +163,7 @@ const updateUser = async (req, res) => {
       });
     }
 
-    // Don't allow updating the current admin user's role
+    // Prevent users from changing their own admin role
     if (userId === req.user.id && role && role !== 'admin') {
       return res.status(400).json({
         success: false,
@@ -179,13 +171,11 @@ const updateUser = async (req, res) => {
       });
     }
 
-    // Check if current user is the main admin (first admin - admin@test.com)
+    // Check if the current user is the main admin
     const isMainAdmin = req.user.email === 'admin@test.com';
 
-    // Prevent admins from demoting other admins (same level protection)
-    // Only the main admin (admin@test.com) can demote other admins
+    // Only main admin can demote other admins
     if (role !== undefined && role !== 'admin') {
-      // If trying to change role to non-admin
       if (user.role === 'admin') {
         if (!isMainAdmin) {
           return res.status(403).json({
@@ -193,7 +183,7 @@ const updateUser = async (req, res) => {
             message: 'You cannot demote another admin. Only the main admin can demote other admins.'
           });
         }
-        // Main admin can demote other admins, but not themselves
+        // Prevent main admin from demoting themselves
         if (userId === req.user.id) {
           return res.status(400).json({
             success: false,
@@ -203,14 +193,15 @@ const updateUser = async (req, res) => {
       }
     }
 
-    // Update fields
+    // Apply updates to user fields
     if (email !== undefined) user.email = email;
     if (role !== undefined) user.role = role;
     if (isApproved !== undefined) user.isApproved = isApproved;
 
+    // Save changes to database
     await user.save();
 
-    // Log the action
+    // Record the update action in audit log
     const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
     await createAuditLog(
@@ -242,14 +233,12 @@ const updateUser = async (req, res) => {
   }
 };
 
-// @desc    Delete user
-// @route   DELETE /api/admin/users/:id
-// @access  Private/Admin
+// Function to delete a user account with safety checks
 const deleteUser = async (req, res) => {
   try {
     const userId = req.params.id;
 
-    // Don't allow deleting yourself
+    // Prevent users from deleting their own account
     if (userId === req.user.id) {
       return res.status(400).json({
         success: false,
@@ -266,7 +255,7 @@ const deleteUser = async (req, res) => {
       });
     }
 
-    // Log the action before deletion
+    // Record deletion action in audit log before removing user
     const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
     await createAuditLog(
@@ -297,25 +286,23 @@ const deleteUser = async (req, res) => {
   }
 };
 
-// @desc    Get admin statistics
-// @route   GET /api/admin/statistics
-// @access  Private/Admin
+// Function to gather and return system-wide statistics for admin dashboard
 const getStatistics = async (req, res) => {
   try {
-    // Get total users
+    // Count total users and users by role
     const totalUsers = await User.count();
     const totalAdmins = await User.count({ where: { role: 'admin' } });
     const totalRegularUsers = await User.count({ where: { role: 'user' } });
     const pendingApprovals = await User.count({ where: { isApproved: false } });
 
-    // Get total VPN configs
+    // Count VPN configurations
     const totalVpnConfigs = await VpnConfig.count();
     const activeVpnConfigs = await VpnConfig.count({ where: { isActive: true } });
 
-    // Get total threats blocked
+    // Count blocked threats
     const totalThreats = await Threat.count({ where: { blocked: true } });
     
-    // Get threats in last 24 hours
+    // Calculate date for last 24 hours
     const oneDayAgo = new Date();
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
     const threatsLast24h = await Threat.count({
@@ -327,7 +314,7 @@ const getStatistics = async (req, res) => {
       }
     });
 
-    // Get threats by severity
+    // Group threats by severity level
     const threatsBySeverity = await Threat.findAll({
       attributes: [
         'severity',

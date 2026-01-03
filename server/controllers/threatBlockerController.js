@@ -1,3 +1,4 @@
+// Import models and services for threat blocker functionality
 const BlocklistIP = require('../models/BlocklistIP');
 const ActivityLog = require('../models/ActivityLog');
 const Notification = require('../models/Notification');
@@ -10,11 +11,11 @@ const abuseIPDBService = require('../services/abuseIPDBService');
 const freeBlocklistService = require('../services/freeBlocklistService');
 const { getSchedulerStatus } = require('../services/threatBlockerScheduler');
 
-// Cache table existence check to avoid repeated queries
+// Cache to avoid repeated database table existence checks
 let tableExistsCache = null;
 let tableExistsChecked = false;
 
-// Helper function to get setting value
+// Helper function to retrieve threat blocker setting from database
 async function getSetting(key, defaultValue) {
   try {
     // Check table existence only once (cache it)
@@ -53,7 +54,7 @@ async function getSetting(key, defaultValue) {
   }
 }
 
-// Helper function to set setting value
+// Helper function to save threat blocker setting to database
 async function setSetting(key, value) {
   try {
     // Check if table exists first, if not, create it
@@ -79,9 +80,7 @@ async function setSetting(key, value) {
   }
 }
 
-/**
- * Helper: Get date ranges for statistics
- */
+// Helper function to calculate date ranges for statistics queries
 const getDateRanges = () => {
   const now = new Date();
   const todayStart = new Date(now);
@@ -93,9 +92,7 @@ const getDateRanges = () => {
   return { now, todayStart, weekStart };
 };
 
-/**
- * Helper: Get blocklist statistics
- */
+// Helper function to gather blocklist statistics including total IPs and sources
 const getBlocklistStats = async () => {
   // Get last update time
   const lastUpdate = await BlocklistIP.findOne({
@@ -128,9 +125,7 @@ const getBlocklistStats = async () => {
   };
 };
 
-/**
- * Helper: Get blocked threats count
- */
+// Helper function to count threats blocked today and this week
 const getBlockedThreatsCount = async (todayStart, weekStart) => {
   let blockedToday = 0;
   let blockedThisWeek = 0;
@@ -164,9 +159,7 @@ const getBlockedThreatsCount = async (todayStart, weekStart) => {
   return { blockedToday, blockedThisWeek };
 };
 
-/**
- * Helper: Get threat blocker settings
- */
+// Helper function to retrieve current threat blocker configuration settings
 const getThreatBlockerSettings = async () => {
   // Get actual scheduler status dynamically
   const schedulerStatus = getSchedulerStatus();
@@ -186,9 +179,7 @@ const getThreatBlockerSettings = async () => {
   };
 };
 
-/**
- * Helper: Format status response
- */
+// Helper function to format threat blocker status data for API response
 const formatStatusResponse = (blocklistStats, blockedThreats, settings) => {
   return {
     enabled: settings.enabled,
@@ -204,9 +195,7 @@ const formatStatusResponse = (blocklistStats, blockedThreats, settings) => {
   };
 };
 
-/**
- * Get threat blocker status and statistics
- */
+// Function to retrieve threat blocker status and current statistics
 exports.getStatus = async (req, res) => {
   try {
     // Get date ranges
@@ -265,9 +254,7 @@ exports.getStatus = async (req, res) => {
   }
 };
 
-/**
- * Get blocklist with pagination and filters
- */
+// Function to retrieve blocklist with pagination, search, and filtering options
 exports.getBlocklist = async (req, res) => {
   try {
     // Valid ENUM values from BlocklistIP model
@@ -386,9 +373,7 @@ exports.getBlocklist = async (req, res) => {
   }
 };
 
-/**
- * Force update blocklist from AbuseIPDB
- */
+// Function to manually trigger blocklist update from external sources
 exports.forceUpdate = async (req, res) => {
   try {
     const apiKey = process.env.ABUSEIPDB_API_KEY;
@@ -621,9 +606,7 @@ exports.forceUpdate = async (req, res) => {
   }
 };
 
-/**
- * Get statistics
- */
+// Function to retrieve detailed threat blocker statistics
 exports.getStats = async (req, res) => {
   try {
     const now = new Date();
@@ -690,9 +673,7 @@ exports.getStats = async (req, res) => {
   }
 };
 
-/**
- * Update settings
- */
+// Function to update threat blocker configuration settings
 exports.updateSettings = async (req, res) => {
   try {
     const { updateFrequency, autoApply, enabled, notificationsEnabled } = req.body;
@@ -856,9 +837,7 @@ exports.testThreatBlocker = async (req, res) => {
   }
 };
 
-/**
- * Export blocklist
- */
+// Function to export blocklist data in CSV or JSON format
 exports.exportBlocklist = async (req, res) => {
   try {
     const { format = 'csv' } = req.query;

@@ -1,11 +1,10 @@
+// Import models for activity log management
 const ActivityLog = require('../models/ActivityLog');
 const User = require('../models/User');
 const Device = require('../models/Device');
 const { Op } = require('sequelize');
 
-/**
- * Helper: Build user filter for activity logs
- */
+// Helper function to build user filter based on role and permissions
 const buildUserFilter = async (currentUser, userId, userRole) => {
   const whereClause = {};
 
@@ -36,9 +35,7 @@ const buildUserFilter = async (currentUser, userId, userRole) => {
   return whereClause;
 };
 
-/**
- * Helper: Build date range filter
- */
+// Helper function to build date range filter for log queries
 const buildDateRangeFilter = (startDate, endDate) => {
   const filter = {};
   
@@ -55,9 +52,7 @@ const buildDateRangeFilter = (startDate, endDate) => {
   return filter;
 };
 
-/**
- * Helper: Build event type, severity, and status filters
- */
+// Helper function to build filters for event type, severity, and status
 const buildEventFilters = (eventType, severity, status) => {
   const filter = {};
 
@@ -97,9 +92,7 @@ const buildEventFilters = (eventType, severity, status) => {
   return filter;
 };
 
-/**
- * Helper: Build search filter
- */
+// Helper function to build search filter for description and IP address
 const buildSearchFilter = (search) => {
   if (!search) return {};
 
@@ -111,9 +104,7 @@ const buildSearchFilter = (search) => {
   };
 };
 
-/**
- * Helper: Build pagination parameters
- */
+// Helper function to calculate pagination parameters
 const buildPaginationParams = (page, limit) => {
   const pageNum = parseInt(page) || 1;
   const limitNum = parseInt(limit) || 50;
@@ -126,9 +117,7 @@ const buildPaginationParams = (page, limit) => {
   };
 };
 
-/**
- * Helper: Format pagination response
- */
+// Helper function to format pagination information for response
 const formatPaginationResponse = (count, page, limit) => {
   return {
     total: count,
@@ -138,9 +127,7 @@ const formatPaginationResponse = (count, page, limit) => {
   };
 };
 
-/**
- * Get activity logs with filters and pagination
- */
+// Main function to retrieve activity logs with filtering, pagination, and sorting
 exports.getLogs = async (req, res) => {
   try {
     // Decode URL-encoded query parameters (handles spaces like "Blocked Threat")
@@ -240,9 +227,7 @@ exports.getLogs = async (req, res) => {
   }
 };
 
-/**
- * Get log by ID
- */
+// Function to retrieve a single activity log entry by ID
 exports.getLogById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -291,9 +276,7 @@ exports.getLogById = async (req, res) => {
   }
 };
 
-/**
- * Create activity log entry (typically called by other services)
- */
+// Function to create a new activity log entry, typically called by other services
 exports.createLog = async (data) => {
   try {
     const log = await ActivityLog.create(data);
@@ -304,9 +287,7 @@ exports.createLog = async (data) => {
   }
 };
 
-/**
- * Export logs
- */
+// Function to export activity logs in CSV or JSON format
 exports.exportLogs = async (req, res) => {
   try {
     const {

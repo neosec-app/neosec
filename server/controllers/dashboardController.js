@@ -1,3 +1,4 @@
+// Import database models and utilities for dashboard data retrieval
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/db');
 const User = require('../models/User');
@@ -13,7 +14,7 @@ const Device = require('../models/Device');
 const LoginHistory = require('../models/LoginHistory');
 const { getClientIP } = require('../utils/ipUtils');
 
-// Helper to format time ago
+// Helper function to convert timestamp to human-readable time ago format
 const getTimeAgo = (date) => {
   const now = new Date();
   const diffMs = now - date;
@@ -27,7 +28,7 @@ const getTimeAgo = (date) => {
   return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
 };
 
-// Helper to format inactive time
+// Helper function to format inactive duration in minutes to readable format
 const formatInactiveTime = (minutes) => {
   if (minutes < 60) {
     return `${Math.floor(minutes)}m ago`;
@@ -38,15 +39,15 @@ const formatInactiveTime = (minutes) => {
   }
 };
 
-// Helper to get active users
+// Helper function to retrieve list of currently active users based on role
 const getActiveUsers = async (userId, userRole) => {
+  // Calculate time thresholds for active status
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const now = new Date();
   
   if (userRole === 'admin') {
-    // Admins see all active users
-    // Get all devices (both active and inactive within 1 hour)
+    // Admins can see all active users in the system
     const allDevices = await Device.findAll({
       where: {
         lastOnlineAt: { [Op.gte]: oneHourAgo },
@@ -310,7 +311,7 @@ const getActiveUsers = async (userId, userRole) => {
   }
 };
 
-// Helper: Update user activity heartbeat
+// Helper function to update user's last activity timestamp for tracking
 const updateUserActivityHeartbeat = async (userId) => {
   try {
     const [device] = await Device.findOrCreate({
@@ -338,7 +339,7 @@ const updateUserActivityHeartbeat = async (userId) => {
   }
 };
 
-// Helper: Get VPN status and connection time
+// Helper function to check if user has active VPN connection and calculate connection duration
 const getVpnStatus = async (userId) => {
   let activeVpn = null;
   let connectionTime = null;
@@ -366,7 +367,7 @@ const getVpnStatus = async (userId) => {
   return { activeVpn, connectionTime };
 };
 
-// Helper: Get threat statistics
+// Helper function to calculate threat blocking statistics for the user
 const getThreatStatistics = async (userId) => {
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -482,7 +483,7 @@ const getThreatStatistics = async (userId) => {
   };
 };
 
-// Helper: Get active profile
+// Helper function to retrieve the currently active security profile for user
 const getActiveProfile = async (userId) => {
   try {
     return await Profile.findOne({
@@ -497,7 +498,7 @@ const getActiveProfile = async (userId) => {
   }
 };
 
-// Helper: Get recent activities
+// Helper function to gather recent activities including threats, notifications, and logs
 const getRecentActivities = async (userId) => {
   const oneWeekAgoForLogs = new Date();
   oneWeekAgoForLogs.setDate(oneWeekAgoForLogs.getDate() - 7);
@@ -579,7 +580,7 @@ const getRecentActivities = async (userId) => {
   return activities;
 };
 
-// Helper: Get data transfer statistics
+// Helper function to calculate total data sent and received by user
 const getDataTransferStats = async (userId) => {
   let totalBytesSent = BigInt(0);
   let totalBytesReceived = BigInt(0);
@@ -627,7 +628,7 @@ const getDataTransferStats = async (userId) => {
   };
 };
 
-// Helper: Get client IP address
+// Helper function to determine user's current IP address considering VPN status
 const getClientIpAddress = (req, activeVpn) => {
   if (!activeVpn) return null;
 
@@ -643,11 +644,10 @@ const getClientIpAddress = (req, activeVpn) => {
   }
 };
 
-// @desc    Get dashboard data (VPN status and threats blocked)
-// @route   GET /api/dashboard
-// @access  Private
+// Main function to gather all dashboard data and return to frontend
 const getDashboard = async (req, res) => {
   try {
+    // Verify user authentication
     if (!req.user || !req.user.id) {
       return res.status(401).json({
         success: false,
@@ -657,28 +657,28 @@ const getDashboard = async (req, res) => {
     
     const userId = req.user.id;
 
-    // Update user activity heartbeat
+    // Update user's last activity timestamp
     await updateUserActivityHeartbeat(userId);
 
-    // Get VPN status and connection time
+    // Retrieve VPN connection status and duration
     const { activeVpn, connectionTime } = await getVpnStatus(userId);
 
-    // Get threat statistics
+    // Calculate threat blocking statistics
     const threatStats = await getThreatStatistics(userId);
 
-    // Get active profile
+    // Get currently active security profile
     const activeProfile = await getActiveProfile(userId);
 
-    // Get recent activities
+    // Retrieve recent system activities
     const activities = await getRecentActivities(userId);
 
-    // Get data transfer statistics
+    // Calculate data transfer totals
     const dataTransfer = await getDataTransferStats(userId);
 
-    // Get client IP address
+    // Determine user's current IP address
     const clientIP = getClientIpAddress(req, activeVpn);
 
-    // Get active users
+    // Get list of active users
     let activeUsers = [];
     try {
       activeUsers = await getActiveUsers(userId, req.user.role);
