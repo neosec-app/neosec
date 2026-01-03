@@ -376,6 +376,8 @@ const getMe = async (req, res) => {
       attributes: [
         'id',
         'email',
+        'name',
+        'phone',
         'role',
         'accountType',
         'subscriptionTier',
@@ -463,6 +465,8 @@ const updateProfile = async (req, res) => {
       attributes: [
         'id',
         'email',
+        'name',
+        'phone',
         'role',
         'accountType',
         'subscriptionTier',
